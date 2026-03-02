@@ -1,6 +1,9 @@
+
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { User, UserRole, UserStatus } from '../types';
-import { Shield, User as UserIcon, Phone, ShieldCheck, Plus, X, MessageCircle, Calendar, Hammer } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, ShieldCheck, Plus, X, MessageCircle, Calendar, Hammer, Lock, Mail, Edit, Loader2, Trash2 } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface StaffProps {
   users: User[];
@@ -9,41 +12,111 @@ interface StaffProps {
 
 const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newUser, setNewUser] = useState({
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
       name: '',
       email: '',
       phone: '',
-      role: 'USER' as UserRole,
+      role: 'operario_taller' as UserRole,
       status: 'ACTIVE' as UserStatus,
-      joinedDate: new Date().toISOString().split('T')[0]
+      joinedDate: new Date().toISOString().split('T')[0],
+      password: '' // Only used for creation
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const user: User = {
-          id: `u${Date.now()}`,
-          name: newUser.name,
-          email: newUser.email, // Kept for data structure consistency
-          phone: newUser.phone,
-          role: newUser.role,
-          status: newUser.status,
-          joinedDate: newUser.joinedDate,
-          avatarInitials: newUser.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()
-      };
-      onAddUser(user);
-      setIsModalOpen(false);
-      setNewUser({ 
-          name: '', 
-          email: '', 
-          phone: '', 
-          role: 'USER', 
-          status: 'ACTIVE', 
-          joinedDate: new Date().toISOString().split('T')[0] 
+  const openCreateModal = () => {
+      setIsEditMode(false);
+      setEditingUserId(null);
+      setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          role: 'operario_taller',
+          status: 'ACTIVE',
+          joinedDate: new Date().toISOString().split('T')[0],
+          password: ''
       });
+      setIsModalOpen(true);
+  };
+
+  const openEditModal = (user: User) => {
+      setIsEditMode(true);
+      setEditingUserId(user.id);
+      setFormData({
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          status: user.status,
+          joinedDate: user.joinedDate,
+          password: '' 
+      });
+      setIsModalOpen(true);
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+      if (!confirm(`¿Estás seguro de que deseas eliminar al usuario "${userName}"? Esta acción no se puede deshacer.`)) {
+          return;
+      }
+
+      setLoading(true);
+      try {
+          const { error } = await supabase.from('users').delete().eq('id', userId);
+          if (error) throw error;
+          
+          // Force refresh to update list
+          window.location.reload();
+      } catch (error: any) {
+          alert("Error eliminando usuario: " + error.message);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+
+      if (isEditMode && editingUserId) {
+          // UPDATE MODE
+          const { error } = await supabase.from('users').update({
+              name: formData.name,
+              phone: formData.phone,
+              role: formData.role,
+              status: formData.status,
+              joinedDate: formData.joinedDate
+          }).eq('id', editingUserId);
+
+          if (error) {
+              alert("Error actualizando usuario: " + error.message);
+          } else {
+              window.location.reload(); 
+          }
+      } else {
+          // CREATE MODE (Simulation)
+          alert(`Simulación: Usuario creado en Auth con Email: ${formData.email} y Contraseña: ${formData.password}\n\nSe procederá a crear el perfil.`);
+
+          const newUser: User = {
+              id: `u${Date.now()}`,
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone,
+              role: formData.role,
+              status: formData.status,
+              joinedDate: formData.joinedDate,
+              avatarInitials: formData.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()
+          };
+          
+          onAddUser(newUser);
+      }
+
+      setLoading(false);
+      setIsModalOpen(false);
   };
 
   const getWhatsappLink = (phone: string) => {
-      // Remove spaces, +, -, (, )
       const cleanPhone = phone.replace(/[^0-9]/g, '');
       return `https://wa.me/${cleanPhone}`;
   };
@@ -56,9 +129,9 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
           <p className="text-roden-gray text-sm mt-1">Gestión de usuarios, roles y permisos del sistema.</p>
         </div>
         <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
-            <Plus size={16} /> Dar de Alta Usuario
+            <Plus size={16} /> Nuevo Usuario
         </button>
       </header>
 
@@ -86,7 +159,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                    <Hammer size={100} />
                </div>
                <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-                   <Hammer size={20} className="text-sky-300" /> Manager Taller
+                   <Hammer size={20} className="text-sky-300" /> Gerente Taller
                </h3>
                <p className="text-slate-300 text-sm mb-4">Gestión productiva y logística.</p>
                <ul className="text-[11px] space-y-2 text-slate-400">
@@ -94,7 +167,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-sky-400"></div> Visualización Proveedores</li>
                    <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-sky-400"></div> Gestión completa Taller y Tareas</li>
                </ul>
-          </div>
+           </div>
           
           {/* Operator Card */}
           <div className="bg-white border border-roden-border p-6 rounded-xl relative overflow-hidden group hover:shadow-lg transition-shadow">
@@ -131,12 +204,15 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                           <td className="py-4 px-6">
                               <div className="flex items-center gap-3">
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                                      user.role === 'ADMIN' ? 'bg-roden-black' : 
-                                      user.role === 'WORKSHOP_MANAGER' ? 'bg-slate-700' : 'bg-indigo-600'
+                                      user.role === 'administrador' ? 'bg-roden-black' : 
+                                      user.role === 'gerente_taller' ? 'bg-slate-700' : 'bg-indigo-600'
                                   }`}>
                                       {user.avatarInitials}
                                   </div>
-                                  <span className="text-sm font-bold text-roden-black">{user.name}</span>
+                                  <div>
+                                      <p className="text-sm font-bold text-roden-black">{user.name}</p>
+                                      <p className="text-[10px] text-gray-400">{user.email}</p>
+                                  </div>
                               </div>
                           </td>
                           <td className="py-4 px-6 text-sm text-gray-500">
@@ -146,12 +222,12 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                           </td>
                           <td className="py-4 px-6">
                               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                                  user.role === 'ADMIN' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                  user.role === 'WORKSHOP_MANAGER' ? 'bg-sky-50 text-sky-700 border-sky-100' :
+                                  user.role === 'administrador' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                  user.role === 'gerente_taller' ? 'bg-sky-50 text-sky-700 border-sky-100' :
                                   'bg-indigo-50 text-indigo-700 border-indigo-100'
                               }`}>
-                                  {user.role === 'ADMIN' ? <Shield size={12} /> : user.role === 'WORKSHOP_MANAGER' ? <Hammer size={12} /> : <UserIcon size={12} />}
-                                  {user.role === 'ADMIN' ? 'ADMINISTRADOR' : user.role === 'WORKSHOP_MANAGER' ? 'MANAGER TALLER' : 'OPERARIO'}
+                                  {user.role === 'administrador' ? <Shield size={12} /> : user.role === 'gerente_taller' ? <Hammer size={12} /> : <UserIcon size={12} />}
+                                  {user.role === 'administrador' ? 'ADMINISTRADOR' : user.role === 'gerente_taller' ? 'GERENTE TALLER' : 'OPERARIO TALLER'}
                               </span>
                           </td>
                           <td className="py-4 px-6 text-sm text-gray-500">
@@ -169,15 +245,31 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                               </span>
                           </td>
                           <td className="py-4 px-6 text-right">
-                             <a 
-                                href={getWhatsappLink(user.phone)} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                                title="Enviar WhatsApp"
-                             >
-                                 <MessageCircle size={16} />
-                             </a>
+                             <div className="flex justify-end gap-2">
+                                 <button 
+                                    onClick={() => openEditModal(user)}
+                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                                    title="Editar Usuario"
+                                 >
+                                     <Edit size={14} />
+                                 </button>
+                                 <button 
+                                    onClick={() => handleDeleteUser(user.id, user.name)}
+                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                    title="Eliminar Usuario"
+                                 >
+                                     <Trash2 size={14} />
+                                 </button>
+                                 <a 
+                                    href={getWhatsappLink(user.phone)} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+                                    title="Enviar WhatsApp"
+                                 >
+                                     <MessageCircle size={16} />
+                                 </a>
+                             </div>
                           </td>
                       </tr>
                   ))}
@@ -185,64 +277,102 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
           </table>
       </div>
 
-       {/* New User Modal */}
-       {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
-                  <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                      <h3 className="text-xl font-bold text-roden-black">Dar de Alta Usuario</h3>
-                      <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
-                          <X size={20} />
-                      </button>
+       {/* User Modal (Create/Edit) - Using Portal */}
+       {isModalOpen && createPortal(
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
+              <div className="flex min-h-full items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 relative">
+                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+                          <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
+                          <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
+                              <X size={20} />
+                          </button>
+                      </div>
+                      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
+                              <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                     value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                          </div>
+                          
+                          <div className="grid grid-cols-1 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico (Login)</label>
+                                <div className="relative">
+                                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                    <input 
+                                        required 
+                                        type="email" 
+                                        disabled={isEditMode} 
+                                        className={`w-full p-2.5 pl-10 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none ${isEditMode ? 'bg-gray-100 text-gray-500' : ''}`}
+                                        value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
+                                    />
+                                </div>
+                              </div>
+                              
+                              {!isEditMode && (
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña Temporal</label>
+                                    <div className="relative">
+                                        <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                        <input 
+                                            required 
+                                            type="password" 
+                                            className="w-full p-2.5 pl-10 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                            placeholder="••••••••"
+                                            value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-1">Comparte esta contraseña con el usuario para su primer ingreso.</p>
+                                  </div>
+                              )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                                <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                     value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})}>
+                                     <option value="operario_taller">Operario Taller</option>
+                                     <option value="gerente_taller">Gerente Taller</option>
+                                     <option value="administrador">Administrador</option>
+                                 </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                                <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                              </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                 <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                     value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as UserStatus})}>
+                                     <option value="ACTIVE">Activo</option>
+                                     <option value="INACTIVE">Inactivo</option>
+                                 </select>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Alta</label>
+                                <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                    value={formData.joinedDate} onChange={e => setFormData({...formData, joinedDate: e.target.value})} />
+                              </div>
+                          </div>
+                          <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100 sticky bottom-0 rounded-b-2xl p-4 -mx-6 -mb-6 mt-2">
+                              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
+                                  Cancelar
+                              </button>
+                              <button type="submit" disabled={loading} className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg flex items-center gap-2">
+                                  {loading && <Loader2 size={16} className="animate-spin" />}
+                                  {isEditMode ? 'Guardar Cambios' : 'Confirmar Alta'}
+                              </button>
+                          </div>
+                      </form>
                   </div>
-                  <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
-                          <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                 value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-                            <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                 value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
-                                 <option value="USER">Operario Taller</option>
-                                 <option value="WORKSHOP_MANAGER">Manager Taller</option>
-                                 <option value="ADMIN">Administrador</option>
-                             </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                            <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                    value={newUser.phone} onChange={e => setNewUser({...newUser, phone: e.target.value})} />
-                          </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                             <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                             <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                 value={newUser.status} onChange={e => setNewUser({...newUser, status: e.target.value as UserStatus})}>
-                                 <option value="ACTIVE">Activo</option>
-                                 <option value="INACTIVE">Inactivo</option>
-                             </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Alta</label>
-                            <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
-                                value={newUser.joinedDate} onChange={e => setNewUser({...newUser, joinedDate: e.target.value})} />
-                          </div>
-                      </div>
-                      <div className="pt-4 flex justify-end gap-3">
-                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
-                              Cancelar
-                          </button>
-                          <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
-                              Confirmar Alta
-                          </button>
-                      </div>
-                  </form>
               </div>
-          </div>
+          </div>,
+          document.body
       )}
     </div>
   );

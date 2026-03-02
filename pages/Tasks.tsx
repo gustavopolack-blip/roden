@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Task, Project, TaskPriority, User } from '../types';
-import { CheckSquare, AlertCircle, Clock, CheckCircle2, MoreHorizontal, Plus, X, Filter } from 'lucide-react';
+import { CheckCircle2, Clock, MoreHorizontal, Plus, X, Filter, UserPlus, Trash2 } from 'lucide-react';
 
 interface TasksProps {
   tasks: Task[];
   projects: Project[];
   users: User[];
+  currentUser?: User | null;
   onAddTask: (task: Task) => void;
+  onDeleteTask: (taskId: string) => void;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, onAddTask }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAddTask, onDeleteTask }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterProjectId, setFilterProjectId] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
@@ -22,6 +25,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, onAddTask }) => {
       priority: 'MEDIUM' as TaskPriority,
       projectId: ''
   });
+
+  const isAdmin = currentUser?.role === 'administrador';
 
   const getProjectTitle = (id?: string) => {
       if (!id) return 'General';
@@ -49,7 +54,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, onAddTask }) => {
           dueDate: newTask.dueDate,
           priority: newTask.priority,
           projectId: newTask.projectId || undefined,
-          completed: false
+          completed: false,
+          createdBy: currentUser?.name || 'Sistema'
       };
       onAddTask(task);
       setIsModalOpen(false);
@@ -139,18 +145,40 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, onAddTask }) => {
                   </div>
 
                   <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-3">
-                           <div className="text-right hidden md:block">
-                               <p className="text-xs text-gray-400">Asignado a</p>
-                               <p className="text-xs font-bold text-gray-700">{task.assignee}</p>
+                      <div className="flex flex-col items-end gap-1">
+                           <div className="text-right flex items-center gap-2">
+                               <div className="text-right hidden md:block">
+                                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Asignado a</p>
+                                   <p className="text-xs font-bold text-gray-700">{task.assignee}</p>
+                               </div>
+                               <div className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${priorityStyles[task.priority]}`}>
+                                   {task.priority === 'HIGH' ? 'ALTA' : task.priority === 'MEDIUM' ? 'MEDIA' : 'BAJA'}
+                               </div>
                            </div>
-                           <div className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${priorityStyles[task.priority]}`}>
-                               {task.priority === 'HIGH' ? 'ALTA' : task.priority === 'MEDIUM' ? 'MEDIA' : 'BAJA'}
-                           </div>
+                           {task.createdBy && (
+                               <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                                   <UserPlus size={10} /> Creado por: <span className="font-medium text-gray-500">{task.createdBy}</span>
+                               </p>
+                           )}
                       </div>
-                      <button className="text-gray-300 hover:text-black">
-                          <MoreHorizontal size={18} />
-                      </button>
+                      
+                      <div className="flex items-center gap-2">
+                        {/* Only ADMIN can see delete button */}
+                        {isAdmin && (
+                            <button 
+                                onClick={() => onDeleteTask(task.id)}
+                                className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                                title="Eliminar/Archivar Tarea"
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        )}
+                        {!isAdmin && (
+                             <button className="text-gray-300 cursor-not-allowed opacity-50 p-2">
+                                <MoreHorizontal size={18} />
+                             </button>
+                        )}
+                      </div>
                   </div>
               </div>
           ))}
@@ -161,69 +189,72 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, onAddTask }) => {
           )}
       </div>
 
-      {/* New Task Modal */}
-      {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
-                  <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                      <h3 className="text-xl font-bold text-roden-black">Nueva Tarea</h3>
-                      <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
-                          <X size={20} />
-                      </button>
+      {/* New Task Modal - Using Portal */}
+      {isModalOpen && createPortal(
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
+              <div className="flex min-h-full items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 relative">
+                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+                          <h3 className="text-xl font-bold text-roden-black">Nueva Tarea</h3>
+                          <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
+                              <X size={20} />
+                          </button>
+                      </div>
+                      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción de la Tarea</label>
+                              <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                     value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Asignar a</label>
+                                <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                       value={newTask.assignee} onChange={e => setNewTask({...newTask, assignee: e.target.value})}>
+                                    <option value="">Seleccionar Usuario...</option>
+                                    {users.map(u => (
+                                        <option key={u.id} value={u.name}>{u.name}</option>
+                                    ))}
+                                </select>
+                             </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Límite</label>
+                                <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                    value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
+                             </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto Relacionado</label>
+                                 <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                     value={newTask.projectId} onChange={e => setNewTask({...newTask, projectId: e.target.value})}>
+                                     <option value="">Ninguno / General</option>
+                                     {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                                 </select>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                                 <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                     value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value as TaskPriority})}>
+                                     <option value="LOW">Baja</option>
+                                     <option value="MEDIUM">Media</option>
+                                     <option value="HIGH">Alta</option>
+                                 </select>
+                             </div>
+                          </div>
+                          <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100 sticky bottom-0 rounded-b-2xl p-4 -mx-6 -mb-6 mt-2">
+                              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
+                                  Cancelar
+                              </button>
+                              <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
+                                  Crear Tarea
+                              </button>
+                          </div>
+                      </form>
                   </div>
-                  <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Descripción de la Tarea</label>
-                          <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                 value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Asignar a</label>
-                            <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                   value={newTask.assignee} onChange={e => setNewTask({...newTask, assignee: e.target.value})}>
-                                <option value="">Seleccionar Usuario...</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.name}>{u.name}</option>
-                                ))}
-                            </select>
-                         </div>
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Límite</label>
-                            <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
-                                value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
-                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto Relacionado</label>
-                             <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                 value={newTask.projectId} onChange={e => setNewTask({...newTask, projectId: e.target.value})}>
-                                 <option value="">Ninguno / General</option>
-                                 {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                             </select>
-                         </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
-                             <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                 value={newTask.priority} onChange={e => setNewTask({...newTask, priority: e.target.value as TaskPriority})}>
-                                 <option value="LOW">Baja</option>
-                                 <option value="MEDIUM">Media</option>
-                                 <option value="HIGH">Alta</option>
-                             </select>
-                         </div>
-                      </div>
-                      <div className="pt-4 flex justify-end gap-3">
-                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
-                              Cancelar
-                          </button>
-                          <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
-                              Crear Tarea
-                          </button>
-                      </div>
-                  </form>
               </div>
-          </div>
+          </div>,
+          document.body
       )}
     </div>
   );

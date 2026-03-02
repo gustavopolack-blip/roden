@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus, Client, User, ProductionStep } from '../types';
 import { generateChecklist } from '../services/geminiService';
-import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle } from 'lucide-react';
+import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator } from 'lucide-react';
 
 interface ProjectsProps {
   projects: Project[];
@@ -10,9 +10,10 @@ interface ProjectsProps {
   user: User;
   onAddProject: (project: Project) => void;
   onUpdateProject: (project: Project) => void;
+  onNavigateToEstimator?: (projectId: string) => void;
 }
 
-// Visual Groups updated to 5 states
+// Visual Groups updated to include CANCELLED
 type ProjectGroup = 'PROPUESTA' | 'PRESUPUESTO' | 'FABRICACION' | 'LISTO' | 'FINALIZADO';
 
 const PROJECT_GROUPS: { id: ProjectGroup; label: string; statuses: ProjectStatus[]; color: string; bg: string; border: string; accent: string }[] = [
@@ -43,7 +44,7 @@ const PROJECT_GROUPS: { id: ProjectGroup; label: string; statuses: ProjectStatus
     { 
         id: 'FINALIZADO', 
         label: 'ARCHIVADO / FINALIZADO', 
-        statuses: ['COMPLETED'], 
+        statuses: ['COMPLETED', 'CANCELLED'], 
         color: 'text-gray-500', bg: 'bg-gray-100', border: 'border-gray-200', accent: 'border-l-gray-400' 
     }
 ];
@@ -57,7 +58,7 @@ const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
     'LISTO': 'Listo'
 };
 
-const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProject, onUpdateProject }) => {
+const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProject, onUpdateProject, onNavigateToEstimator }) => {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -78,7 +79,8 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
       deadline: '',
       status: 'PROPOSAL' as ProjectStatus,
       budget: 0,
-      driveFolderUrl: ''
+      driveFolderUrl: '',
+      archiveReason: ''
   });
 
   const handleGenerateChecklist = async (projectId: string, title: string) => {
@@ -97,7 +99,8 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
         deadline: '',
         status: 'PROPOSAL',
         budget: 0,
-        driveFolderUrl: ''
+        driveFolderUrl: '',
+        archiveReason: ''
       });
       setIsEditMode(false);
       setIsModalOpen(true);
@@ -105,7 +108,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
 
   const openEditModal = (project: Project) => {
       // Security Check: Only Admin can edit
-      if (user.role !== 'ADMIN') return;
+      if (user.role !== 'administrador') return;
 
       setFormData({
           id: project.id,
@@ -116,7 +119,8 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
           deadline: project.deadline,
           status: project.status,
           budget: project.budget,
-          driveFolderUrl: project.driveFolderUrl || ''
+          driveFolderUrl: project.driveFolderUrl || '',
+          archiveReason: project.archiveReason || ''
       });
       setIsEditMode(true);
       setIsModalOpen(true);
@@ -140,7 +144,8 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
             status: formData.status,
             // Budget kept from original or 0 as input is removed
             budget: original.budget,
-            driveFolderUrl: formData.driveFolderUrl
+            driveFolderUrl: formData.driveFolderUrl,
+            archiveReason: formData.archiveReason
         };
         onUpdateProject(updated);
     } else {
@@ -160,7 +165,8 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
             stepDates: {
                 'ANTICIPO_PLANOS': new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit'})
             },
-            driveFolderUrl: formData.driveFolderUrl
+            driveFolderUrl: formData.driveFolderUrl,
+            archiveReason: formData.archiveReason
         };
         onAddProject(project);
     }
@@ -182,7 +188,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
   };
 
   // --- Role Based Logic ---
-  const isWorkshopRole = ['USER', 'WORKSHOP_MANAGER'].includes(user.role);
+  const isWorkshopRole = ['operario_taller', 'gerente_taller'].includes(user.role);
 
   const roleFilteredProjects = isWorkshopRole
     ? projects.filter(p => ['PRODUCTION', 'READY', 'COMPLETED'].includes(p.status))
@@ -193,13 +199,15 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
     const matchesClient = filterClient ? p.clientId === filterClient : true;
     const matchesText = filterText ? p.title.toLowerCase().includes(filterText.toLowerCase()) : true;
     
-    // Hide Completed Projects by default unless showCompleted is true
-    const matchesStatus = showCompleted ? true : p.status !== 'COMPLETED';
+    // Hide Completed/Cancelled Projects by default unless showCompleted is true
+    const isArchived = p.status === 'COMPLETED' || p.status === 'CANCELLED';
+    const matchesStatus = showCompleted ? true : !isArchived;
 
     return matchesClient && matchesText && matchesStatus;
   });
 
-  const areDatesEnabled = ['PRODUCTION', 'READY', 'COMPLETED'].includes(formData.status);
+  const areDatesEnabled = ['PRODUCTION', 'READY', 'COMPLETED', 'CANCELLED'].includes(formData.status);
+  const showReasonField = ['COMPLETED', 'CANCELLED'].includes(formData.status);
 
   return (
     <div className="h-full flex flex-col animate-fade-in relative">
@@ -218,7 +226,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                     <Filter size={16} /> {showFilters ? 'Ocultar Filtros' : 'Filtrar'}
                 </button>
                 {/* Condition: Only Admin sees New Project */}
-                {user.role === 'ADMIN' && (
+                {user.role === 'administrador' && (
                     <button 
                         onClick={openCreateModal}
                         className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
@@ -263,7 +271,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                             checked={showCompleted}
                             onChange={(e) => setShowCompleted(e.target.checked)}
                         />
-                        Mostrar Archivados
+                        Mostrar Archivo Kanban
                     </label>
                 </div>
 
@@ -308,24 +316,26 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                   {columnProjects.map((project) => {
                     const daysRemaining = calculateDaysRemaining(project.deadline);
                     const pendingTasks = project.tasksTotal - project.tasksCompleted;
+                    const isArchived = project.status === 'COMPLETED' || project.status === 'CANCELLED';
 
                     return (
                     <div 
                       key={project.id} 
                       onClick={(e) => { e.stopPropagation(); openEditModal(project); }}
-                      className={`bg-white border border-gray-100 p-4 rounded-lg shadow-sm transition-all group border-l-4 ${project.status === 'COMPLETED' ? 'border-l-gray-400 opacity-75' : group.accent} ${user.role === 'ADMIN' ? 'hover:shadow-md cursor-pointer' : 'cursor-default'}`}
+                      className={`bg-white border border-gray-100 p-4 rounded-lg shadow-sm transition-all group border-l-4 ${isArchived ? 'border-l-gray-400 opacity-75' : group.accent} ${user.role === 'administrador' ? 'hover:shadow-md cursor-pointer' : 'cursor-default'}`}
                     >
                       {/* 1. Header: Edit & Drive Buttons (Top Right) */}
                       <div className="flex justify-between items-start mb-1">
                          {/* Status & Workshop Badge Group */}
                          <div className="flex flex-wrap gap-1">
-                            {/* Percentage Badge */}
+                            {/* Percentage/Status Badge */}
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                project.status === 'COMPLETED' ? 'bg-gray-100 text-gray-500 border-gray-200' :
+                                project.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                project.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-100' :
                                 project.progress > 75 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 
                                 'bg-gray-50 text-gray-500 border-gray-100'
                             }`}>
-                              {project.status === 'COMPLETED' ? 'ARCHIVADO' : `${project.progress}% Avance`}
+                              {project.status === 'COMPLETED' ? 'FINALIZADO' : project.status === 'CANCELLED' ? 'CANCELADO' : `${project.progress}% Avance`}
                             </span>
 
                              {/* WORKSHOP STATUS INDICATOR (If Production/Ready) */}
@@ -355,7 +365,16 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                                     <HardDrive size={14} />
                                 </a>
                              )}
-                            {user.role === 'ADMIN' && (
+                            {onNavigateToEstimator && user.role === 'administrador' && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onNavigateToEstimator(project.id); }}
+                                    className="text-gray-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
+                                    title="Ir al Estimador de Costos"
+                                >
+                                    <Calculator size={14} />
+                                </button>
+                            )}
+                            {user.role === 'administrador' && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); openEditModal(project); }}
                                     className="text-gray-300 hover:text-black p-1 transition-colors"
@@ -369,13 +388,13 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                       
                       {/* 2. Project Name (Prominent) */}
                       <h4 
-                        className={`text-roden-black font-extrabold text-base mb-3 leading-snug transition-colors ${user.role === 'ADMIN' ? 'group-hover:text-indigo-600' : ''}`}
+                        className={`text-roden-black font-extrabold text-base mb-3 leading-snug transition-colors ${user.role === 'administrador' ? 'group-hover:text-indigo-600' : ''}`}
                       >
                           {project.title}
                       </h4>
 
                       {/* 3. Highlighted Dates (Yellow & Red Boxes) */}
-                      {project.status !== 'COMPLETED' && (
+                      {!isArchived && (
                           <div className="flex gap-2 mb-3">
                               {/* Deadline (Yellow) */}
                               <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5 flex flex-col justify-center min-w-0">
@@ -416,7 +435,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                             </span>
                          </div>
                          
-                         {user.role === 'ADMIN' && project.status !== 'COMPLETED' && (
+                         {user.role === 'administrador' && !isArchived && (
                              <button 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -449,90 +468,110 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
       </div>
 
        {/* Create/Edit Project Modal */}
-       {isModalOpen && user.role === 'ADMIN' && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
-                  <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                      <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
-                      <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
-                          <X size={20} />
-                      </button>
-                  </div>
-                  <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
-                          <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                 value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+       {isModalOpen && user.role === 'administrador' && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
+              <div className="flex min-h-full items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
+                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+                          <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
+                          <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
+                              <X size={20} />
+                          </button>
                       </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                        <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                            value={formData.clientId} onChange={e => setFormData({...formData, clientId: e.target.value})}>
-                            <option value="">Seleccionar...</option>
-                            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-
-                      <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                         <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                             value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as ProjectStatus})}>
-                             <option value="PROPOSAL">Propuesta</option>
-                             <option value="QUOTING">Presupuesto Enviado</option>
-                             <option value="PRODUCTION">Fabricación</option>
-                             <option value="READY">Listo para Entregar</option>
-                             <option value="COMPLETED">Finalizado (Archivar)</option>
-                         </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio (Admin)</label>
-                            <input type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
-                                value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
-                         </div>
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Inicio Producción</label>
-                            <input 
-                                type="date" 
-                                disabled={!areDatesEnabled}
-                                className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none ${!areDatesEnabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
-                                value={formData.productionStartDate} 
-                                onChange={e => setFormData({...formData, productionStartDate: e.target.value})} 
-                            />
-                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Entrega</label>
-                            <input 
-                                required 
-                                type="date" 
-                                disabled={!areDatesEnabled}
-                                className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none ${!areDatesEnabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
-                                value={formData.deadline} 
-                                onChange={e => setFormData({...formData, deadline: e.target.value})} 
-                            />
-                         </div>
+                      <form onSubmit={handleSubmit} className="p-6 space-y-4">
                           <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                                 <HardDrive size={14} /> Link Carpeta Drive
-                              </label>
-                              <input type="url" placeholder="https://drive.google.com/..." className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                     value={formData.driveFolderUrl} onChange={e => setFormData({...formData, driveFolderUrl: e.target.value})} />
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto</label>
+                              <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                     value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
                           </div>
-                      </div>
-                      
-                      <div className="pt-4 flex justify-end gap-3">
-                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
-                              Cancelar
-                          </button>
-                          <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
-                              {isEditMode ? 'Guardar Cambios' : 'Crear Proyecto'}
-                          </button>
-                      </div>
-                  </form>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                            <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                value={formData.clientId} onChange={e => setFormData({...formData, clientId: e.target.value})}>
+                                <option value="">Seleccionar...</option>
+                                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          </div>
+
+                          <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                             <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                 value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as ProjectStatus})}>
+                                 <option value="PROPOSAL">Propuesta</option>
+                                 <option value="QUOTING">Presupuesto Enviado</option>
+                                 <option value="PRODUCTION">Fabricación</option>
+                                 <option value="READY">Listo para Entregar</option>
+                                 <option disabled className="bg-gray-100">--- Archivo ---</option>
+                                 <option value="COMPLETED">Finalizado (Archivar)</option>
+                                 <option value="CANCELLED">Cancelado / No Prosperó</option>
+                             </select>
+                          </div>
+
+                          {/* REASON FIELD - Visible ONLY when archiving */}
+                          {showReasonField && (
+                             <div className="animate-fade-in bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                 <label className="block text-xs font-bold uppercase text-gray-500 mb-2 flex items-center gap-2">
+                                     {formData.status === 'COMPLETED' ? <Check size={14} className="text-emerald-500"/> : <X size={14} className="text-red-500"/>}
+                                     {formData.status === 'COMPLETED' ? 'Notas Finales de Cierre' : 'Motivo de Pérdida / Cancelación'}
+                                 </label>
+                                 <textarea 
+                                     className="w-full p-3 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none text-sm min-h-[80px]"
+                                     placeholder={formData.status === 'COMPLETED' ? "Ej: Cliente muy satisfecho, entregado antes de tiempo." : "Ej: Precio muy alto, eligieron otro proveedor."}
+                                     value={formData.archiveReason}
+                                     onChange={(e) => setFormData({...formData, archiveReason: e.target.value})}
+                                 ></textarea>
+                             </div>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio (Admin)</label>
+                                <input type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                    value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                             </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Inicio Producción</label>
+                                <input 
+                                    type="date" 
+                                    disabled={!areDatesEnabled}
+                                    className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none ${!areDatesEnabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                                    value={formData.productionStartDate} 
+                                    onChange={e => setFormData({...formData, productionStartDate: e.target.value})} 
+                                />
+                             </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Entrega</label>
+                                <input 
+                                    required 
+                                    type="date" 
+                                    disabled={!areDatesEnabled}
+                                    className={`w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none ${!areDatesEnabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                                    value={formData.deadline} 
+                                    onChange={e => setFormData({...formData, deadline: e.target.value})} 
+                                />
+                             </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                                     <HardDrive size={14} /> Link Carpeta Drive
+                                  </label>
+                                  <input type="url" placeholder="https://drive.google.com/..." className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                         value={formData.driveFolderUrl} onChange={e => setFormData({...formData, driveFolderUrl: e.target.value})} />
+                              </div>
+                          </div>
+                          
+                          <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100">
+                              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
+                                  Cancelar
+                              </button>
+                              <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
+                                  {isEditMode ? 'Guardar Cambios' : 'Crear Proyecto'}
+                              </button>
+                          </div>
+                      </form>
+                  </div>
               </div>
           </div>
       )}

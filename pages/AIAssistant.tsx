@@ -1,24 +1,70 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BusinessData } from '../types';
 import { askRodenAI } from '../services/geminiService';
-import { Sparkles, Send, Bot, User, ArrowUp } from 'lucide-react';
+import { Sparkles, Send, Bot, User, ArrowUp, Trash2 } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface AIAssistantProps {
   data: BusinessData;
+  userEmail: string;
 }
 
 interface Message {
   role: 'user' | 'ai';
   content: string;
+  timestamp: number;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ data }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: 'Hola. Soy la IA de rødën. Tengo acceso a tus proyectos, clientes y presupuestos. ¿Cómo puedo ayudarte con la operación hoy?' }
+    { role: 'ai', content: 'Hola. Soy la IA de rødën. Tengo acceso a tus proyectos, clientes y presupuestos. ¿Cómo puedo ayudarte con la operación hoy?', timestamp: Date.now() }
   ]);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load History from Supabase
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const { data: historyData, error } = await supabase
+          .from('ai_chat_history')
+          .select('messages')
+          .eq('user_email', userEmail)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error("Error loading chat history:", error);
+        } else if (historyData && historyData.messages) {
+          setMessages(historyData.messages);
+        }
+      } catch (err) {
+        console.error("Failed to load chat history:", err);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+
+    loadHistory();
+  }, [userEmail]);
+
+  // Save History to Supabase
+  const saveHistory = async (newMessages: Message[]) => {
+    try {
+      const { error } = await supabase
+        .from('ai_chat_history')
+        .upsert({
+          user_email: userEmail,
+          messages: newMessages,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_email' });
+
+      if (error) console.error("Error saving chat history:", error);
+    } catch (err) {
+      console.error("Failed to save chat history:", err);
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -29,15 +75,33 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data }) => {
   const handleSend = async () => {
     if (!query.trim()) return;
 
-    const userMsg = query;
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    const userMsg = query.trim();
+    const newMessages: Message[] = [...messages, { role: 'user', content: userMsg, timestamp: Date.now() }];
+    
+    setMessages(newMessages);
     setQuery('');
     setLoading(true);
 
-    const response = await askRodenAI(userMsg, data);
+    try {
+      const responseContent = await askRodenAI(userMsg, data);
+      const finalMessages: Message[] = [...newMessages, { role: 'ai', content: responseContent, timestamp: Date.now() }];
+      setMessages(finalMessages);
+      saveHistory(finalMessages);
+    } catch (error) {
+      const errorMessages: Message[] = [...newMessages, { role: 'ai', content: "Lo siento, hubo un error procesando tu consulta.", timestamp: Date.now() }];
+      setMessages(errorMessages);
+      saveHistory(errorMessages);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setMessages(prev => [...prev, { role: 'ai', content: response }]);
-    setLoading(false);
+  const clearHistory = async () => {
+    if (confirm("¿Deseas borrar el historial de chat?")) {
+      const initialMessages: Message[] = [{ role: 'ai', content: 'Historial borrado. ¿En qué puedo ayudarte?', timestamp: Date.now() }];
+      setMessages(initialMessages);
+      await supabase.from('ai_chat_history').delete().eq('user_email', userEmail);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -47,15 +111,34 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data }) => {
     }
   };
 
+  if (isInitialLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Bot size={48} className="text-gray-300 animate-pulse" />
+          <p className="text-gray-500 font-medium">Cargando asistente...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col max-w-5xl mx-auto animate-fade-in">
-      <header className="mb-8 text-center">
-        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-900 to-black px-4 py-1.5 rounded-full shadow-lg mb-4">
-           <Sparkles size={14} className="text-yellow-200" />
-           <span className="text-xs font-bold text-white uppercase tracking-widest">Inteligencia rødën</span>
+      <header className="mb-8 flex justify-between items-end">
+        <div className="text-left">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-900 to-black px-4 py-1.5 rounded-full shadow-lg mb-4">
+             <Sparkles size={14} className="text-yellow-200" />
+             <span className="text-xs font-bold text-white uppercase tracking-widest">Inteligencia rødën</span>
+          </div>
+          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Pregunta a rødën</h2>
+          <p className="text-gray-500 text-sm mt-2">Análisis semántico de los datos de tu negocio.</p>
         </div>
-        <h2 className="text-3xl font-bold text-roden-black tracking-tight">Pregunta a rødën</h2>
-        <p className="text-gray-500 text-sm mt-2">Análisis semántico de los datos de tu negocio.</p>
+        <button 
+          onClick={clearHistory}
+          className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors mb-2"
+        >
+          <Trash2 size={14} /> Borrar Historial
+        </button>
       </header>
 
       {/* Chat Container */}

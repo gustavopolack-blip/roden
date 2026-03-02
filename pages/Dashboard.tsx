@@ -41,19 +41,19 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
   }));
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <header className="flex justify-between items-end border-b border-gray-200 pb-6">
+    <div className="space-y-6 lg:space-y-8 animate-fade-in">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-gray-200 pb-6 gap-4">
         <div>
-           <h2 className="text-3xl font-bold text-roden-black tracking-tight mb-2">Panel de Control</h2>
-           <p className="text-roden-gray">Visión general del flujo de trabajo y finanzas.</p>
+           <h2 className="text-2xl md:text-3xl font-bold text-roden-black tracking-tight mb-2">Panel de Control</h2>
+           <p className="text-roden-gray text-sm">Visión general del flujo de trabajo y finanzas.</p>
         </div>
-        <div className="text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-sm capitalize">
+        <div className="text-xs md:text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-sm capitalize self-start md:self-auto">
             {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </div>
       </header>
 
-      {/* Main Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Main Metrics Grid - Responsive Cols */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         <MetricCard 
           label="Propuestas" 
           value={proposalsCount} 
@@ -78,27 +78,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           icon={Truck} 
           color="emerald"
         />
-         <MetricCard 
-          label="Facturación Mes" 
-          value={`$${monthlyBilling.toLocaleString()}`} 
-          icon={DollarSign} 
-          trendUp={true} 
-          color="gray"
-        />
+         <div className="col-span-2 md:col-span-1">
+            <MetricCard 
+              label="Facturación Mes" 
+              value={`$${monthlyBilling.toLocaleString()}`} 
+              icon={DollarSign} 
+              trendUp={true} 
+              color="gray"
+            />
+         </div>
       </div>
 
       {/* Charts & Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white border border-roden-border rounded-xl p-8 shadow-sm hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="lg:col-span-2 bg-white border border-roden-border rounded-xl p-4 md:p-8 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex justify-between items-center mb-6">
              <h3 className="text-lg font-bold text-roden-black">Progreso de Obras Activas</h3>
           </div>
-          <div className="h-64 w-full">
+          <div className="h-56 md:h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} barSize={40}>
+              <BarChart data={chartData} barSize={32}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis dataKey="name" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} dy={10} interval={0} />
+                <YAxis stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip 
                   cursor={{fill: '#f8fafc'}}
                   contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
@@ -114,7 +116,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
           </div>
         </div>
 
-        <div className="bg-white border border-roden-border rounded-xl p-8 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+        <div className="bg-white border border-roden-border rounded-xl p-6 md:p-8 shadow-sm flex flex-col hover:shadow-md transition-shadow">
           <h3 className="text-lg font-bold text-roden-black mb-6">Movimientos Recientes</h3>
           <div className="space-y-6 flex-1">
             {data.projects.slice(0, 4).map((project, i) => (
@@ -123,8 +125,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
                     ['PRODUCTION', 'READY'].includes(project.status) ? 'bg-amber-500' : 
                     project.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-indigo-500'
                 }`}></div>
-                <div>
-                  <p className="text-sm text-roden-black font-semibold group-hover:text-indigo-600 transition-colors">{project.title}</p>
+                <div className="min-w-0">
+                  <p className="text-sm text-roden-black font-semibold group-hover:text-indigo-600 transition-colors truncate">{project.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Estado: <span className="font-medium text-gray-700">{project.status}</span></p>
                 </div>
               </div>

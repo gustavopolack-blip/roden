@@ -13,12 +13,12 @@ interface ReportsProps {
 }
 
 const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
-    'ANTICIPO_PLANOS': 'Anticipo y Planos',
+    'ANTICIPO_PLANOS': 'Anticipo',
     'COMPRA_MATERIALES': 'Materiales',
     'FABRICACION': 'Fabricación',
     'LUSTRE': 'Lustre',
     'PREPARACION': 'Preparación',
-    'LISTO': 'Listo para Entrega'
+    'LISTO': 'Listo'
 };
 
 const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, user, onSaveReport }) => {
@@ -36,41 +36,6 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
 
   // --- LOGIC ---
-
-  const calculateElapsedDays = (project: Project): number | null => {
-      // Priority 1: Use productionStartDate
-      if (project.productionStartDate) {
-          const start = new Date(project.productionStartDate);
-          const now = new Date();
-          const diffTime = now.getTime() - start.getTime();
-          if (diffTime < 0) return 0;
-          return Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      }
-
-      // Priority 2: Step Date
-      let startDate: Date | null = null;
-      const stepDate = project.stepDates?.['ANTICIPO_PLANOS'];
-
-      if (stepDate) {
-          const [day, month] = stepDate.split('/').map(Number);
-          if (!isNaN(day) && !isNaN(month)) {
-              const currentYear = new Date().getFullYear();
-              startDate = new Date(currentYear, month - 1, day);
-          }
-      }
-
-      // Priority 3: Start Date
-      if (!startDate && project.startDate) {
-          startDate = new Date(project.startDate);
-      }
-
-      if (startDate) {
-          const now = new Date();
-          const diffTime = Math.abs(now.getTime() - startDate.getTime());
-          return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      }
-      return null;
-  };
 
   const calculateDaysRemaining = (deadlineStr: string) => {
     if (!deadlineStr) return 0;
@@ -146,22 +111,12 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
       return dateMatch && projectMatch;
   });
 
-  // Filter Logic for Modal (Role Restrictions)
-  const allowedStatusesForWorkshop = ['PRODUCTION', 'READY'];
+  // Filter Logic for Modal (RESTRICTED TO PRODUCTION/READY ONLY)
+  const allowedStatusesForReport = ['PRODUCTION', 'READY'];
   
   const filteredProjectsForModal = projects.filter(p => {
       const nameMatch = p.title.toLowerCase().includes(projectSearchTerm.toLowerCase());
-      
-      // Role Check
-      let statusMatch = true;
-      if (user.role !== 'ADMIN') {
-          // If not admin (Workshop Manager), only allow Production or Ready
-          statusMatch = allowedStatusesForWorkshop.includes(p.status);
-      } else {
-          // Admin can see all
-          statusMatch = true;
-      }
-
+      const statusMatch = allowedStatusesForReport.includes(p.status);
       return nameMatch && statusMatch;
   });
 
@@ -174,11 +129,19 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                     <h2 className="text-3xl font-bold text-roden-black tracking-tight">Informes</h2>
                     <p className="text-roden-gray text-sm mt-1">Historial de reportes técnicos y hojas de ruta.</p>
                 </div>
-                <button 
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
-                    <Plus size={16} /> Generar Informe Técnico
-                </button>
+                <div className="flex gap-3">
+                     <button
+                        onClick={() => window.print()}
+                        className="bg-white border border-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm no-print"
+                    >
+                        <Printer size={16} /> Imprimir Lista
+                    </button>
+                    <button 
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
+                        <Plus size={16} /> Generar Informe Técnico
+                    </button>
+                </div>
             </header>
 
             {/* Filters */}
@@ -268,59 +231,59 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
 
             {/* Project Selection Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                            <h3 className="text-xl font-bold text-roden-black">Seleccionar Proyecto</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-4 border-b border-gray-100 bg-gray-50">
-                            <div className="relative">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input 
-                                    type="text" 
-                                    placeholder="Buscar proyecto..." 
-                                    className="w-full bg-white border border-gray-200 pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:border-black"
-                                    value={projectSearchTerm}
-                                    onChange={(e) => setProjectSearchTerm(e.target.value)}
-                                    autoFocus
-                                />
-                            </div>
-                            {user.role !== 'ADMIN' && (
-                                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                                    <Lock size={12} /> Solo puedes generar informes de obras en Fabricación o Listas.
-                                </p>
-                            )}
-                        </div>
-                        <div className="overflow-y-auto p-2 space-y-1 flex-1">
-                            {filteredProjectsForModal.map(project => (
-                                <button 
-                                    key={project.id}
-                                    onClick={() => handleStartReport(project)}
-                                    className="w-full text-left p-4 hover:bg-gray-50 rounded-xl transition-colors group border border-transparent hover:border-gray-200"
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h4 className="font-bold text-roden-black group-hover:text-indigo-600 transition-colors">{project.title}</h4>
-                                            <p className="text-xs text-gray-500 mt-0.5">{getClient(project.clientId)?.name || 'Cliente Desconocido'}</p>
-                                        </div>
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${
-                                            project.status === 'PRODUCTION' ? 'bg-amber-100 text-amber-700' :
-                                            project.status === 'READY' ? 'bg-emerald-100 text-emerald-700' :
-                                            'bg-gray-100 text-gray-600'
-                                        }`}>
-                                            {project.status}
-                                        </span>
-                                    </div>
+                <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[80vh]">
+                            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+                                <h3 className="text-xl font-bold text-roden-black">Seleccionar Proyecto</h3>
+                                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
+                                    <X size={20} />
                                 </button>
-                            ))}
-                            {filteredProjectsForModal.length === 0 && (
-                                <div className="p-8 text-center text-gray-400 text-sm">
-                                    No se encontraron proyectos disponibles para generar informe con tu rol actual.
+                            </div>
+                            <div className="p-4 border-b border-gray-100 bg-gray-50">
+                                <div className="relative">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar proyecto..." 
+                                        className="w-full bg-white border border-gray-200 pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:border-black"
+                                        value={projectSearchTerm}
+                                        onChange={(e) => setProjectSearchTerm(e.target.value)}
+                                        autoFocus
+                                    />
                                 </div>
-                            )}
+                                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                                    <Lock size={12} /> Solo se pueden generar informes de obras en Fabricación o Listas.
+                                </p>
+                            </div>
+                            <div className="overflow-y-auto p-2 space-y-1 flex-1">
+                                {filteredProjectsForModal.map(project => (
+                                    <button 
+                                        key={project.id}
+                                        onClick={() => handleStartReport(project)}
+                                        className="w-full text-left p-4 hover:bg-gray-50 rounded-xl transition-colors group border border-transparent hover:border-gray-200"
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="font-bold text-roden-black group-hover:text-indigo-600 transition-colors">{project.title}</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5">{getClient(project.clientId)?.name || 'Cliente Desconocido'}</p>
+                                            </div>
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+                                                project.status === 'PRODUCTION' ? 'bg-amber-100 text-amber-700' :
+                                                project.status === 'READY' ? 'bg-emerald-100 text-emerald-700' :
+                                                'bg-gray-100 text-gray-600'
+                                            }`}>
+                                                {project.status}
+                                            </span>
+                                        </div>
+                                    </button>
+                                ))}
+                                {filteredProjectsForModal.length === 0 && (
+                                    <div className="p-8 text-center text-gray-400 text-sm">
+                                        No hay obras disponibles en estado Fabricación o Listo.
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -332,16 +295,9 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   // --- RENDER: REPORT VIEW (CREATE OR ARCHIVE) ---
   if (!selectedProject) return null;
 
-  const client = getClient(selectedProject.clientId);
   const projectTasks = getProjectTasks(selectedProject.id);
-  const generationDate = selectedReport 
-    ? new Date(selectedReport.generatedDate).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' })
-    : new Date().toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' });
-
-  const elapsedDays = calculateElapsedDays(selectedProject);
   const daysRemaining = calculateDaysRemaining(selectedProject.deadline);
   const isReadOnly = view === 'VIEW';
-  const reportId = selectedReport ? selectedReport.id.toUpperCase() : `DRAFT-${Date.now().toString().slice(-6)}`;
 
   return (
     <div className="animate-fade-in min-h-screen bg-gray-100/50 print:bg-white flex flex-col items-center">
@@ -360,8 +316,9 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                     box-shadow: none !important; 
                     overflow: hidden !important;
                     background: white !important;
+                    display: flex !important;
+                    flex-direction: column !important;
                 }
-                /* Ensure background colors print */
                 * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             }
         `}</style>
@@ -378,7 +335,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
             >
                 <ArrowLeft size={16} /> Volver
             </button>
-            <div className="flex gap-3">
+            <div className="flex gap-3 no-print">
                  {view === 'CREATE' ? (
                      <button 
                         onClick={handleSaveAndPrint}
@@ -398,100 +355,82 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
         {/* REPORT CONTAINER (Visual representation of A4 Paper) */}
         <div className="print-container relative w-[210mm] min-h-[297mm] bg-white shadow-2xl print:shadow-none flex flex-col text-black font-sans leading-tight">
             
-            {/* 1. ISO HEADER */}
-            <header className="h-[25mm] border-b-2 border-black flex items-stretch">
-                {/* Logo Section */}
-                <div className="w-[60mm] bg-black flex items-center justify-center">
-                    <h1 className="text-white text-2xl font-bold tracking-tighter">rødën</h1>
+            {/* 1. HEADER (REDUCED HEIGHT & LOGO SIZE) */}
+            <header className="h-[14mm] bg-black text-white flex items-center justify-between px-10 relative">
+                {/* Left Group */}
+                <div className="flex items-baseline gap-4">
+                    <h1 className="text-4xl font-bold tracking-tighter leading-none">rødën</h1>
+                    <span className="text-3xl font-light text-gray-500 pb-0.5">|</span>
+                    <span className="text-lg font-medium mb-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                        Informe avance de obra
+                    </span>
                 </div>
-                {/* Document Title */}
-                <div className="flex-1 flex flex-col justify-center px-6 border-r border-gray-300">
-                    <h2 className="text-lg font-bold uppercase tracking-wide">Hoja de Ruta Técnica</h2>
-                    <p className="text-[10px] text-gray-500">Control de Producción y Calidad</p>
-                </div>
-                {/* Meta Data */}
-                <div className="w-[50mm] text-[9px] flex flex-col justify-center px-4 space-y-1 bg-gray-50">
-                    <div className="flex justify-between">
-                        <span className="font-bold text-gray-500">DOC ID:</span>
-                        <span>{reportId}</span>
+
+                {/* Right */}
+                <div className="text-right">
+                    <div className="text-sm font-bold">
+                        {new Date().toLocaleDateString('es-AR')}
                     </div>
-                    <div className="flex justify-between">
-                        <span className="font-bold text-gray-500">FECHA:</span>
-                        <span>{new Date().toLocaleDateString('es-AR')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="font-bold text-gray-500">PÁGINA:</span>
-                        <span>1 de 1</span>
+                    <div className="text-xs opacity-70 mt-0.5">
+                        Página 1 de 1
                     </div>
                 </div>
             </header>
 
             {/* Content Padding */}
-            <div className="p-8 flex-1 flex flex-col gap-6">
+            <div className="px-10 py-8 flex-1 flex flex-col gap-8">
 
-                {/* 2. PROJECT IDENTITY */}
-                <section className="border border-gray-300 rounded-lg overflow-hidden flex">
-                     <div className="flex-1 p-4 border-r border-gray-300">
-                         <p className="text-[9px] text-gray-400 uppercase font-bold mb-1">Proyecto / Obra</p>
-                         <h1 className="text-xl font-bold text-black leading-none mb-1">{selectedProject.title}</h1>
-                         <p className="text-xs text-gray-600">ID: {selectedProject.id.toUpperCase()}</p>
-                     </div>
-                     <div className="w-1/3 p-4 bg-gray-50 flex flex-col justify-center">
-                         <p className="text-[9px] text-gray-400 uppercase font-bold mb-1">Cliente</p>
-                         <p className="text-sm font-bold text-black">{client?.name || 'Cliente General'}</p>
-                         <p className="text-[10px] text-gray-600 truncate">{client?.address || 'Sin dirección registrada'}</p>
-                     </div>
+                {/* 2. PROJECT IDENTITY (LARGE - NO UPPERCASE) */}
+                <section className="border-b border-gray-300 pb-4">
+                     <h1 className="text-4xl font-extrabold text-black tracking-tight leading-none mb-1">
+                        {selectedProject.title}
+                     </h1>
                 </section>
 
-                {/* 3. DATES & STATUS GRID */}
-                <section className="grid grid-cols-4 gap-4">
-                    <div className="border border-gray-200 p-3 rounded">
-                        <p className="text-[9px] uppercase font-bold text-gray-400">Inicio Prod.</p>
-                        <p className="text-sm font-bold">{selectedProject.productionStartDate || selectedProject.startDate || '-'}</p>
+                {/* 3. COLORED METRICS GRID (CENTERED CONTENT) */}
+                <section className="grid grid-cols-4 gap-6">
+                    <div className="flex flex-col items-center text-center text-blue-700">
+                        <span className="text-sm uppercase font-bold mb-1">Inicio Prod.</span>
+                        <span className="text-3xl font-bold">{selectedProject.productionStartDate ? new Date(selectedProject.productionStartDate).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit'}) : '-'}</span>
                     </div>
-                    <div className="border border-gray-200 p-3 rounded bg-yellow-50/50 border-yellow-100">
-                        <p className="text-[9px] uppercase font-bold text-yellow-700">Entrega Pactada</p>
-                        <p className="text-sm font-bold text-yellow-900">{selectedProject.deadline || 'A definir'}</p>
+                    <div className="flex flex-col items-center text-center text-amber-600">
+                        <span className="text-sm uppercase font-bold mb-1">Entrega Pactada</span>
+                        <span className="text-3xl font-bold">{selectedProject.deadline ? new Date(selectedProject.deadline).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit'}) : 'A definir'}</span>
                     </div>
-                    <div className="border border-gray-200 p-3 rounded bg-red-50/50 border-red-100">
-                        <p className="text-[9px] uppercase font-bold text-red-700">Restante</p>
-                        <p className="text-sm font-bold text-red-900">{daysRemaining} Días</p>
+                    <div className="flex flex-col items-center text-center text-red-600">
+                        <span className="text-sm uppercase font-bold mb-1">Restante</span>
+                        <span className="text-3xl font-bold">{daysRemaining} Días</span>
                     </div>
-                    <div className="border border-gray-200 p-3 rounded">
-                        <p className="text-[9px] uppercase font-bold text-gray-400">Avance Total</p>
-                        <p className="text-sm font-bold">{selectedProject.progress}%</p>
+                    <div className="flex flex-col items-center text-center text-emerald-600">
+                        <span className="text-sm uppercase font-bold mb-1">Avance</span>
+                        <span className="text-3xl font-bold">{selectedProject.progress}%</span>
                     </div>
                 </section>
 
-                {/* 4. TECHNICAL STAGES */}
-                <section>
-                    <h3 className="text-xs font-bold uppercase border-b border-black mb-3 pb-1 flex items-center gap-2">
-                        <Hammer size={12}/> Etapas de Producción
-                    </h3>
-                    <div className="flex justify-between items-start pt-2">
+                {/* 4. TECHNICAL STAGES (DARK GRAY GRAPHICS) */}
+                <section className="py-6 border-b border-gray-300">
+                    <div className="flex justify-between items-start w-full px-2">
                         {Object.entries(PRODUCTION_STEP_LABELS).map(([key, label], idx) => {
-                            const isCompleted = (selectedProject.progress || 0) > (idx * 16); 
-                            // Rough estimate logic or exact match if needed.
-                            // Better logic: Compare keys index
+                            // Logic for active step
                             const steps = Object.keys(PRODUCTION_STEP_LABELS);
                             const currentIdx = steps.indexOf(selectedProject.productionStep || 'ANTICIPO_PLANOS');
                             const thisIdx = steps.indexOf(key);
                             const status = thisIdx < currentIdx ? 'completed' : thisIdx === currentIdx ? 'active' : 'pending';
 
                             return (
-                                <div key={key} className="flex flex-col items-center w-20 text-center">
-                                    <div className={`w-6 h-6 rounded-full border-2 text-[10px] flex items-center justify-center font-bold mb-2 ${
-                                        status === 'completed' ? 'bg-black border-black text-white' :
-                                        status === 'active' ? 'bg-white border-black text-black' :
-                                        'bg-white border-gray-200 text-gray-300'
+                                <div key={key} className="flex flex-col items-center flex-1 text-center">
+                                    <div className={`w-16 h-16 rounded-full border-2 text-lg flex items-center justify-center font-bold mb-4 transition-colors ${
+                                        status === 'completed' ? 'bg-gray-800 border-gray-800 text-white' :
+                                        status === 'active' ? 'bg-white border-gray-800 text-gray-800 scale-110 shadow-lg' :
+                                        'bg-white border-gray-300 text-gray-300'
                                     }`}>
                                         {idx + 1}
                                     </div>
-                                    <span className={`text-[8px] uppercase font-bold leading-tight ${
-                                        status === 'pending' ? 'text-gray-300' : 'text-black'
+                                    <span className={`text-xs uppercase font-bold leading-tight ${
+                                        status === 'pending' ? 'text-gray-300' : 'text-gray-800'
                                     }`}>{label}</span>
                                     {selectedProject.stepDates?.[key] && (
-                                        <span className="text-[8px] text-gray-500 mt-1">{selectedProject.stepDates[key]}</span>
+                                        <span className="text-sm font-bold text-gray-600 mt-1">{selectedProject.stepDates[key]}</span>
                                     )}
                                 </div>
                             )
@@ -499,91 +438,70 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                     </div>
                 </section>
 
-                <div className="flex gap-8">
-                    {/* 5. NOTES & OBSERVATIONS */}
-                    <div className="flex-1 space-y-6">
-                        <section>
-                            <h3 className="text-xs font-bold uppercase border-b border-black mb-3 pb-1 flex items-center gap-2">
-                                <MessageSquare size={12}/> Notas de Proceso
-                            </h3>
-                            <div className="bg-gray-50 p-4 rounded border border-gray-200 min-h-[100px]">
-                                {selectedProject.productionNotes?.slice(-3).map(note => (
-                                    <div key={note.id} className="mb-2 last:mb-0 border-b border-gray-200 last:border-0 pb-2 last:pb-0">
-                                        <p className="text-[10px] italic text-gray-700">"{note.content}"</p>
-                                        <p className="text-[8px] text-gray-400 text-right mt-1">{note.date} - {note.author}</p>
-                                    </div>
-                                ))}
-                                {(!selectedProject.productionNotes || selectedProject.productionNotes.length === 0) && (
-                                    <p className="text-[10px] text-gray-400 text-center py-4">Sin notas registradas.</p>
-                                )}
-                            </div>
-                        </section>
-
-                        <section>
-                            <h3 className="text-xs font-bold uppercase border-b border-black mb-3 pb-1 flex items-center gap-2">
-                                <PenTool size={12}/> Observaciones Finales
-                            </h3>
-                             {isReadOnly ? (
-                                <div className="min-h-[80px] text-xs text-gray-800 leading-relaxed whitespace-pre-wrap border border-gray-200 p-2 rounded">
-                                    {observations || "Sin observaciones adicionales."}
-                                </div>
-                            ) : (
-                                <textarea 
-                                    value={observations}
-                                    onChange={(e) => setObservations(e.target.value)}
-                                    placeholder="Ingrese detalles de entrega, faltantes o instrucciones de instalación..."
-                                    className="w-full p-2 border border-gray-300 rounded text-xs focus:outline-none min-h-[80px] bg-white resize-none"
-                                ></textarea>
-                            )}
-                        </section>
-                    </div>
-
-                    {/* 6. TASKS CHECKLIST (SIDEBAR) */}
-                    <div className="w-[65mm]">
-                         <h3 className="text-xs font-bold uppercase border-b border-black mb-3 pb-1 flex items-center gap-2">
-                            <CheckSquare size={12}/> Checklist
+                {/* 5. VERTICAL STACKED SECTIONS */}
+                <div className="flex flex-col gap-8">
+                    
+                    {/* A. NOTES */}
+                    <section>
+                        <h3 className="text-base font-bold uppercase border-b border-gray-300 mb-4 pb-1 flex items-center gap-2 text-black">
+                            <MessageSquare size={18}/> Notas de Proceso (Bitácora)
                         </h3>
-                        <div className="space-y-1">
+                        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 min-h-[120px]">
+                            {selectedProject.productionNotes?.length ? (
+                                selectedProject.productionNotes.map(note => (
+                                    <div key={note.id} className="mb-5 last:mb-0 border-b border-gray-200 last:border-0 pb-5 last:pb-0">
+                                        <p className="text-lg text-gray-900 leading-relaxed font-medium">"{note.content}"</p>
+                                        <p className="text-sm text-gray-500 mt-1 font-bold">{note.date} — {note.author}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-base text-gray-400 italic text-center py-4">Sin notas registradas en la bitácora.</p>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* B. CHECKLIST */}
+                    <section>
+                         <h3 className="text-base font-bold uppercase border-b border-gray-300 mb-4 pb-1 flex items-center gap-2 text-black">
+                            <CheckSquare size={18}/> Checklist de Tareas
+                        </h3>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                             {projectTasks.filter(t => !t.completed).map(task => (
-                                <div key={task.id} className="flex items-start gap-2 py-1">
-                                    <div className="w-3 h-3 border border-gray-400 rounded-sm mt-0.5"></div>
-                                    <span className="text-[10px] text-gray-700 leading-tight">{task.title}</span>
+                                <div key={task.id} className="flex items-start gap-4 py-2 border-b border-gray-100">
+                                    <div className="w-6 h-6 border-2 border-gray-300 rounded mt-0.5 shrink-0"></div>
+                                    <span className="text-base text-gray-800 font-medium leading-tight pt-0.5">{task.title}</span>
                                 </div>
                             ))}
-                            {projectTasks.length === 0 && <p className="text-[10px] text-gray-400 italic">No hay tareas pendientes.</p>}
+                            {projectTasks.length === 0 && <p className="col-span-2 text-base text-gray-400 italic">No hay tareas pendientes.</p>}
                         </div>
+                    </section>
 
-                        {/* QR Placeholder */}
-                        <div className="mt-8 border border-gray-200 rounded p-4 flex flex-col items-center justify-center text-center bg-gray-50">
-                            <QrCode size={64} className="text-black mb-2" />
-                            <p className="text-[8px] font-bold uppercase text-gray-500">Escanea para ver<br/>estado digital</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 7. SIGNATURE BLOCK (FOOTER) */}
-                <div className="mt-auto grid grid-cols-3 gap-8 pt-8">
-                    <div className="border-t border-black pt-2">
-                        <p className="text-[9px] uppercase font-bold text-center">Control de Calidad</p>
-                        <p className="text-[8px] text-gray-400 text-center mt-8">(Firma y Fecha)</p>
-                    </div>
-                    <div className="border-t border-black pt-2">
-                        <p className="text-[9px] uppercase font-bold text-center">Jefe de Taller</p>
-                        <p className="text-[8px] text-gray-400 text-center mt-8">(Firma y Fecha)</p>
-                    </div>
-                    <div className="border-t border-black pt-2">
-                        <p className="text-[9px] uppercase font-bold text-center">Conformidad Cliente</p>
-                        <p className="text-[8px] text-gray-400 text-center mt-8">(Firma y Aclaración)</p>
-                    </div>
+                    {/* C. OBSERVATIONS */}
+                    <section>
+                        <h3 className="text-base font-bold uppercase border-b border-gray-300 mb-4 pb-1 flex items-center gap-2 text-black">
+                            <PenTool size={18}/> Observaciones Finales
+                        </h3>
+                         {isReadOnly ? (
+                            <div className="min-h-[120px] text-lg text-gray-900 leading-relaxed whitespace-pre-wrap border border-gray-200 p-6 rounded-lg bg-white">
+                                {observations || "Sin observaciones adicionales."}
+                            </div>
+                        ) : (
+                            <textarea 
+                                value={observations}
+                                onChange={(e) => setObservations(e.target.value)}
+                                placeholder="Ingrese detalles técnicos de entrega, faltantes de herrajes o instrucciones específicas de instalación..."
+                                className="w-full p-6 border border-gray-300 rounded-lg text-lg focus:outline-none min-h-[150px] bg-white resize-none font-medium text-gray-800"
+                            ></textarea>
+                        )}
+                    </section>
                 </div>
 
             </div>
 
-            {/* 8. SYSTEM FOOTER */}
-            <footer className="h-[10mm] bg-gray-100 flex items-center justify-between px-8 text-[8px] text-gray-500 uppercase tracking-widest border-t border-gray-200">
-                <span>Sistema Operativo rødën v2.1</span>
-                <span>Generado por: {user.name}</span>
-                <span>Página 1/1</span>
+            {/* 6. COMPACT FOOTER (ADJUSTED SIZES) */}
+            <footer className="h-[10mm] bg-gray-300 flex items-center justify-between px-10 mt-auto border-t border-gray-300 leading-none text-gray-800">
+                <span className="text-xs tracking-wider" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: '400' }}>Devoto | Buenos Aires | Argentina</span>
+                <span className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: '700' }}>www.rodenmobel.com</span>
             </footer>
 
         </div>

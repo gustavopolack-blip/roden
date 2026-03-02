@@ -51,11 +51,11 @@ export const askRodenAI = async (
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash-lite',
       contents: question,
       config: {
         systemInstruction: systemInstruction,
-        temperature: 0.2, // Low temperature for factual accuracy based on data
+        temperature: 0.1, // Even lower for more consistency
       }
     });
 
@@ -70,7 +70,7 @@ export const generateChecklist = async (projectType: string): Promise<string[]> 
   try {
     const ai = getAiInstance();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash-lite',
       contents: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
       config: {
         responseMimeType: "application/json"
