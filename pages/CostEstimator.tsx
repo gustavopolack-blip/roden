@@ -22,6 +22,7 @@ interface CostEstimatorProps {
     onSaveEstimate?: (estimate: SavedEstimate) => void; 
     onDeleteEstimate?: (id: string) => void; 
     onAddProductionOrder?: (order: ProductionOrder) => void;
+    initialProjectId?: string;
 }
 
 // --- EXTENDED TYPES ---

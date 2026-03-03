@@ -84,7 +84,7 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
       downPaymentDate: '',
       balance: 0,
       balanceDate: '',
-      status: 'DRAFT',
+      status: BudgetStatus.DRAFT,
       importedEstimateId: ''
     });
     setIsModalOpen(true);

@@ -37,4 +37,11 @@ if (SUPABASE_URL.includes("PEGAR_TU") || SUPABASE_ANON_KEY.includes("PEGAR_TU"))
   console.warn("⚠️ ATENCIÓN: No has configurado las claves de Supabase en services/supabaseClient.ts");
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+});

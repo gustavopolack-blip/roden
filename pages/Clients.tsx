@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Client, ClientType, ClientOrigin } from '../types';
-import { Search, MapPin, Phone, Tag, Mail, Plus, X, Building2, User, Calendar, Globe, Share2, Heart, Smile } from 'lucide-react';
+import { Search, MapPin, Phone, Tag, Mail, Plus, X, Building2, User, Calendar, Globe, Share2, Heart, Smile, Trash2 } from 'lucide-react';
 
 interface ClientsProps {
   clients: Client[];
   onAddClient: (newClient: Client) => void;
   onUpdateClient: (updatedClient: Client) => void;
+  onDeleteClient: (clientId: string) => void; // <-- Nueva Prop
 }
 
 const ORIGIN_LABELS: Record<ClientOrigin, string> = {
@@ -24,12 +25,11 @@ const ORIGIN_ICONS: Record<ClientOrigin, any> = {
     'WEBSITE': Globe
 };
 
-const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient }) => {
+const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient, onDeleteClient }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   
-  // Form State
   const [formData, setFormData] = useState({
       name: '',
       phone: '',
@@ -41,9 +41,10 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
       status: 'LEAD' as any
   });
 
-  const filteredClients = clients.filter(client => 
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    client.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+  // CORRECCIÓN ERROR 'SOME': Añadida validación opcional en tags
+  const filteredClients = (clients || []).filter(client => 
+    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    client.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleOpenAddModal = () => {
@@ -64,16 +65,23 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
   const handleOpenEditModal = (client: Client) => {
     setEditingClient(client);
     setFormData({
-        name: client.name,
-        phone: client.phone,
-        address: client.address,
+        name: client.name || '',
+        phone: client.phone || '',
+        address: client.address || '',
         type: client.type,
         joinedDate: client.joinedDate,
         origin: client.origin,
-        notes: client.notes,
+        notes: client.notes || '',
         status: client.status
     });
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation(); // Evita que se abra el modal de edición al hacer clic en borrar
+    if (window.confirm(`¿Estás seguro de que deseas eliminar al cliente "${name}"? Esta acción no se puede deshacer.`)) {
+      onDeleteClient(id);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -147,6 +155,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Origen</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Valor Histórico</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-center w-10">Acciones</th>
                   </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -165,7 +174,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
                                       </div>
                                       <div>
                                           <p className="text-sm font-bold text-roden-black group-hover:text-indigo-600 transition-colors">{client.name}</p>
-                                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">#{client.id.toUpperCase()}</p>
+                                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">#{client.id.toString().substring(0,8)}</p>
                                       </div>
                                   </div>
                               </td>
@@ -202,14 +211,23 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
                                   </span>
                               </td>
                               <td className="py-4 px-6 text-right">
-                                  <p className="text-sm font-bold text-roden-black">${client.totalValue.toLocaleString()}</p>
+                                  <p className="text-sm font-bold text-roden-black">${(client.totalValue || 0).toLocaleString()}</p>
+                              </td>
+                              <td className="py-4 px-6 text-center">
+                                  <button 
+                                    onClick={(e) => handleDeleteClick(e, client.id, client.name)}
+                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Eliminar cliente"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
                               </td>
                           </tr>
                       );
                   })}
                   {filteredClients.length === 0 && (
                       <tr>
-                          <td colSpan={6} className="py-12 text-center text-gray-400 text-sm">
+                          <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">
                               No se encontraron clientes que coincidan con la búsqueda.
                           </td>
                       </tr>
@@ -218,7 +236,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
           </table>
       </div>
 
-      {/* Add/Edit Client Modal - Using Portal */}
       {isModalOpen && createPortal(
           <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
               <div className="flex min-h-full items-center justify-center p-4">
@@ -235,18 +252,18 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
                           <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo / Razón Social</label>
                               <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" 
-                                     value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                                     value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                                 <input type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" 
-                                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                        value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
                               </div>
                               <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Alta</label>
                                   <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" 
-                                         value={formData.joinedDate} onChange={e => setFormData({...formData, joinedDate: e.target.value})} />
+                                         value={formData.joinedDate || ''} onChange={e => setFormData({...formData, joinedDate: e.target.value})} />
                               </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -273,7 +290,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Dirección / Obra</label>
                                 <input type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" 
-                                      value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                                      value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                               </div>
                               {editingClient && (
                                   <div>
@@ -290,7 +307,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient 
                           <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Notas Iniciales</label>
                               <textarea className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none h-24 resize-none" 
-                                     value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} ></textarea>
+                                     value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} ></textarea>
                           </div>
                           <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100">
                               <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">

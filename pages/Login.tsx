@@ -18,15 +18,11 @@ const Login: React.FC = () => {
 
     try {
       console.log(`Intentando login para: ${email}`);
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) {
-        console.error("Error de Supabase Auth:", error);
-        throw error;
-      }
+      if (error) throw error;
       console.log("Login exitoso:", data);
     } catch (err: any) {
       console.error("Error de Autenticación:", err);
