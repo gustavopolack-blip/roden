@@ -1700,26 +1700,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         <div className="animate-fade-in min-h-screen bg-gray-100/50 print:bg-white flex flex-col items-center font-sans">
              <style>{`
                 @media print {
-                    @page { margin: 0; size: A4; }
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print-container, .print-container * {
-                        visibility: visible;
-                    }
-                    .print-container {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 210mm;
-                        min-height: 297mm;
-                        margin: 0;
-                        padding: 0;
-                        background: white;
-                        z-index: 9999;
-                    }
+                    @page { margin: 10mm; size: A4; }
                     .no-print { display: none !important; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 }
             `}</style>
              <div className="no-print w-full max-w-[210mm] flex flex-col gap-4 mb-6 pt-6">
@@ -2267,26 +2249,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         <div className="animate-fade-in min-h-screen bg-gray-100/50 print:bg-white flex flex-col items-center font-sans">
             <style>{`
                 @media print {
-                    @page { margin: 0; size: A4; }
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print-container, .print-container * {
-                        visibility: visible;
-                    }
-                    .print-container {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 210mm;
-                        min-height: 297mm;
-                        margin: 0;
-                        padding: 0;
-                        background: white;
-                        z-index: 9999;
-                    }
+                    @page { margin: 10mm; size: A4; }
                     .no-print { display: none !important; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 }
             `}</style>
             <div className="no-print w-full max-w-[210mm] flex justify-between items-center mb-6 pt-6">

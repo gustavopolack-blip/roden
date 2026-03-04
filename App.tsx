@@ -182,10 +182,12 @@ const App: React.FC = () => {
             .maybeSingle();
 
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("fetchUserProfile timeout")), 60000)
+            setTimeout(() => reject(new Error("fetchUserProfile timeout (90s exceeded)")), 90000)
           );
 
+          console.log("[fetchUserProfile] Attempting Supabase query...");
           const result = await Promise.race([profilePromise, timeoutPromise]) as any;
+          console.log("[fetchUserProfile] Query result:", result);
           clearTimeout(wakingUpTimeout);
           setIsWakingUpDb(false);
           return result;
