@@ -275,6 +275,18 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   });
 
   const [priceHistory, setPriceHistory] = useState<PriceListHistory[]>([]);
+
+  useEffect(() => {
+    const loadPriceLists = async () => {
+      const { data, error } = await supabase.from('price_lists').select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error loading price lists:', error);
+        return;
+      }
+      setPriceHistory(data.map(d => ({ id: d.id, date: d.created_at, name: d.name, settings: d.settings })));
+    };
+    loadPriceLists();
+  }, []);
   const [newListName, setNewListName] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
@@ -1598,9 +1610,25 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       const matchesStatus = filterStatus === 'ALL' || estimate.status === filterStatus;
       return estimate.isLatest && matchesSearch && matchesStatus;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const handleSavePriceList = () => {
+  const handleSavePriceList = async () => {
       if (!newListName.trim()) return;
-      setPriceHistory([{ id: `h${Date.now()}`, date: new Date().toISOString(), name: newListName, settings: { ...settings } }, ...priceHistory]);
+      const newList = { id: crypto.randomUUID(), date: new Date().toISOString(), name: newListName, settings: { ...settings } };
+      
+      // Save to Supabase
+      const { error } = await supabase.from('price_lists').insert({
+          id: newList.id,
+          name: newList.name,
+          settings: newList.settings,
+          created_at: newList.date
+      });
+      
+      if (error) {
+          console.error('Error saving price list:', error);
+          alert('Error al guardar la lista de precios.');
+          return;
+      }
+      
+      setPriceHistory([newList, ...priceHistory]);
       setNewListName('');
   };
   const handleLoadPriceList = (id: string) => {
@@ -1968,6 +1996,19 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <span className="font-bold">{activeSettings.name || 'Lista Actual'}</span>
                                     </div>
                                 </div>
+                                <div className="mt-4 flex justify-end">
+                                    <button 
+                                       onClick={() => {
+                                           if (editingEstimate) {
+                                               handleArchive(editingEstimate.id);
+                                               alert('Planilla archivada en historial.');
+                                           }
+                                       }}
+                                       className="bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-700 flex items-center gap-2"
+                                    >
+                                        <Archive size={14}/> Archivar en Historial
+                                    </button>
+                                </div>
                             </div>
 
                             {/* RESUMEN GENERAL */}
@@ -2048,7 +2089,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <td className="p-3 text-right font-bold text-xl bg-black text-white">
                                             {formatCurrency(itemsToPrint.reduce((acc, item) => {
                                                 const q = calculateItemQuantities(item.modules);
-                                                const laborCost = item.labor.workers * item.labor.days * activeSettings.costLaborDay * q.avgComplexity;
+                                                const laborCost = item.labor.workers * item.labor.days * activeSettings.costLaborDay;
                                                 const matCost = (q.boards18Color * activeSettings.priceBoard18ColorAglo) + (q.boards18White * activeSettings.priceBoard18WhiteAglo) + (q.boards18MDFMelamine * activeSettings.priceBoard18ColorMDF) + (q.boards18MDF * activeSettings.priceBoard18MDFCrudo1Face) + (q.boards15 * activeSettings.priceBoard15WhiteAglo) + (q.backing55 * activeSettings.priceBacking55Color) + (q.backing3 * activeSettings.priceBacking3White) + (q.linearWhite22 * activeSettings.priceEdge22White045) + (q.linearWhite45 * activeSettings.priceEdge45White045) + (q.linearColor22 * activeSettings.priceEdge22Color045) + (q.linearColor45 * activeSettings.priceEdge45Color045) + (q.linear2mm * activeSettings.priceEdge2mm);
                                                 const hwCost = (q.totalHinges * activeSettings.priceHingeStandard) + (q.totalPistons * activeSettings.priceGasPiston) + (q.totalSlides * activeSettings.priceSlide500Std) + q.totalExtrasCost + activeSettings.priceGlueTin;
                                                 const finishCost = (q.lacquerAreaM2 * activeSettings.priceFinishLacquerSemi) + (q.veneerAreaM2 * activeSettings.priceFinishLustreSemi);

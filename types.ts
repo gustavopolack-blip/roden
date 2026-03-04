@@ -189,6 +189,7 @@ export interface Budget {
   version: number;
   items: BudgetItem[];
   lastModified: string;
+  isArchived?: boolean;
 }
 
 export interface Report {

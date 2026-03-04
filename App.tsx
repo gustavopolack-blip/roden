@@ -522,6 +522,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleArchiveBudget = async (budget: Budget) => {
+    try {
+      const { error } = await supabase.from('budgets').update({ isArchived: true }).eq('id', budget.id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      console.error('Error archivando presupuesto:', err);
+      alert(`Error: ${err.message}`);
+    }
+  };
+
   const handleUpdateBudget = async (budget: Budget) => {
     try {
       const { error } = await supabase.from('budgets').update(budget).eq('id', budget.id);
@@ -775,9 +786,11 @@ const App: React.FC = () => {
             projects={projects}
             supplierPayments={supplierPayments}
             savedEstimates={savedEstimates}
+            userRole={role}
             onAddBudget={handleAddBudget}
             onUpdateBudget={handleUpdateBudget}
             onDeleteBudget={handleDeleteBudget}
+            onArchiveBudget={handleArchiveBudget}
           />
         ) : null;
 

@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Budget, Project, BudgetStatus, ProductionStep, SupplierPayment, SavedEstimate } from '../types';
-import { FileText, CheckCircle, Clock, X, Search, PieChart, TrendingUp, Hammer, BarChart2, TrendingDown, DollarSign, Pencil, Trash2, Download } from 'lucide-react';
+import { FileText, CheckCircle, Clock, X, Search, PieChart, TrendingUp, Hammer, BarChart2, TrendingDown, DollarSign, Pencil, Trash2, Download, Archive } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface BudgetsProps {
   budgets: Budget[];
@@ -12,6 +13,8 @@ interface BudgetsProps {
   onAddBudget: (budget: Budget) => void;
   onUpdateBudget: (budget: Budget) => void;
   onDeleteBudget: (budgetId: string) => void;
+  onArchiveBudget: (budget: Budget) => void;
+  userRole: string;
 }
 
 const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
@@ -23,7 +26,7 @@ const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
     'LISTO': 'Listo'
 };
 
-const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, savedEstimates = [], onAddBudget, onUpdateBudget, onDeleteBudget }) => {
+const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, savedEstimates = [], userRole, onAddBudget, onUpdateBudget, onDeleteBudget, onArchiveBudget }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
@@ -179,6 +182,11 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
           <p className="text-roden-gray text-sm mt-1">Gestión de cobros, anticipos y rentabilidad.</p>
         </div>
         <div className="flex gap-3">
+            <RodenAIButton 
+                mode="finanzas_lectura" 
+                data={{ budgets, projects, supplierPayments, savedEstimates }} 
+                userRole={userRole}
+            />
             <button 
                 onClick={handleOpenCreate}
                 className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-lg shadow-gray-200">
@@ -281,6 +289,7 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
                           <td className="py-4 px-6"><span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100">{budget.status}</span></td>
                           <td className="py-4 px-6 text-right">
                               <div className="flex justify-end gap-2">
+                                <button onClick={() => onArchiveBudget(budget)} className="text-gray-400 hover:text-amber-600 p-1.5"><Archive size={14} /></button>
                                 <button onClick={() => handleOpenEdit(budget)} className="text-gray-400 hover:text-indigo-600 p-1.5"><Pencil size={14} /></button>
                                 <button onClick={() => handleDelete(budget.id)} className="text-gray-400 hover:text-red-600 p-1.5"><Trash2 size={14} /></button>
                               </div>

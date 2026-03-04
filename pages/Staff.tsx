@@ -95,11 +95,9 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
               window.location.reload(); 
           }
       } else {
-          // CREATE MODE (Simulation)
-          alert(`Simulación: Usuario creado en Auth con Email: ${formData.email} y Contraseña: ${formData.password}\n\nSe procederá a crear el perfil.`);
-
+          // CREATE MODE
           const newUser: User = {
-              id: `u${Date.now()}`,
+              id: crypto.randomUUID(), // Generate a valid UUID
               name: formData.name,
               email: formData.email,
               phone: formData.phone,
