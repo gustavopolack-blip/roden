@@ -32,38 +32,64 @@ const RodenAIButton: React.FC<RodenAIButtonProps> = ({ mode, data, userRole, lab
 
   const renderContent = (text: string) => {
     return text.split('\n').map((line, i) => {
-      // Interpretar checkboxes [ ]
-      if (line.trim().startsWith('[ ]')) {
+      const trimmedLine = line.trim();
+      
+      // Interpretar separadores ---
+      if (trimmedLine.startsWith('---')) {
+        return <hr key={i} className="my-4 border-gray-100" />;
+      }
+
+      // Interpretar títulos (líneas en mayúsculas o que terminan en :)
+      const isHeader = trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 3 && !trimmedLine.includes('$');
+      if (isHeader || (trimmedLine.endsWith(':') && trimmedLine.length < 40)) {
         return (
-          <div key={i} className="flex items-start gap-2 my-1 text-gray-700">
-            <Square size={16} className="mt-1 flex-shrink-0 text-gray-400" />
-            <span>{line.replace('[ ]', '').trim()}</span>
+          <h4 key={i} className="text-[10px] font-bold text-roden-black uppercase tracking-widest mt-6 mb-2 first:mt-0">
+            {trimmedLine}
+          </h4>
+        );
+      }
+
+      // Interpretar checkboxes [ ]
+      if (trimmedLine.startsWith('[ ]')) {
+        return (
+          <div key={i} className="flex items-start gap-2 my-1.5 text-roden-black">
+            <Square size={14} className="mt-0.5 flex-shrink-0 text-gray-300" />
+            <span className="text-xs leading-relaxed">{trimmedLine.replace('[ ]', '').trim()}</span>
           </div>
         );
       }
-      if (line.trim().startsWith('[x]') || line.trim().startsWith('[X]')) {
+      if (trimmedLine.startsWith('[x]') || trimmedLine.startsWith('[X]')) {
         return (
-          <div key={i} className="flex items-start gap-2 my-1 text-gray-700">
-            <CheckSquare size={16} className="mt-1 flex-shrink-0 text-indigo-500" />
-            <span className="line-through text-gray-400">{line.replace(/\[x\]|\[X\]/gi, '').trim()}</span>
+          <div key={i} className="flex items-start gap-2 my-1.5 text-roden-black">
+            <CheckSquare size={14} className="mt-0.5 flex-shrink-0 text-roden-black" />
+            <span className="text-xs leading-relaxed line-through text-gray-400">{trimmedLine.replace(/\[x\]|\[X\]/gi, '').trim()}</span>
           </div>
         );
       }
 
       // Interpretar indicadores visuales (emojis)
       let indicator = null;
-      if (line.includes('🔴')) indicator = <span className="w-2 h-2 rounded-full bg-red-500 inline-block mr-2" />;
-      if (line.includes('🟡')) indicator = <span className="w-2 h-2 rounded-full bg-yellow-500 inline-block mr-2" />;
-      if (line.includes('🟢')) indicator = <span className="w-2 h-2 rounded-full bg-green-500 inline-block mr-2" />;
+      if (line.includes('🔴')) indicator = <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block mr-2 flex-shrink-0" />;
+      if (line.includes('🟡')) indicator = <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block mr-2 flex-shrink-0" />;
+      if (line.includes('🟢')) indicator = <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block mr-2 flex-shrink-0" />;
 
       const cleanLine = line.replace(/[🔴🟡🟢]/g, '').trim();
 
-      if (!cleanLine && !indicator) return <br key={i} />;
+      if (!cleanLine && !indicator) return <div key={i} className="h-2" />;
+
+      // Líneas con flecha → (Acciones)
+      if (cleanLine.startsWith('→')) {
+        return (
+          <p key={i} className="text-[10px] font-bold text-indigo-600 bg-indigo-50/50 p-2 rounded mt-4 border border-indigo-100/50 flex items-center gap-2">
+            {cleanLine}
+          </p>
+        );
+      }
 
       return (
-        <p key={i} className={`my-1 flex items-center ${line.startsWith('---') ? 'border-t border-gray-100 pt-4 mt-4 font-bold text-gray-900' : 'text-gray-700'}`}>
+        <p key={i} className="text-xs text-roden-black leading-relaxed my-1 flex items-start">
           {indicator}
-          {cleanLine}
+          <span>{cleanLine}</span>
         </p>
       );
     });
@@ -73,9 +99,9 @@ const RodenAIButton: React.FC<RodenAIButtonProps> = ({ mode, data, userRole, lab
     <>
       <button
         onClick={handleAnalyze}
-        className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm shadow-sm"
+        className="inline-flex items-center gap-2 bg-white text-roden-black border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-all font-bold text-xs shadow-sm"
       >
-        <Zap size={16} className="fill-indigo-700" />
+        <Zap size={14} className="fill-roden-black" />
         {label}
       </button>
 
@@ -83,40 +109,40 @@ const RodenAIButton: React.FC<RodenAIButtonProps> = ({ mode, data, userRole, lab
       {isOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div 
-            className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-black/10 backdrop-blur-[2px] transition-opacity"
             onClick={() => setIsOpen(false)}
           />
           
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
-            <header className="p-6 border-b border-gray-100 flex justify-between items-center bg-indigo-50/50">
+          <div className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col animate-slide-in-right border-l border-gray-100">
+            <header className="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <Zap size={18} className="text-indigo-600 fill-indigo-600" />
-                <h3 className="font-bold text-gray-900 uppercase tracking-wider text-sm">rødën AI Analysis</h3>
+                <Zap size={16} className="text-roden-black fill-roden-black" />
+                <h3 className="font-bold text-roden-black uppercase tracking-widest text-[11px]">rødën AI Intelligence</h3>
               </div>
               <button 
                 onClick={() => setIsOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
               >
-                <X size={20} className="text-gray-400" />
+                <X size={18} className="text-gray-400" />
               </button>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
               {loading ? (
                 <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-400">
-                  <Loader2 size={32} className="animate-spin text-indigo-500" />
-                  <p className="text-sm font-medium animate-pulse">Procesando datos operativos...</p>
+                  <Loader2 size={24} className="animate-spin text-roden-black" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest animate-pulse">Analizando datos...</p>
                 </div>
               ) : (
-                <div className="prose prose-sm max-w-none">
+                <div className="max-w-none">
                   {analysis ? renderContent(analysis) : "No hay datos para mostrar."}
                 </div>
               )}
             </div>
 
-            <footer className="p-6 border-t border-gray-100 bg-gray-50">
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold text-center">
-                Sistema de Inteligencia Operativa rødën
+            <footer className="p-6 border-t border-gray-100 bg-gray-50/50">
+              <p className="text-[9px] text-gray-400 uppercase tracking-[0.2em] font-bold text-center">
+                Propiedad Intelectual de rødën
               </p>
             </footer>
           </div>

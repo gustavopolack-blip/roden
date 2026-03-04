@@ -905,7 +905,10 @@ const App: React.FC = () => {
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
             currentPage={currentPage}
-            onNavigate={setCurrentPage}
+            onNavigate={(page) => {
+              setCurrentPage(page);
+              setIsSidebarOpen(false);
+            }}
             user={currentUser}
             onToggleRole={() => {}}
             onLogout={async () => {
@@ -917,6 +920,21 @@ const App: React.FC = () => {
           />
 
           <div className="lg:pl-64">
+            {/* Mobile Header */}
+            <header className="lg:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold tracking-tighter text-roden-black">rødën</h1>
+                <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold border-l border-gray-200 pl-2">OS</span>
+              </div>
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Abrir menú"
+              >
+                <Menu size={24} className="text-roden-black" />
+              </button>
+            </header>
+
             <main className="min-h-screen p-4 md:p-6 lg:p-8">
               {renderContent()}
 
