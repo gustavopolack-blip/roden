@@ -78,6 +78,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient,
   };
 
   const handleDeleteClick = (e: React.MouseEvent, id: string, name: string) => {
+    console.log("[Clients.tsx] handleDeleteClick called for:", id, name);
     e.stopPropagation(); // Evita que se abra el modal de edición al hacer clic en borrar
     if (window.confirm(`¿Estás seguro de que deseas eliminar al cliente "${name}"? Esta acción no se puede deshacer.`)) {
       onDeleteClient(id);

@@ -15,10 +15,10 @@ const getEnvVar = (key: string) => {
 };
 
 const getAiInstance = () => {
-  // Safe check for environment variable
-  const apiKey = getEnvVar('API_KEY') || '';
+  // Always use process.env.GEMINI_API_KEY for the Gemini API.
+  const apiKey = process.env.GEMINI_API_KEY || '';
   if (!apiKey) {
-    console.warn("API_KEY is missing. AI features will be simulated or fail.");
+    console.warn("GEMINI_API_KEY is missing. AI features will be simulated or fail.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -41,7 +41,7 @@ export const askRodenAI = async (
       
       Responde la pregunta del usuario basándote estrictamente en estos datos.
       Si el usuario pregunta por ingresos (revenue), calcúlalo sumando los presupuestos con estado APPROVED.
-      Si el usuario pregunta por retrasos, revisa las fechas límite (deadline) vs la fecha actual (Asume que hoy es 2024-05-20).
+      Si el usuario pregunta por retrasos, revisa las fechas límite (deadline) vs la fecha actual (Asume que hoy es ${new Date().toISOString().split('T')[0]}).
       
       Datos:
       ${contextString}
@@ -51,7 +51,7 @@ export const askRodenAI = async (
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-3-flash-preview',
       contents: question,
       config: {
         systemInstruction: systemInstruction,
@@ -70,7 +70,7 @@ export const generateChecklist = async (projectType: string): Promise<string[]> 
   try {
     const ai = getAiInstance();
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-3-flash-preview',
       contents: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
       config: {
         responseMimeType: "application/json"

@@ -175,8 +175,9 @@ const App: React.FC = () => {
         .eq('id', session.user.id)
         .maybeSingle();
 
+      // Increased timeout to 45s
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("fetchUserProfile timeout")), 20000)
+        setTimeout(() => reject(new Error("fetchUserProfile timeout")), 45000)
       );
 
       const result = await Promise.race([profilePromise, timeoutPromise]) as any;
@@ -322,15 +323,25 @@ const App: React.FC = () => {
     const checkInitialSession = async () => {
       console.log("[checkInitialSession] Checking...");
       
-      // Increased safety timeout for getSession (10s)
-      let timeoutId: any;
-      const timeoutPromise = new Promise((_, reject) => 
-        timeoutId = setTimeout(() => reject(new Error("getSession timeout")), 10000)
-      );
+      // Retry logic for getSession
+      const getSessionWithRetry = async (retries = 3, delay = 2000): Promise<any> => {
+        for (let i = 0; i < retries; i++) {
+          try {
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error("getSession timeout")), 15000)
+            );
+            const result = await Promise.race([supabase.auth.getSession(), timeoutPromise]);
+            return result;
+          } catch (err) {
+            console.warn(`[checkInitialSession] Attempt ${i + 1} failed:`, err);
+            if (i === retries - 1) throw err;
+            await new Promise(res => setTimeout(res, delay));
+          }
+        }
+      };
 
       try {
-        const result = await Promise.race([supabase.auth.getSession(), timeoutPromise]) as any;
-        clearTimeout(timeoutId);
+        const result = await getSessionWithRetry() as any;
         
         const initialSession = result?.data?.session;
         const error = result?.error;
@@ -435,9 +446,14 @@ const App: React.FC = () => {
   };
 
   const handleDeleteClient = async (clientId: string) => {
+    console.log("[handleDeleteClient] Attempting to delete client:", clientId);
     try {
       const { error } = await supabase.from('clients').delete().eq('id', clientId);
-      if (error) throw error;
+      if (error) {
+        console.error("[handleDeleteClient] Supabase error:", error);
+        throw error;
+      }
+      console.log("[handleDeleteClient] Success, fetching data...");
       fetchData();
     } catch (err: any) {
       console.error('Error eliminando cliente:', err);
@@ -802,6 +818,14 @@ const App: React.FC = () => {
 
       case 'staff':
         return role === 'administrador' ? <Staff users={users} onAddUser={handleAddUser} /> : null;
+
+      case 'ai':
+        return role === 'administrador' ? (
+          <AIAssistant 
+            data={data} 
+            userEmail={currentUser.email} 
+          />
+        ) : null;
 
       case 'settings':
         return role === 'administrador' ? <Settings /> : null;
