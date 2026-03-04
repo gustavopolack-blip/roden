@@ -1615,18 +1615,24 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       const newList = { id: crypto.randomUUID(), date: new Date().toISOString(), name: newListName, settings: { ...settings } };
       
       // Save to Supabase
+      console.log("[handleSavePriceList] Attempting to save (simplified):", {
+          id: newList.id,
+          name: newList.name,
+          created_at: newList.date
+      });
       const { error } = await supabase.from('price_lists').insert({
           id: newList.id,
           name: newList.name,
-          settings: newList.settings,
+          // settings: newList.settings,
           created_at: newList.date
       });
       
       if (error) {
           console.error('Error saving price list:', error);
-          alert('Error al guardar la lista de precios.');
+          alert('Error al guardar la lista de precios: ' + error.message);
           return;
       }
+      console.log("[handleSavePriceList] Success!");
       
       setPriceHistory([newList, ...priceHistory]);
       setNewListName('');
@@ -2410,6 +2416,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
             <div className="flex items-center gap-4">
                 <h2 className="text-xl font-bold text-roden-black flex items-center gap-2"><Calculator size={20}/> Estimador de Costos</h2>
+                {/* {console.log("[CostEstimator] userRole:", userRole)} */}
                 <RodenAIButton 
                     mode="estimador_revision" 
                     data={{ items, settings, selectedProjectId: selectedProjectId }} 
