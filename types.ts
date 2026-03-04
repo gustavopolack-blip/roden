@@ -399,6 +399,8 @@ export interface QuoteData {
 }
 
 export interface FinancialSnapshot {
+  id?: string;
+  name?: string;
   costMaterials: number;
   costHardware: number;
   costScrews: number;

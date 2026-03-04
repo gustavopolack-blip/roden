@@ -86,10 +86,12 @@ const App: React.FC = () => {
     console.log("[fetchData] Started.");
     setIsSyncing(true);
     try {
-      // Asegurarse de tener una sesión válida antes de consultar
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      // Use the session we already have instead of calling getSession again
+      const currentSession = session || (await supabase.auth.getSession()).data.session;
+      
       if (!currentSession) {
         console.warn("[fetchData] No hay sesión activa, abortando carga de datos.");
+        setIsSyncing(false);
         return;
       }
 
@@ -112,7 +114,11 @@ const App: React.FC = () => {
         setIsWakingUpDb(true);
       }, 5000);
 
-      const results = await fetchPromise;
+      const globalFetchTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("fetchData timeout")), 60000)
+      );
+
+      const results = await Promise.race([fetchPromise, globalFetchTimeout]) as any;
       clearTimeout(wakingUpTimeout);
       setIsWakingUpDb(false);
       
@@ -162,27 +168,39 @@ const App: React.FC = () => {
     isFetchingProfileRef.current = true;
     setIsProfileLoading(true);
 
+    const fetchWithRetry = async (retries = 3, delay = 3000): Promise<any> => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const wakingUpTimeout = setTimeout(() => {
+            setIsWakingUpDb(true);
+          }, 5000);
+
+          const profilePromise = supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("fetchUserProfile timeout")), 60000)
+          );
+
+          const result = await Promise.race([profilePromise, timeoutPromise]) as any;
+          clearTimeout(wakingUpTimeout);
+          setIsWakingUpDb(false);
+          return result;
+        } catch (err) {
+          console.warn(`[fetchUserProfile] Attempt ${i + 1} failed:`, err);
+          setIsWakingUpDb(false);
+          if (i === retries - 1) throw err;
+          await new Promise(res => setTimeout(res, delay));
+        }
+      }
+    };
+
     try {
       console.log("[fetchUserProfile] Querying DB for user:", session.user.id);
-      
-      const wakingUpTimeout = setTimeout(() => {
-        setIsWakingUpDb(true);
-      }, 5000);
-
-      const profilePromise = supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      // Increased timeout to 45s
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("fetchUserProfile timeout")), 45000)
-      );
-
-      const result = await Promise.race([profilePromise, timeoutPromise]) as any;
-      clearTimeout(wakingUpTimeout);
-      setIsWakingUpDb(false);
+      const result = await fetchWithRetry();
 
       const userData = result?.data;
       const profileError = result?.error;
@@ -243,7 +261,6 @@ const App: React.FC = () => {
         setCurrentUser(resolvedUser);
         
         // Sync metadata if needed (don't await to speed up UI)
-        // REMOVED refreshSession to avoid potential loops
         if (session.user.user_metadata?.role !== resolvedUser.role) {
           console.log("[fetchUserProfile] Syncing role to metadata...");
           supabase.auth.updateUser({ data: { role: resolvedUser.role } });
@@ -314,60 +331,50 @@ const App: React.FC = () => {
 
     const globalSafetyTimeout = setTimeout(() => {
       if (mounted) {
-        console.warn("[Global Safety Timeout] Unblocking UI after 10s");
+        console.warn("[Global Safety Timeout] Unblocking UI after 60s");
         setIsAuthLoading(false);
         setIsProfileLoading(false);
       }
-    }, 10000);
+    }, 60000);
 
     const checkInitialSession = async () => {
       console.log("[checkInitialSession] Checking...");
       
-      // Retry logic for getSession
-      const getSessionWithRetry = async (retries = 3, delay = 2000): Promise<any> => {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error("getSession timeout")), 15000)
-            );
-            const result = await Promise.race([supabase.auth.getSession(), timeoutPromise]);
-            return result;
-          } catch (err) {
-            console.warn(`[checkInitialSession] Attempt ${i + 1} failed:`, err);
-            if (i === retries - 1) throw err;
-            await new Promise(res => setTimeout(res, delay));
-          }
-        }
-      };
-
       try {
-        const result = await getSessionWithRetry() as any;
+        // In Supabase v2, getSession() is fast as it reads from storage.
+        // If it's slow, it might be a storage issue or a network check if the session is expired.
+        // We'll use a reasonable timeout but won't retry excessively.
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("getSession timeout")), 12000)
+        );
         
-        const initialSession = result?.data?.session;
-        const error = result?.error;
+        const { data: { session: initialSession }, error } = await Promise.race([
+          supabase.auth.getSession(),
+          timeoutPromise
+        ]) as any;
         
         if (error) throw error;
         
-        if (mounted && initialSession) {
-          console.log("[checkInitialSession] Session found:", initialSession.user.email);
-          setSession(initialSession);
-          if (!currentUserRef.current) {
-            // Don't await here to allow checkInitialSession to finish and unblock isAuthLoading
-            fetchUserProfile(initialSession);
+        if (mounted) {
+          if (initialSession) {
+            console.log("[checkInitialSession] Session found:", initialSession.user.email);
+            setSession(initialSession);
+            if (!currentUserRef.current && !isFetchingProfileRef.current) {
+              fetchUserProfile(initialSession);
+            }
+          } else {
+            console.log("[checkInitialSession] No session.");
+            setIsAuthLoading(false);
+            setIsProfileLoading(false);
           }
-        } else {
-          console.log("[checkInitialSession] No session.");
         }
       } catch (e) {
-        console.error("[checkInitialSession] Error or Timeout:", e);
-        // On timeout or error, we ensure we are not stuck
+        console.warn("[checkInitialSession] Error or Timeout (handled):", e);
+        // If getSession fails/times out, we don't block the UI.
+        // onAuthStateChange might still fire later if the network recovers.
         if (mounted) {
           setIsAuthLoading(false);
           setIsProfileLoading(false);
-        }
-      } finally {
-        if (mounted) {
-          setIsAuthLoading(false);
         }
       }
     };
@@ -708,7 +715,7 @@ const App: React.FC = () => {
 
     switch (currentPage) {
       case 'dashboard':
-        return role === 'administrador' ? <Dashboard data={data} /> : null;
+        return role === 'administrador' ? <Dashboard data={data} userRole={role} /> : null;
 
       case 'projects':
         return (
@@ -729,6 +736,7 @@ const App: React.FC = () => {
         return role === 'administrador' ? (
           <Clients
             clients={clients}
+            user={currentUser!}
             onAddClient={handleAddClient}
             onUpdateClient={handleUpdateClient}
             onDeleteClient={handleDeleteClient}
@@ -753,6 +761,7 @@ const App: React.FC = () => {
             projects={projects}
             clients={clients}
             savedEstimates={savedEstimates}
+            userRole={role}
             onSaveEstimate={handleSaveEstimate}
             onDeleteEstimate={handleDeleteEstimate}
             initialProjectId={selectedProjectId ?? undefined}
@@ -823,7 +832,7 @@ const App: React.FC = () => {
         return role === 'administrador' ? (
           <AIAssistant 
             data={data} 
-            userEmail={currentUser.email} 
+            user={currentUser!} 
           />
         ) : null;
 

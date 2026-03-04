@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BusinessData } from '../types';
+import { BusinessData, User } from '../types';
 import { askRodenAI } from '../services/geminiService';
-import { Sparkles, Send, Bot, User, ArrowUp, Trash2 } from 'lucide-react';
+import { Sparkles, Send, Bot, User as UserIcon, ArrowUp, Trash2, Zap } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface AIAssistantProps {
   data: BusinessData;
-  userEmail: string;
+  user: User;
 }
 
 interface Message {
@@ -15,10 +16,11 @@ interface Message {
   timestamp: number;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ data, user }) => {
+  const userEmail = user.email;
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: 'Hola. Soy la IA de rødën. Tengo acceso a tus proyectos, clientes y presupuestos. ¿Cómo puedo ayudarte con la operación hoy?', timestamp: Date.now() }
+    { role: 'ai', content: 'Hola. Soy rødën AI, tu Sistema de Inteligencia Operativa. Tengo acceso a la operación en tiempo real. ¿Qué necesitás saber hoy?', timestamp: Date.now() }
   ]);
   const [loading, setLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -88,7 +90,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
       setMessages(finalMessages);
       saveHistory(finalMessages);
     } catch (error) {
-      const errorMessages: Message[] = [...newMessages, { role: 'ai', content: "Lo siento, hubo un error procesando tu consulta.", timestamp: Date.now() }];
+      const errorMessages: Message[] = [...newMessages, { role: 'ai', content: "Error en la conexión con rødën AI. Reintentá en unos momentos.", timestamp: Date.now() }];
       setMessages(errorMessages);
       saveHistory(errorMessages);
     } finally {
@@ -98,7 +100,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
 
   const clearHistory = async () => {
     if (confirm("¿Deseas borrar el historial de chat?")) {
-      const initialMessages: Message[] = [{ role: 'ai', content: 'Historial borrado. ¿En qué puedo ayudarte?', timestamp: Date.now() }];
+      const initialMessages: Message[] = [{ role: 'ai', content: 'Historial borrado. ¿Qué necesitás saber hoy?', timestamp: Date.now() }];
       setMessages(initialMessages);
       await supabase.from('ai_chat_history').delete().eq('user_email', userEmail);
     }
@@ -116,7 +118,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
       <div className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Bot size={48} className="text-gray-300 animate-pulse" />
-          <p className="text-gray-500 font-medium">Cargando asistente...</p>
+          <p className="text-gray-500 font-medium">Iniciando rødën AI...</p>
         </div>
       </div>
     );
@@ -128,17 +130,24 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
         <div className="text-left">
           <div className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-900 to-black px-4 py-1.5 rounded-full shadow-lg mb-4">
              <Sparkles size={14} className="text-yellow-200" />
-             <span className="text-xs font-bold text-white uppercase tracking-widest">Inteligencia rødën</span>
+             <span className="text-xs font-bold text-white uppercase tracking-widest">rødën AI</span>
           </div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Pregunta a rødën</h2>
-          <p className="text-gray-500 text-sm mt-2">Análisis semántico de los datos de tu negocio.</p>
+          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Inteligencia Operativa</h2>
+          <p className="text-gray-500 text-sm mt-2">Análisis estratégico y gestión de taller en tiempo real.</p>
         </div>
-        <button 
-          onClick={clearHistory}
-          className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors mb-2"
-        >
-          <Trash2 size={14} /> Borrar Historial
-        </button>
+        <div className="flex items-end gap-3">
+          <RodenAIButton 
+            mode="historial_diagnostico" 
+            data={data} 
+            userRole={user.role}
+          />
+          <button 
+            onClick={clearHistory}
+            className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors mb-2"
+          >
+            <Trash2 size={14} /> Borrar Historial
+          </button>
+        </div>
       </header>
 
       {/* Chat Container */}
@@ -149,14 +158,14 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex gap-6 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm border ${msg.role === 'ai' ? 'bg-black border-black' : 'bg-white border-gray-200'}`}>
-                {msg.role === 'ai' ? <Bot size={20} className="text-white" /> : <User size={20} className="text-black" />}
+                {msg.role === 'ai' ? <Bot size={20} className="text-white" /> : <UserIcon size={20} className="text-black" />}
               </div>
               <div className={`max-w-[80%] p-6 rounded-2xl text-base leading-relaxed shadow-sm ${
                 msg.role === 'ai' 
                   ? 'bg-gray-50 text-gray-800 border border-gray-100 rounded-tl-none' 
                   : 'bg-black text-white rounded-tr-none'
               }`}>
-                {msg.content}
+                <div className="whitespace-pre-wrap">{msg.content}</div>
               </div>
             </div>
           ))}
@@ -182,7 +191,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Pregunta sobre proyectos, clientes o ingresos..."
+              placeholder="Preguntá sobre riesgos, rentabilidad o pedí un briefing..."
               className="w-full bg-white text-roden-black pl-6 pr-14 py-4 rounded-xl border border-gray-200 focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all placeholder:text-gray-400 font-medium"
             />
             <button 
@@ -194,7 +203,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, userEmail }) => {
             </button>
           </div>
           <div className="mt-4 flex justify-center gap-3">
-            {['Resumen de estado', 'Presupuestos pendientes', 'Checklist Cocina'].map(suggestion => (
+            {['Briefing diario', 'Alerta de riesgos', 'Análisis de rentabilidad'].map(suggestion => (
                <button 
                 key={suggestion} 
                 onClick={() => {

@@ -3,15 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   CostSettings, CabinetModule, CalculatedPart, Project, ModuleType, PriceListHistory, SavedEstimate, EdgeCategory,
   CostModule, CostSnapshot, CommercialConfig, MaterialConfig, BudgetStatus, ProductionOrder, ProductionOrderStatus,
-  CommercialStatus, ProductionStatus, AuditEntry, Client
+  CommercialStatus, ProductionStatus, AuditEntry, Client, User
 } from '../types';
 import { calculateModuleFull } from '../utils/costEngine'; // NEW ENGINE
 import { 
   Database, Plus, Trash2, 
   DollarSign, Calculator, Box, FileText,
   Hammer, TrendingUp, Save, History,
-  Search, Printer, Scissors, Pencil, X, AlertTriangle, ArrowLeft, ListPlus, Package, Check, Layers, Settings, ChevronRight, FileCheck, ArrowDown, Link, Download, Grid, PieChart, ShoppingCart, FolderPlus, ArrowRight, RefreshCw, Archive, Eye, Clock, Calendar, ChevronDown, ChevronUp, Share2, Activity, CheckCircle, Copy, ArrowUpCircle
+  Search, Printer, Scissors, Pencil, X, AlertTriangle, ArrowLeft, ListPlus, Package, Check, Layers, Settings, ChevronRight, FileCheck, ArrowDown, Link, Download, Grid, PieChart, ShoppingCart, FolderPlus, ArrowRight, RefreshCw, Archive, Eye, Clock, Calendar, ChevronDown, ChevronUp, Share2, Activity, CheckCircle, Copy, ArrowUpCircle, Zap
 } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
 import { supabase } from '../services/supabaseClient';
 
@@ -19,6 +20,7 @@ interface CostEstimatorProps {
     projects?: Project[];
     clients?: Client[];
     savedEstimates?: SavedEstimate[]; 
+    userRole: string;
     onSaveEstimate?: (estimate: SavedEstimate) => void; 
     onDeleteEstimate?: (id: string) => void; 
     onAddProductionOrder?: (order: ProductionOrder) => void;
@@ -159,12 +161,13 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
     projects = [], 
     clients = [],
     savedEstimates = [], 
+    userRole,
     onSaveEstimate, 
     onDeleteEstimate,
     onAddProductionOrder,
     initialProjectId
 }) => {
-  const [view, setView] = useState<'SETUP' | 'MODULES' | 'RESULTS' | 'HISTORY'>('MODULES');
+  const [view, setView] = useState<'SETUP' | 'MODULES' | 'RESULTS' | 'HISTORY' | 'PROJECTS'>('MODULES');
     const [printMode, setPrintMode] = useState<'NONE' | 'SUPPLIES' | 'CUTTING' | 'COSTS' | 'ECONOMIC' | 'PRODUCTION_ORDER'>('NONE');
     
     // Use initialProjectId if provided
@@ -332,7 +335,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       costLaborDay: 35000
   });
 
-  const [activeSettings, setActiveSettings] = useState<CostSettings>(settings);
+  const [activeSettings, setActiveSettings] = useState<CostSettings & { id?: string; name?: string }>(settings);
 
 
   // --- HELPERS ---
@@ -897,7 +900,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               items: selectedItemsList,
               modules: [], // Not used for ECONOMIC but required by type
               settingsSnapshot: activeSettings,
-              financialsSnapshot: { ...activeSettings, timestamp: new Date().toISOString(), currency: 'ARS' },
               totalDirectCost: selectedItemsList.reduce((sum, item) => sum + (getRecalculatedItemPrices(item, activeSettings) as any).totalDirectCost, 0),
               finalPrice: totalRef,
               status: BudgetStatus.DRAFT,
@@ -1052,12 +1054,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
       // 1. Calculate the updated cost based on technicalItems
       const updatedTotalDirectCost = technicalItems.reduce((sum, item) => {
-          const prices = calculateFinancialsForScenario(item.modules, item.labor.workers * item.labor.days * settings.costLaborDay, item.margins, {}, originalEstimateForComparison.financialsSnapshot);
+          const prices = calculateFinancialsForScenario(item.modules, item.labor.workers * item.labor.days * settings.costLaborDay, item.margins, {}, { ...originalEstimateForComparison.settingsSnapshot, currency: 'ARS', timestamp: originalEstimateForComparison.date });
           return sum + prices.totalDirectCost;
       }, 0);
 
       const updatedFinalPrice = technicalItems.reduce((sum, item) => {
-          const prices = calculateFinancialsForScenario(item.modules, item.labor.workers * item.labor.days * settings.costLaborDay, item.margins, {}, originalEstimateForComparison.financialsSnapshot);
+          const prices = calculateFinancialsForScenario(item.modules, item.labor.workers * item.labor.days * settings.costLaborDay, item.margins, {}, { ...originalEstimateForComparison.settingsSnapshot, currency: 'ARS', timestamp: originalEstimateForComparison.date });
           return sum + prices.finalPrice;
       }, 0);
 
@@ -1133,7 +1135,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           clientName: budget.customProjectName || 'Cliente Desconocido',
           itemDescription: productionOrderForm.itemDescription,
           technicalDetails: budget.modules,
-          materialsList: budget.details,
+          materialsList: budget.items,
           startDate: productionOrderForm.startDate,
           estimatedDeliveryDate: productionOrderForm.estimatedDeliveryDate,
           assignedOperators: productionOrderForm.assignedOperators.split(',').map(s => s.trim()).filter(Boolean),
@@ -1338,6 +1340,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       setEditingEstimate({
           ...estimate,
           quoteData: estimate.quoteData || {
+              id: estimate.id,
               title: 'Amoblamiento Integral',
               reference: estimate.customProjectName || getProjectTitleById(estimate.projectId || ''),
               observations: DEFAULT_OBSERVATIONS,
@@ -1410,7 +1413,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         const selectedItemsList = (editingEstimate.items || []).filter(item => 
             !(editingEstimate as any)._removedItemIds?.includes(item.id)
         );
-        const snapshot = editingEstimate.financialsSnapshot || editingEstimate.settingsSnapshot;
+        const snapshot = editingEstimate.settingsSnapshot;
         
         const totalRef = selectedItemsList.reduce((sum, item) => {
             const prices = getRecalculatedItemPrices(item, snapshot);
@@ -2364,7 +2367,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col animate-fade-in">
         <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-            <div><h2 className="text-xl font-bold text-roden-black flex items-center gap-2"><Calculator size={20}/> Estimador de Costos</h2></div>
+            <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold text-roden-black flex items-center gap-2"><Calculator size={20}/> Estimador de Costos</h2>
+                <RodenAIButton 
+                    mode="estimador_revision" 
+                    data={{ items, settings, selectedProjectId: selectedProjectId }} 
+                    userRole={userRole}
+                />
+            </div>
             <div className="flex gap-2">
                 <button onClick={() => setView('SETUP')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${view === 'SETUP' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-100'}`}><Database size={16}/> Precios</button>
                 <button onClick={() => setView('MODULES')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${view === 'MODULES' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-100'}`}><Box size={16}/> Módulos</button>

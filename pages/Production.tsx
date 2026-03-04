@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProductionStep, Client, ProjectStatus, User, ProductionNote, SavedEstimate, ProductionOrder, ProductionOrderStatus } from '../types';
-import { Hammer, Clock, ArrowRight, ArrowLeft, Check, Package, Palette, FileText, ShoppingCart, Truck, X, Info, Plus, HardDrive, Archive, Calendar, MessageSquare, Save, Lock, Printer, List, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { Hammer, Clock, ArrowRight, ArrowLeft, Check, Package, Palette, FileText, ShoppingCart, Truck, X, Info, Plus, HardDrive, Archive, Calendar, MessageSquare, Save, Lock, Printer, List, LayoutGrid, AlertTriangle, Zap } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface ProductionProps {
   projects: Project[];
@@ -300,6 +301,13 @@ const Production: React.FC<ProductionProps> = ({
             >
               <List size={14} /> Órdenes de Producción
             </button>
+          </div>
+          <div className="ml-4">
+            <RodenAIButton 
+              mode="taller_checklist" 
+              data={{ projects: productionProjects, orders: productionOrders }} 
+              userRole={user.role}
+            />
           </div>
         </div>
         {canManageProduction ? (

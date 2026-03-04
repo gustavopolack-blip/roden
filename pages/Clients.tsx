@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Client, ClientType, ClientOrigin } from '../types';
-import { Search, MapPin, Phone, Tag, Mail, Plus, X, Building2, User, Calendar, Globe, Share2, Heart, Smile, Trash2 } from 'lucide-react';
+import { Client, ClientType, ClientOrigin, User as UserType } from '../types';
+import { Search, MapPin, Phone, Tag, Mail, Plus, X, Building2, User as UserIcon, Calendar, Globe, Share2, Heart, Smile, Trash2, Zap } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface ClientsProps {
   clients: Client[];
+  user: UserType;
   onAddClient: (newClient: Client) => void;
   onUpdateClient: (updatedClient: Client) => void;
-  onDeleteClient: (clientId: string) => void; // <-- Nueva Prop
+  onDeleteClient: (clientId: string) => void; 
 }
 
 const ORIGIN_LABELS: Record<ClientOrigin, string> = {
@@ -25,7 +27,7 @@ const ORIGIN_ICONS: Record<ClientOrigin, any> = {
     'WEBSITE': Globe
 };
 
-const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient, onDeleteClient }) => {
+const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateClient, onDeleteClient }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -127,6 +129,11 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient,
           <p className="text-roden-gray text-sm mt-1">Directorio y gestión de relaciones.</p>
         </div>
         <div className="flex gap-3">
+             <RodenAIButton 
+                mode="clientes_cartera" 
+                data={{ clients: filteredClients }} 
+                userRole={user.role}
+             />
              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input 
@@ -171,7 +178,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, onAddClient, onUpdateClient,
                               <td className="py-4 px-6">
                                   <div className="flex items-center gap-3">
                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${client.type === 'COMPANY' ? 'bg-blue-600' : 'bg-indigo-600'}`}>
-                                          {client.type === 'COMPANY' ? <Building2 size={14} /> : <User size={14} />}
+                                          {client.type === 'COMPANY' ? <Building2 size={14} /> : <UserIcon size={14} />}
                                       </div>
                                       <div>
                                           <p className="text-sm font-bold text-roden-black group-hover:text-indigo-600 transition-colors">{client.name}</p>

@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatus, Client, User, ProductionStep } from '../types';
 import { generateChecklist } from '../services/geminiService';
-import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator } from 'lucide-react';
+import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator, Zap } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface ProjectsProps {
   projects: Project[];
@@ -218,6 +219,11 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
             <p className="text-roden-gray text-sm mt-1">Gestiona el ciclo de vida de obras y amoblamientos.</p>
             </div>
             <div className="flex gap-3">
+                <RodenAIButton 
+                    mode="proyectos_atencion" 
+                    data={{ projects: filteredProjects }} 
+                    userRole={user.role}
+                />
                 <button 
                     onClick={() => setShowFilters(!showFilters)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 transition-colors ${

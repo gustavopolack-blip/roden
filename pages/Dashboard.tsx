@@ -2,14 +2,16 @@
 import React from 'react';
 import { BusinessData } from '../types';
 import MetricCard from '../components/MetricCard';
-import { DollarSign, Clock, CheckCircle, AlertTriangle, ArrowRight, FileText, Send, Hammer, Truck } from 'lucide-react';
+import { DollarSign, Clock, CheckCircle, AlertTriangle, ArrowRight, FileText, Send, Hammer, Truck, Zap } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface DashboardProps {
   data: BusinessData;
+  userRole: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
   
   // 1. Propuestas en curso (Status: PROPOSAL)
   const proposalsCount = data.projects.filter(p => p.status === 'PROPOSAL').length;
@@ -47,8 +49,15 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
            <h2 className="text-2xl md:text-3xl font-bold text-roden-black tracking-tight mb-2">Panel de Control</h2>
            <p className="text-roden-gray text-sm">Visión general del flujo de trabajo y finanzas.</p>
         </div>
-        <div className="text-xs md:text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-sm capitalize self-start md:self-auto">
-            {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        <div className="flex items-center gap-3 self-start md:self-auto">
+          <RodenAIButton 
+            mode="dashboard_briefing" 
+            data={data} 
+            userRole={userRole}
+          />
+          <div className="text-xs md:text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-sm capitalize">
+              {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
         </div>
       </header>
 

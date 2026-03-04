@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { Project, Client, Task, Report, ProductionStep, User } from '../types';
-import { FileText, Printer, Calendar, ArrowLeft, Hammer, CheckSquare, Plus, Search, X, Archive, Filter, Eye, Clock, Lock, MessageSquare, QrCode, PenTool } from 'lucide-react';
+import { FileText, Printer, Calendar, ArrowLeft, Hammer, CheckSquare, Plus, Search, X, Archive, Filter, Eye, Clock, Lock, MessageSquare, QrCode, PenTool, Zap } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface ReportsProps {
   projects: Project[];
@@ -130,6 +131,11 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                     <p className="text-roden-gray text-sm mt-1">Historial de reportes técnicos y hojas de ruta.</p>
                 </div>
                 <div className="flex gap-3">
+                     <RodenAIButton 
+                        mode="finanzas_lectura" 
+                        data={{ projects, reports }} 
+                        userRole={user.role}
+                     />
                      <button
                         onClick={() => window.print()}
                         className="bg-white border border-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm no-print"

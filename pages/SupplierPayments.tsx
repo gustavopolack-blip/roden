@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SupplierPayment, User, Supplier, Project } from '../types';
-import { Plus, Search, Calendar, DollarSign, X, Truck, Pencil, Archive, Check, Building2, Filter, Users, LayoutList, Lock } from 'lucide-react';
+import { Plus, Search, Calendar, DollarSign, X, Truck, Pencil, Archive, Check, Building2, Filter, Users, LayoutList, Lock, Zap } from 'lucide-react';
+import RodenAIButton from '../components/RodenAIButton';
 
 interface SupplierPaymentsProps {
   payments: SupplierPayment[];
@@ -241,6 +242,11 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
         </div>
         
         <div className="flex gap-3 flex-wrap">
+             <RodenAIButton 
+                mode="proveedores_costos" 
+                data={{ payments: filteredPayments, suppliers: filteredSuppliers }} 
+                userRole={user.role}
+             />
              {/* Filter Section */}
              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-1">
                  <div className="relative">
