@@ -15,8 +15,10 @@ const getEnvVar = (key: string) => {
 };
 
 const getGeminiClient = () => {
-  // Always use process.env.GEMINI_API_KEY for the Gemini API.
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Try process.env (server/full-stack) or import.meta.env (client-side SPA)
+  // @ts-ignore
+  const apiKey = process.env.GEMINI_API_KEY || (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY);
+  
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY no encontrada en el entorno.");
   }
