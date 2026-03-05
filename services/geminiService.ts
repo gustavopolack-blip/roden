@@ -2,35 +2,30 @@
 import { GoogleGenAI } from "@google/genai";
 import { BusinessData } from '../types';
 
-const getEnvVar = (key: string) => {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
-  }
+// 🛠️ Forzamos la lectura de la variable de Vite
+const getApiKey = () => {
+  // Primero intenta leer la de Vite (estándar) o process.env
   // @ts-ignore
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-    // @ts-ignore
-    return import.meta.env[key];
+  const key = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  
+  if (!key || key === 'undefined') {
+    console.error("🚨 Error Crítico: GEMINI_API_KEY no detectada.");
+    return null;
   }
-  return '';
+  return key;
 };
 
-const getGeminiClient = () => {
-  // Try process.env (server/full-stack) or import.meta.env (client-side SPA)
-  // @ts-ignore
-  const apiKey = process.env.GEMINI_API_KEY || (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY);
-  
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY no encontrada en el entorno.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
+const apiKey = getApiKey();
+
+// Solo inicializamos si la llave existe
+export const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const runContextualAnalysis = async (
   mode: string,
   data: any
 ): Promise<string> => {
+  if (!genAI) return "Error en la conexión con rødën AI: API Key no configurada.";
   try {
-    const ai = getGeminiClient();
     const today = new Date().toISOString().split('T')[0];
     const dataString = JSON.stringify(data, null, 2);
 
@@ -184,7 +179,7 @@ export const runContextualAnalysis = async (
       ${dataString}
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await genAI.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Ejecutá el análisis para el modo: ${mode}`,
       config: {
@@ -201,8 +196,8 @@ export const runContextualAnalysis = async (
 };
 
 export const askRodenAI = async (query: string, data: BusinessData): Promise<string> => {
+  if (!genAI) return "Error en la conexión con rødën AI: API Key no configurada.";
   try {
-    const ai = getGeminiClient();
     const today = new Date().toISOString().split('T')[0];
     const dataString = JSON.stringify(data, null, 2);
 
@@ -226,7 +221,7 @@ export const askRodenAI = async (query: string, data: BusinessData): Promise<str
       Responde a la consulta del usuario basándote en estos datos.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await genAI.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: query,
       config: {
@@ -243,9 +238,9 @@ export const askRodenAI = async (query: string, data: BusinessData): Promise<str
 };
 
 export const generateChecklist = async (projectType: string): Promise<string[]> => {
+  if (!genAI) return ["Medición en obra", "Pedido de materiales", "Corte de placas", "Ensamblaje", "Control de Calidad"];
   try {
-    const ai = getGeminiClient();
-    const response = await ai.models.generateContent({
+    const response = await genAI.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
       config: {
