@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.price_lists (
     valid_until DATE,
     inflation_rate DECIMAL(5, 2) DEFAULT 0, -- % de aumento respecto a la anterior
     is_active BOOLEAN DEFAULT TRUE,
+    settings JSONB DEFAULT '{}'::jsonb, -- Snapshot de configuración completa
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
