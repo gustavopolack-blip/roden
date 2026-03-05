@@ -14,11 +14,11 @@ const getEnvVar = (key: string) => {
   return '';
 };
 
-const getAiInstance = () => {
+const getGeminiClient = () => {
   // Always use process.env.GEMINI_API_KEY for the Gemini API.
-  const apiKey = process.env.GEMINI_API_KEY || '';
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("GEMINI_API_KEY is missing. AI features will be simulated or fail.");
+    throw new Error("GEMINI_API_KEY no encontrada en el entorno.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -28,7 +28,7 @@ export const runContextualAnalysis = async (
   data: any
 ): Promise<string> => {
   try {
-    const ai = getAiInstance();
+    const ai = getGeminiClient();
     const today = new Date().toISOString().split('T')[0];
     const dataString = JSON.stringify(data, null, 2);
 
@@ -200,7 +200,7 @@ export const runContextualAnalysis = async (
 
 export const askRodenAI = async (query: string, data: BusinessData): Promise<string> => {
   try {
-    const ai = getAiInstance();
+    const ai = getGeminiClient();
     const today = new Date().toISOString().split('T')[0];
     const dataString = JSON.stringify(data, null, 2);
 
@@ -242,7 +242,7 @@ export const askRodenAI = async (query: string, data: BusinessData): Promise<str
 
 export const generateChecklist = async (projectType: string): Promise<string[]> => {
   try {
-    const ai = getAiInstance();
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
