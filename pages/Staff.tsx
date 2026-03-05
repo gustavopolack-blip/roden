@@ -133,26 +133,24 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
               
               if (!authData.user) throw new Error("No se pudo crear el usuario en Auth.");
               
-              // 3. Crear perfil en Public (Public.users)
+              // 3. Crear perfil en Public (Public.users) - ELIMINADO
+              // Ahora confiamos en el trigger on_auth_user_created definido en migration_auth_trigger.sql
+              // para insertar automáticamente en public.users al crear el usuario en Auth.
+              
+              // Simulamos el objeto User para actualizar la UI inmediatamente (optimistic update)
               const newUserProfile: User = {
                   id: authData.user.id,
                   name: formData.name,
-                  email: formData.email,
+                  email: formData.email || '',
                   phone: formData.phone,
                   role: formData.role,
                   status: formData.status,
                   joinedDate: formData.joinedDate,
                   avatarInitials: formData.name.substring(0, 2).toUpperCase()
               };
-
-              const { error: profileError } = await supabase
-                  .from('users')
-                  .upsert(newUserProfile);
-
-              if (profileError) throw profileError;
               
               onAddUser(newUserProfile);
-              alert(`Usuario creado exitosamente.\n\nEmail: ${formData.email}\nPassword: ${formData.password}\n\nTu sesión se ha cerrado. Por favor, vuelve a ingresar.`);
+              alert(`Usuario creado exitosamente.\n\nEmail: ${formData.email}\nPassword: ${formData.password}\n\nTu sesión se ha cerrado automáticamente por seguridad. Por favor, vuelve a ingresar con tu cuenta de administrador.`);
               window.location.reload(); // Recargar para forzar login de nuevo o manejar el estado
               setIsModalOpen(false);
           }

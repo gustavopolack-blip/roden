@@ -20,6 +20,7 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { PAGE_PERMISSIONS } from '../constants';
 
 interface SidebarProps {
   currentPage: string;
@@ -35,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, user, onTogg
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Helper to check if role has access
-  const hasAccess = (allowedRoles: UserRole[]) => allowedRoles.includes(user.role);
+  const hasAccess = (allowedRoles: string[]) => allowedRoles.includes(user.role);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -48,18 +49,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, user, onTogg
   };
 
   const menuItems = [
-    { id: 'dashboard', label: 'Panel de Control', icon: LayoutDashboard, allowed: ['administrador'] },
-    { id: 'clients', label: 'Clientes', icon: Users, allowed: ['administrador'] },
-    { id: 'projects', label: 'Proyectos', icon: FolderKanban, allowed: ['administrador', 'operario_taller', 'gerente_taller'] },
-    { id: 'estimator', label: 'Estimador Costos', icon: ClipboardList, allowed: ['administrador'] },
-    { id: 'production', label: 'Taller', icon: Hammer, allowed: ['administrador', 'operario_taller', 'gerente_taller'] },
-    { id: 'tasks', label: 'Tareas', icon: CheckSquare, allowed: ['administrador', 'operario_taller', 'gerente_taller'] },
-    { id: 'archive', label: 'Archivo', icon: Archive, allowed: ['administrador'] },
-    { id: 'reports', label: 'Informes', icon: FileText, allowed: ['administrador', 'gerente_taller', 'operario_taller'] },
-    { id: 'budgets', label: 'Finanzas', icon: Calculator, allowed: ['administrador'] },
-    { id: 'suppliers', label: 'Proveedores', icon: Truck, allowed: ['administrador', 'gerente_taller'] },
-    { id: 'ai', label: 'Inteligencia rødën', icon: Sparkles, allowed: ['administrador'] },
-    { id: 'staff', label: 'Personal', icon: ShieldCheck, allowed: ['administrador'] }, 
+    { id: 'dashboard', label: 'Panel de Control', icon: LayoutDashboard, allowed: PAGE_PERMISSIONS.dashboard },
+    { id: 'clients', label: 'Clientes', icon: Users, allowed: PAGE_PERMISSIONS.clients },
+    { id: 'projects', label: 'Proyectos', icon: FolderKanban, allowed: PAGE_PERMISSIONS.projects },
+    { id: 'estimator', label: 'Estimador Costos', icon: ClipboardList, allowed: PAGE_PERMISSIONS.estimator },
+    { id: 'production', label: 'Taller', icon: Hammer, allowed: PAGE_PERMISSIONS.production },
+    { id: 'tasks', label: 'Tareas', icon: CheckSquare, allowed: PAGE_PERMISSIONS.tasks },
+    { id: 'archive', label: 'Archivo', icon: Archive, allowed: PAGE_PERMISSIONS.archive },
+    { id: 'reports', label: 'Informes', icon: FileText, allowed: PAGE_PERMISSIONS.reports },
+    { id: 'budgets', label: 'Presupuestos', icon: Calculator, allowed: PAGE_PERMISSIONS.budgets },
+    { id: 'suppliers', label: 'Proveedores', icon: Truck, allowed: PAGE_PERMISSIONS.suppliers },
+    { id: 'ai', label: 'Inteligencia rødën', icon: Sparkles, allowed: PAGE_PERMISSIONS.ai },
+    { id: 'staff', label: 'Personal', icon: ShieldCheck, allowed: PAGE_PERMISSIONS.staff }, 
   ];
 
   return (

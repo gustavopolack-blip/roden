@@ -1,6 +1,22 @@
 
 import { Client, Project, Budget, Task, User, SupplierPayment, Supplier, BudgetStatus } from './types';
 
+export const PAGE_PERMISSIONS = {
+  dashboard: ['administrador'],
+  clients: ['administrador'],
+  projects: ['administrador', 'gerente_taller', 'operario_taller'],
+  estimator: ['administrador'],
+  production: ['administrador', 'gerente_taller', 'operario_taller'],
+  tasks: ['administrador', 'gerente_taller', 'operario_taller'],
+  archive: ['administrador'],
+  reports: ['administrador', 'gerente_taller', 'operario_taller'],
+  budgets: ['administrador'],
+  suppliers: ['administrador', 'gerente_taller'],
+  ai: ['administrador'],
+  staff: ['administrador'],
+  settings: ['administrador']
+};
+
 export const MOCK_USER_ADMIN: User = {
   id: 'u1',
   name: 'Admin rødën',

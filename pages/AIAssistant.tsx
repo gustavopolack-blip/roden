@@ -36,8 +36,15 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ data, user }) => {
           .eq('user_email', userEmail)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-          console.error("Error loading chat history:", error);
+        if (error) {
+          if (error.code === 'PGRST116') {
+             // No rows returned - normal for new users
+          } else if (error.code === 'PGRST205' || error.code === '42P01') {
+             // Table not found - normal if migration hasn't run yet
+             console.warn("Chat history table not found. Chat will not be persisted.");
+          } else {
+             console.error("Error loading chat history:", error);
+          }
         } else if (historyData && historyData.messages) {
           setMessages(historyData.messages);
         }

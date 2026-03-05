@@ -1,19 +1,20 @@
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Budget, Project, BudgetStatus, ProductionStep, SupplierPayment, SavedEstimate } from '../types';
-import { FileText, CheckCircle, Clock, X, Search, PieChart, TrendingUp, Hammer, BarChart2, TrendingDown, DollarSign, Pencil, Trash2, Download, Archive } from 'lucide-react';
+import { Estimate, Project, EstimateStatus, ProductionStep, SupplierPayment, SavedEstimate } from '../types';
+import { FileText, CheckCircle, Clock, X, Search, PieChart, TrendingUp, Hammer, BarChart2, TrendingDown, DollarSign, Pencil, Trash2, Download, Archive, Filter } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 
 interface BudgetsProps {
-  budgets: Budget[];
+  estimates: Estimate[];
   projects: Project[];
   supplierPayments: SupplierPayment[];
-  savedEstimates?: SavedEstimate[]; // New Prop
-  onAddBudget: (budget: Budget) => void;
-  onUpdateBudget: (budget: Budget) => void;
-  onDeleteBudget: (budgetId: string) => void;
-  onArchiveBudget: (budget: Budget) => void;
+  savedEstimates?: SavedEstimate[];
+  priceLists?: any[];
+  onAddEstimate: (estimate: Estimate) => void;
+  onUpdateEstimate: (estimate: Estimate) => void;
+  onDeleteEstimate: (id: string) => void;
+  user: any; // Added user prop
   userRole: string;
 }
 
@@ -26,165 +27,149 @@ const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
     'LISTO': 'Listo'
 };
 
-const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, savedEstimates = [], userRole, onAddBudget, onUpdateBudget, onDeleteBudget, onArchiveBudget }) => {
+const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments, savedEstimates = [], priceLists = [], user, userRole, onAddEstimate, onUpdateEstimate, onDeleteEstimate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  const [filterStatus, setFilterStatus] = useState<BudgetStatus | 'ALL'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<EstimateStatus | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [budgetForm, setBudgetForm] = useState({
+  const [estimateForm, setEstimateForm] = useState({
       projectId: '',
+      title: '',
+      description: '',
       downPayment: 0,
       downPaymentDate: '',
       balance: 0,
       balanceDate: '',
-      status: 'DRAFT' as BudgetStatus,
-      importedEstimateId: '' // Temporary field for import logic
+      status: 'DRAFT' as EstimateStatus,
+      totalAmount: 0,
+      priceListId: ''
   });
 
   const getProject = (id: string) => projects.find(p => p.id === id);
   const getProjectName = (id: string) => getProject(id)?.title || 'Proyecto Desconocido';
 
-  // Find available estimates for selected project in form
-  const availableEstimatesForSelectedProject = savedEstimates.filter(
-      est => est.type === 'ECONOMIC' && est.projectId === budgetForm.projectId
-  );
-
-  const filteredBudgets = budgets.filter(budget => {
-    const matchesStatus = filterStatus === 'ALL' || budget.status === filterStatus;
-    const projectName = getProjectName(budget.projectId).toLowerCase();
+  const filteredEstimates = estimates.filter(est => {
+    const matchesStatus = filterStatus === 'ALL' || est.status === filterStatus;
+    const projectName = getProjectName(est.projectId || '').toLowerCase();
+    const title = est.title.toLowerCase();
     const matchesSearch = projectName.includes(searchTerm.toLowerCase()) || 
-                          budget.id.toLowerCase().includes(searchTerm.toLowerCase());
+                          title.includes(searchTerm.toLowerCase()) ||
+                          est.id.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
-  // Financial Metrics Logic (Same as before)
-  const totalReceivedDownPayments = budgets.filter(b => b.status === 'APPROVED').reduce((acc, b) => acc + (b.downPayment || 0), 0);
-  const totalPendingBalances = budgets.filter(b => b.status === 'APPROVED').reduce((acc, b) => acc + (b.balance || 0), 0);
+  // Financial Metrics Logic
+  const totalReceivedDownPayments = estimates.filter(e => e.status === 'APPROVED' || e.status === 'PRODUCTION').reduce((acc, e) => acc + (e.downPayment || 0), 0);
+  const totalPendingBalances = estimates.filter(e => e.status === 'APPROVED' || e.status === 'PRODUCTION').reduce((acc, e) => acc + (e.balance || 0), 0);
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  const monthlyBilling = budgets.filter(b => {
-        const d = new Date(b.lastModified);
-        return b.status === 'APPROVED' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    }).reduce((acc, b) => acc + b.total, 0);
+  const monthlyBilling = estimates.filter(e => {
+        const d = new Date(e.createdAt);
+        return (e.status === 'APPROVED' || e.status === 'PRODUCTION') && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    }).reduce((acc, e) => acc + e.totalAmount, 0);
 
-  // --- PROFITABILITY LOGIC (Same as before) ---
+  // Profitability Analysis
   const profitabilityData = projects.map(project => {
-      const income = budgets.filter(b => b.projectId === project.id && b.status === 'APPROVED').reduce((sum, b) => sum + b.total, 0);
+      const income = estimates.filter(e => e.projectId === project.id && (e.status === 'APPROVED' || e.status === 'PRODUCTION')).reduce((sum, e) => sum + e.totalAmount, 0);
       const expenses = supplierPayments.filter(sp => sp.projectId === project.id).reduce((sum, sp) => sum + sp.totalAmount, 0);
       const profit = income - expenses;
       const margin = income > 0 ? (profit / income) * 100 : 0;
       return { id: project.id, title: project.title, status: project.status, income, expenses, profit, margin };
   }).filter(d => d.income > 0 || d.expenses > 0).sort((a, b) => b.profit - a.profit); 
 
-
   const handleOpenCreate = () => {
     setEditingId(null);
-    setBudgetForm({
+    setEstimateForm({
       projectId: '',
+      title: '',
+      description: '',
       downPayment: 0,
       downPaymentDate: '',
       balance: 0,
       balanceDate: '',
-      status: BudgetStatus.DRAFT,
-      importedEstimateId: ''
+      status: 'DRAFT',
+      totalAmount: 0,
+      priceListId: ''
     });
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (budget: Budget) => {
-    setEditingId(budget.id);
-    setBudgetForm({
-      projectId: budget.projectId,
-      downPayment: budget.downPayment,
-      downPaymentDate: budget.downPaymentDate || '',
-      balance: budget.balance,
-      balanceDate: budget.balanceDate || '',
-      status: budget.status,
-      importedEstimateId: ''
+  const handleOpenEdit = (estimate: Estimate) => {
+    setEditingId(estimate.id);
+    setEstimateForm({
+      projectId: estimate.projectId || '',
+      title: estimate.title,
+      description: estimate.description || '',
+      downPayment: estimate.downPayment || 0,
+      downPaymentDate: estimate.downPaymentDate || '',
+      balance: estimate.balance || 0,
+      balanceDate: estimate.balanceDate || '',
+      status: estimate.status,
+      totalAmount: estimate.totalAmount,
+      priceListId: estimate.priceListId || ''
     });
     setIsModalOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-      onDeleteBudget(id);
-  };
-
-  const handleImportEstimate = () => {
-      if (!budgetForm.importedEstimateId) return;
-      const estimate = savedEstimates.find(e => e.id === budgetForm.importedEstimateId);
-      if (estimate && estimate.finalPrice) {
-          // Auto-fill logic: 50% Downpayment by default
-          const total = estimate.finalPrice;
-          const down = Math.round(total * 0.5);
-          const bal = total - down;
-          
-          setBudgetForm(prev => ({
-              ...prev,
-              downPayment: down,
-              balance: bal
-          }));
-          alert(`Importado monto total: $${total.toLocaleString()} desde la estimación del ${new Date(estimate.date).toLocaleDateString()}`);
-      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      const calculatedTotal = Number(budgetForm.downPayment) + Number(budgetForm.balance);
       
       if (editingId) {
-          // UPDATE
-          const original = budgets.find(b => b.id === editingId);
+          const original = estimates.find(e => e.id === editingId);
           if (!original) return;
 
-          const updatedBudget: Budget = {
+          const updatedEstimate: Estimate = {
               ...original,
-              projectId: budgetForm.projectId,
-              total: calculatedTotal,
-              downPayment: Number(budgetForm.downPayment),
-              downPaymentDate: budgetForm.downPaymentDate,
-              balance: Number(budgetForm.balance),
-              balanceDate: budgetForm.balanceDate,
-              status: budgetForm.status,
-              lastModified: new Date().toLocaleDateString('en-CA'),
+              projectId: estimateForm.projectId,
+              title: estimateForm.title,
+              description: estimateForm.description,
+              totalAmount: Number(estimateForm.totalAmount),
+              downPayment: Number(estimateForm.downPayment),
+              downPaymentDate: estimateForm.downPaymentDate,
+              balance: Number(estimateForm.balance),
+              balanceDate: estimateForm.balanceDate,
+              status: estimateForm.status,
+              updatedAt: new Date().toISOString(),
           };
-          onUpdateBudget(updatedBudget);
-
+          onUpdateEstimate(updatedEstimate);
       } else {
-          // CREATE
-          const newBudget: Budget = {
-              id: `b${Date.now()}`,
-              projectId: budgetForm.projectId,
-              total: calculatedTotal,
-              downPayment: Number(budgetForm.downPayment),
-              downPaymentDate: budgetForm.downPaymentDate,
-              balance: Number(budgetForm.balance),
-              balanceDate: budgetForm.balanceDate,
-              status: budgetForm.status,
+          const newEstimate: Estimate = {
+              id: crypto.randomUUID(),
+              projectId: estimateForm.projectId,
+              title: estimateForm.title,
+              description: estimateForm.description,
+              totalAmount: Number(estimateForm.totalAmount),
+              downPayment: Number(estimateForm.downPayment),
+              downPaymentDate: estimateForm.downPaymentDate,
+              balance: Number(estimateForm.balance),
+              balanceDate: estimateForm.balanceDate,
+              status: estimateForm.status,
               version: 1,
-              lastModified: new Date().toLocaleDateString('en-CA'),
-              items: [] 
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              createdBy: user?.id || 'system'
           };
-          onAddBudget(newBudget);
+          onAddEstimate(newEstimate);
       }
 
       setIsModalOpen(false);
   };
 
-  const calculatedTotalDisplay = Number(budgetForm.downPayment) + Number(budgetForm.balance);
+  const calculatedTotalDisplay = Number(estimateForm.downPayment) + Number(estimateForm.balance);
 
   return (
     <div className="space-y-8 animate-fade-in relative">
       <header className="flex justify-between items-center border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Finanzas</h2>
+          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Presupuestos</h2>
           <p className="text-roden-gray text-sm mt-1">Gestión de cobros, anticipos y rentabilidad.</p>
         </div>
         <div className="flex gap-3">
             <RodenAIButton 
                 mode="finanzas_lectura" 
-                data={{ budgets, projects, supplierPayments, savedEstimates }} 
+                data={{ estimates, projects, supplierPayments, savedEstimates }} 
                 userRole={userRole}
             />
             <button 
@@ -267,11 +252,29 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                  <input type="text" placeholder="Buscar presupuestos..." className="w-full bg-white border border-gray-200 pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
+              <div className="flex items-center gap-2">
+                  <Filter size={16} className="text-gray-400" />
+                  <select 
+                    className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as any)}
+                  >
+                      <option value="ALL">Todos los Estados</option>
+                      <option value="DRAFT">Borrador</option>
+                      <option value="SENT">Enviado</option>
+                      <option value="APPROVED">Aprobado</option>
+                      <option value="PRODUCTION">En Producción</option>
+                      <option value="REJECTED">Rechazado</option>
+                      <option value="CANCELLED">Cancelado</option>
+                      <option value="FINISHED">Finalizado</option>
+                      <option value="ARCHIVED">Archivado</option>
+                  </select>
+              </div>
           </div>
           <table className="w-full text-left border-collapse">
               <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/50">
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Proyecto</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Proyecto / Título</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Anticipo</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Saldo</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Total</th>
@@ -280,18 +283,29 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
                   </tr>
               </thead>
               <tbody>
-                  {filteredBudgets.map((budget) => (
-                      <tr key={budget.id} className="border-b border-gray-100 hover:bg-indigo-50/30 transition-colors group">
-                          <td className="py-4 px-6"><p className="text-sm font-bold text-roden-black">{getProjectName(budget.projectId)}</p></td>
-                          <td className="py-4 px-6"><p className="text-sm font-medium text-emerald-600">+${budget.downPayment?.toLocaleString()}</p></td>
-                          <td className="py-4 px-6"><p className="text-sm font-medium text-amber-600">${budget.balance?.toLocaleString()}</p></td>
-                          <td className="py-4 px-6 text-sm font-bold text-roden-black">${budget.total.toLocaleString()}</td>
-                          <td className="py-4 px-6"><span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100">{budget.status}</span></td>
+                  {filteredEstimates.map((estimate) => (
+                      <tr key={estimate.id} className="border-b border-gray-100 hover:bg-indigo-50/30 transition-colors group">
+                          <td className="py-4 px-6">
+                              <p className="text-sm font-bold text-roden-black">{getProjectName(estimate.projectId || '')}</p>
+                              <p className="text-xs text-gray-500">{estimate.title}</p>
+                          </td>
+                          <td className="py-4 px-6"><p className="text-sm font-medium text-emerald-600">+${estimate.downPayment?.toLocaleString()}</p></td>
+                          <td className="py-4 px-6"><p className="text-sm font-medium text-amber-600">${estimate.balance?.toLocaleString()}</p></td>
+                          <td className="py-4 px-6 text-sm font-bold text-roden-black">${estimate.totalAmount.toLocaleString()}</td>
+                          <td className="py-4 px-6">
+                              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${
+                                  estimate.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                                  estimate.status === 'PRODUCTION' ? 'bg-blue-100 text-blue-700' :
+                                  estimate.status === 'SENT' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-gray-100 text-gray-600'
+                              }`}>
+                                  {estimate.status}
+                              </span>
+                          </td>
                           <td className="py-4 px-6 text-right">
                               <div className="flex justify-end gap-2">
-                                <button onClick={() => onArchiveBudget(budget)} className="text-gray-400 hover:text-amber-600 p-1.5"><Archive size={14} /></button>
-                                <button onClick={() => handleOpenEdit(budget)} className="text-gray-400 hover:text-indigo-600 p-1.5"><Pencil size={14} /></button>
-                                <button onClick={() => handleDelete(budget.id)} className="text-gray-400 hover:text-red-600 p-1.5"><Trash2 size={14} /></button>
+                                <button onClick={() => handleOpenEdit(estimate)} className="text-gray-400 hover:text-indigo-600 p-1.5"><Pencil size={14} /></button>
+                                <button onClick={() => onDeleteEstimate(estimate.id)} className="text-gray-400 hover:text-red-600 p-1.5"><Trash2 size={14} /></button>
                               </div>
                           </td>
                       </tr>
@@ -312,56 +326,38 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
                           </button>
                       </div>
                       <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
-                              <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                    value={budgetForm.projectId} onChange={e => setBudgetForm({...budgetForm, projectId: e.target.value, importedEstimateId: ''})}>
-                                    <option value="">Seleccionar Proyecto...</option>
-                                    {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                                </select>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
+                                  <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                        value={estimateForm.projectId} onChange={e => setEstimateForm({...estimateForm, projectId: e.target.value})}>
+                                        <option value="">Seleccionar Proyecto...</option>
+                                        {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                                    </select>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                                  <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                      value={estimateForm.title} onChange={e => setEstimateForm({...estimateForm, title: e.target.value})} placeholder="Ej: Amoblamiento Cocina" />
+                              </div>
                           </div>
 
-                          {/* IMPORT ESTIMATE LOGIC */}
-                          {!editingId && budgetForm.projectId && availableEstimatesForSelectedProject.length > 0 && (
-                              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                                  <label className="block text-xs font-bold text-indigo-700 mb-2 flex items-center gap-2">
-                                      <FileText size={14}/> Importar Estimación de Costos
-                                  </label>
-                                  <div className="flex gap-2">
-                                      <select 
-                                        className="flex-1 p-2 text-sm border border-indigo-200 rounded bg-white"
-                                        value={budgetForm.importedEstimateId}
-                                        onChange={(e) => setBudgetForm({...budgetForm, importedEstimateId: e.target.value})}
-                                      >
-                                          <option value="">-- Seleccionar Estimación --</option>
-                                          {availableEstimatesForSelectedProject.map(est => (
-                                              <option key={est.id} value={est.id}>
-                                                  {new Date(est.date).toLocaleDateString()} - ${est.finalPrice?.toLocaleString()}
-                                              </option>
-                                          ))}
-                                      </select>
-                                      <button 
-                                        type="button"
-                                        onClick={handleImportEstimate}
-                                        disabled={!budgetForm.importedEstimateId}
-                                        className="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold disabled:opacity-50"
-                                      >
-                                          <Download size={14}/> Importar
-                                      </button>
-                                  </div>
-                              </div>
-                          )}
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                              <textarea className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                  value={estimateForm.description} onChange={e => setEstimateForm({...estimateForm, description: e.target.value})} placeholder="Detalles adicionales..." rows={2} />
+                          </div>
                           
                           <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">Anticipo Recibido <CheckCircle size={12} className="text-emerald-500"/></label>
                                 <input required type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                       value={budgetForm.downPayment} onChange={e => setBudgetForm({...budgetForm, downPayment: Number(e.target.value)})} />
+                                       value={estimateForm.downPayment} onChange={e => setEstimateForm({...estimateForm, downPayment: Number(e.target.value)})} />
                              </div>
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Anticipo</label>
                                 <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
-                                    value={budgetForm.downPaymentDate} onChange={e => setBudgetForm({...budgetForm, downPaymentDate: e.target.value})} />
+                                    value={estimateForm.downPaymentDate} onChange={e => setEstimateForm({...estimateForm, downPaymentDate: e.target.value})} />
                              </div>
                           </div>
 
@@ -369,31 +365,48 @@ const Budgets: React.FC<BudgetsProps> = ({ budgets, projects, supplierPayments, 
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">Saldo Pendiente <Clock size={12} className="text-amber-500"/></label>
                                 <input required type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
-                                       value={budgetForm.balance} onChange={e => setBudgetForm({...budgetForm, balance: Number(e.target.value)})} />
+                                       value={estimateForm.balance} onChange={e => setEstimateForm({...estimateForm, balance: Number(e.target.value)})} />
                              </div>
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Cancelación</label>
                                 <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
-                                    value={budgetForm.balanceDate} onChange={e => setBudgetForm({...budgetForm, balanceDate: e.target.value})} />
+                                    value={estimateForm.balanceDate} onChange={e => setEstimateForm({...estimateForm, balanceDate: e.target.value})} />
                              </div>
                           </div>
 
-                          <div className="p-4 bg-gray-50 rounded-lg flex justify-between items-center border border-gray-200">
-                              <span className="text-sm font-bold text-gray-600">Monto Total</span>
-                              <span className="text-xl font-bold text-roden-black">${calculatedTotalDisplay.toLocaleString()}</span>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Monto Total</label>
+                                  <input required type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none font-bold" 
+                                         value={estimateForm.totalAmount} onChange={e => setEstimateForm({...estimateForm, totalAmount: Number(e.target.value)})} />
+                              </div>
+                              <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                                  <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                      value={estimateForm.status} onChange={e => setEstimateForm({...estimateForm, status: e.target.value as EstimateStatus})}>
+                                      <option value="DRAFT">Borrador</option>
+                                      <option value="SENT">Enviado</option>
+                                      <option value="APPROVED">Aprobado</option>
+                                      <option value="PRODUCTION">En Producción</option>
+                                      <option value="REJECTED">Rechazado</option>
+                                      <option value="CANCELLED">Cancelado</option>
+                                      <option value="FINISHED">Finalizado</option>
+                                      <option value="ARCHIVED">Archivado</option>
+                                  </select>
+                              </div>
                           </div>
 
-                          <div className="grid grid-cols-1 gap-4">
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                                 <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
-                                     value={budgetForm.status} onChange={e => setBudgetForm({...budgetForm, status: e.target.value as BudgetStatus})}>
-                                     <option value="DRAFT">Borrador</option>
-                                     <option value="SENT">Enviado</option>
-                                     <option value="APPROVED">Aprobado</option>
-                                 </select>
-                             </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Lista de Precios (Opcional)</label>
+                              <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                                    value={estimateForm.priceListId} onChange={e => setEstimateForm({...estimateForm, priceListId: e.target.value})}>
+                                    <option value="">Ninguna...</option>
+                                    {priceLists.map(pl => (
+                                        <option key={pl.id} value={pl.id}>{pl.name}</option>
+                                    ))}
+                                </select>
                           </div>
+
                           <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100">
                               <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
                                   Cancelar

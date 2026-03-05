@@ -22,7 +22,8 @@ import {
   MOCK_BUDGETS,
   MOCK_SUPPLIERS,
   MOCK_SUPPLIER_PAYMENTS,
-  MOCK_TASKS
+  MOCK_TASKS,
+  PAGE_PERMISSIONS
 } from './constants';
 
 import {
@@ -38,11 +39,12 @@ import {
   Supplier,
   SavedEstimate,
   ProductionOrder,
-  ProjectDossier
+  ProjectDossier,
+  Estimate
 } from './types';
 
 import { supabase } from './services/supabaseClient';
-import { Loader2, Menu, ShieldAlert, RefreshCw, X } from 'lucide-react';
+import { Loader2, Menu, ShieldAlert, RefreshCw, X, ShieldCheck } from 'lucide-react';
 import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -71,6 +73,8 @@ const App: React.FC = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
   const [savedEstimates, setSavedEstimates] = useState<SavedEstimate[]>([]);
+  const [estimates, setEstimates] = useState<Estimate[]>([]);
+  const [priceLists, setPriceLists] = useState<any[]>([]);
 
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,7 +111,9 @@ const App: React.FC = () => {
         supabase.from('users').select('*'),
         supabase.from('reports').select('*'),
         supabase.from('production_orders').select('*'),
-        supabase.from('saved_estimates').select('*')
+        supabase.from('saved_estimates').select('*'),
+        supabase.from('estimates').select('*'),
+        supabase.from('price_lists').select('*')
       ]);
 
       const wakingUpTimeout = setTimeout(() => {
@@ -132,7 +138,7 @@ const App: React.FC = () => {
           throw new Error("Unexpected result from Promise.race");
       }
 
-      const [cRes, pRes, bRes, sRes, spRes, tRes, uRes, rRes, poRes, seRes] = results;
+      const [cRes, pRes, bRes, sRes, spRes, tRes, uRes, rRes, poRes, seRes, eRes, plRes] = results;
 
       // Log errors for debugging
       results.forEach((res, index) => {
@@ -153,6 +159,8 @@ const App: React.FC = () => {
       if (rRes.status === 'fulfilled' && rRes.value.data) setReports(rRes.value.data);
       if (poRes.status === 'fulfilled' && poRes.value.data) setProductionOrders(poRes.value.data);
       if (seRes.status === 'fulfilled' && seRes.value.data) setSavedEstimates(seRes.value.data);
+      if (eRes.status === 'fulfilled' && eRes.value.data) setEstimates(eRes.value.data);
+      if (plRes.status === 'fulfilled' && plRes.value.data) setPriceLists(plRes.value.data);
     } catch (err: any) {
       console.error('[fetchData] Error cargando datos:', err);
       if (err.message?.includes('Timeout')) {
@@ -190,7 +198,7 @@ const App: React.FC = () => {
             .maybeSingle();
 
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("fetchUserProfile timeout (90s exceeded)")), 90000)
+            setTimeout(() => reject(new Error("fetchUserProfile timeout (10s exceeded)")), 10000)
           );
 
           console.log("[fetchUserProfile] Attempting Supabase query...");
@@ -521,9 +529,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddBudget = async (newBudget: Omit<Budget, 'id'>) => {
+  const handleAddEstimate = async (newEstimate: Estimate) => {
     try {
-      const { error } = await supabase.from('budgets').insert(newBudget);
+      const { error } = await supabase.from('estimates').insert(newEstimate);
       if (error) throw error;
       fetchData();
     } catch (err: any) {
@@ -532,20 +540,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleArchiveBudget = async (budget: Budget) => {
+  const handleUpdateEstimate = async (estimate: Estimate) => {
     try {
-      const { error } = await supabase.from('budgets').update({ isArchived: true }).eq('id', budget.id);
-      if (error) throw error;
-      fetchData();
-    } catch (err: any) {
-      console.error('Error archivando presupuesto:', err);
-      alert(`Error: ${err.message}`);
-    }
-  };
-
-  const handleUpdateBudget = async (budget: Budget) => {
-    try {
-      const { error } = await supabase.from('budgets').update(budget).eq('id', budget.id);
+      const { error } = await supabase.from('estimates').update(estimate).eq('id', estimate.id);
       if (error) throw error;
       fetchData();
     } catch (err: any) {
@@ -554,10 +551,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteBudget = async (id: string) => {
+  const handleDeleteEstimate = async (id: string) => {
     if (!window.confirm('¿Eliminar este presupuesto?')) return;
     try {
-      const { error } = await supabase.from('budgets').delete().eq('id', id);
+      const { error } = await supabase.from('estimates').delete().eq('id', id);
       if (error) throw error;
       fetchData();
     } catch (err: any) {
@@ -681,7 +678,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteEstimate = async (id: string) => {
+  const handleDeleteSavedEstimate = async (id: string) => {
     if (!window.confirm('¿Eliminar estimación?')) return;
     try {
       const { error } = await supabase.from('saved_estimates').delete().eq('id', id);
@@ -731,12 +728,23 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!currentUser) return null;
-
     const role = currentUser.role;
+
+    // Global Permission Check
+    const allowedRoles = PAGE_PERMISSIONS[currentPage as keyof typeof PAGE_PERMISSIONS];
+    if (allowedRoles && !allowedRoles.includes(role)) {
+       return (
+         <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <ShieldCheck size={48} className="mb-4 text-gray-300" />
+            <h2 className="text-xl font-bold text-gray-600">Acceso Restringido</h2>
+            <p className="text-sm">No tienes permisos para ver esta sección.</p>
+         </div>
+       );
+    }
 
     switch (currentPage) {
       case 'dashboard':
-        return role === 'administrador' ? <Dashboard data={data} userRole={role} /> : null;
+        return <Dashboard data={data} userRole={role} />;
 
       case 'projects':
         return (
@@ -754,7 +762,7 @@ const App: React.FC = () => {
         );
 
       case 'clients':
-        return role === 'administrador' ? (
+        return (
           <Clients
             clients={clients}
             user={currentUser!}
@@ -762,7 +770,7 @@ const App: React.FC = () => {
             onUpdateClient={handleUpdateClient}
             onDeleteClient={handleDeleteClient}
           />
-        ) : null;
+        );
 
       case 'tasks':
         return (
@@ -777,35 +785,36 @@ const App: React.FC = () => {
         );
 
       case 'estimator':
-        return role === 'administrador' ? (
+        return (
           <CostEstimator
             projects={projects}
             clients={clients}
             savedEstimates={savedEstimates}
             userRole={role}
             onSaveEstimate={handleSaveEstimate}
-            onDeleteEstimate={handleDeleteEstimate}
+            onDeleteEstimate={handleDeleteSavedEstimate}
             initialProjectId={selectedProjectId ?? undefined}
           />
-        ) : null;
+        );
 
       case 'budgets':
-        return role === 'administrador' ? (
+        return (
           <Budgets
-            budgets={budgets}
+            estimates={estimates}
             projects={projects}
             supplierPayments={supplierPayments}
             savedEstimates={savedEstimates}
+            priceLists={priceLists}
+            user={currentUser}
             userRole={role}
-            onAddBudget={handleAddBudget}
-            onUpdateBudget={handleUpdateBudget}
-            onDeleteBudget={handleDeleteBudget}
-            onArchiveBudget={handleArchiveBudget}
+            onAddEstimate={handleAddEstimate}
+            onUpdateEstimate={handleUpdateEstimate}
+            onDeleteEstimate={handleDeleteEstimate}
           />
-        ) : null;
+        );
 
       case 'suppliers':
-        return ['administrador', 'gerente_taller'].includes(role) ? (
+        return (
           <SupplierPayments
             payments={supplierPayments}
             suppliers={suppliers}
@@ -816,7 +825,7 @@ const App: React.FC = () => {
             onAddSupplier={handleAddSupplier}
             onUpdateSupplier={handleUpdateSupplier}
           />
-        ) : null;
+        );
 
       case 'production':
         return (
@@ -846,21 +855,21 @@ const App: React.FC = () => {
         );
 
       case 'archive':
-        return role === 'administrador' ? <Archive projects={projects} clients={clients} /> : null;
+        return <Archive projects={projects} clients={clients} />;
 
       case 'staff':
-        return role === 'administrador' ? <Staff users={users} onAddUser={handleAddUser} /> : null;
+        return <Staff users={users} onAddUser={handleAddUser} />;
 
       case 'ai':
-        return role === 'administrador' ? (
+        return (
           <AIAssistant 
             data={data} 
             user={currentUser!} 
           />
-        ) : null;
+        );
 
       case 'settings':
-        return role === 'administrador' ? <Settings /> : null;
+        return <Settings />;
 
       default:
         return <div className="p-8">Página no encontrada</div>;

@@ -503,3 +503,38 @@ export interface ProductionOrder {
   createdAt: string;
   updatedAt: string;
 }
+
+export type EstimateStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'PRODUCTION' | 'CANCELLED' | 'FINISHED' | 'ARCHIVED';
+
+export type EstimateItemType = 'MATERIAL' | 'LABOR' | 'PROFIT' | 'OTHER';
+
+export interface EstimateItem {
+  id: string;
+  estimateId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  itemType: EstimateItemType;
+  metadata?: any;
+}
+
+export interface Estimate {
+  id: string;
+  projectId?: string;
+  priceListId?: string;
+  title: string;
+  description?: string;
+  version: number;
+  status: EstimateStatus;
+  totalAmount: number;
+  downPayment?: number;
+  downPaymentDate?: string;
+  balance?: number;
+  balanceDate?: string;
+  expirationDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  items?: EstimateItem[];
+}
