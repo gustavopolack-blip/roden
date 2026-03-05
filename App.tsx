@@ -114,24 +114,32 @@ const App: React.FC = () => {
         setIsWakingUpDb(true);
       }, 5000);
 
-      const globalFetchTimeout = new Promise((_, reject) => 
+      // Create a timeout promise that rejects after 60 seconds
+      const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("fetchData timeout")), 60000)
       );
 
-      const results = await Promise.race([fetchPromise, globalFetchTimeout]) as any;
+      // Race the fetch against the timeout
+      const results = await Promise.race([fetchPromise, timeoutPromise]) as PromiseSettledResult<any>[];
+      
       clearTimeout(wakingUpTimeout);
       setIsWakingUpDb(false);
       
       console.log("[fetchData] Promise.allSettled completed.");
+
+      // Check if results is actually an array (it should be if fetchPromise won)
+      if (!Array.isArray(results)) {
+          throw new Error("Unexpected result from Promise.race");
+      }
 
       const [cRes, pRes, bRes, sRes, spRes, tRes, uRes, rRes, poRes, seRes] = results;
 
       // Log errors for debugging
       results.forEach((res, index) => {
         if (res.status === 'rejected') {
-          console.error(`[fetchData] Table ${index} failed:`, res.reason);
-        } else if (res.value.error) {
-          console.error(`[fetchData] Table ${index} returned error:`, res.value.error);
+          console.error(`[fetchData] Table fetch ${index} failed:`, res.reason);
+        } else if (res.status === 'fulfilled' && res.value.error) {
+          console.error(`[fetchData] Table fetch ${index} returned Supabase error:`, res.value.error);
         }
       });
 

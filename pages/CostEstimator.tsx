@@ -278,7 +278,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   useEffect(() => {
     const loadPriceLists = async () => {
-      const { data, error } = await supabase.from('price_lists').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('price_catalog').select('*').order('created_at', { ascending: false });
       if (error) {
         console.error('Error loading price lists:', error);
         return;
@@ -1620,10 +1620,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           name: newList.name,
           created_at: newList.date
       });
-      const { error } = await supabase.from('price_lists').insert({
+      const { error } = await supabase.from('price_catalog').insert({
           id: newList.id,
           name: newList.name,
-          // settings: newList.settings,
+          settings: newList.settings,
           created_at: newList.date
       });
       

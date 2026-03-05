@@ -24,11 +24,11 @@ const getEnvVar = (viteKey: string, reactKey: string) => {
   return val;
 };
 
-const SUPABASE_URL = 
+export const SUPABASE_URL = 
   getEnvVar('VITE_SUPABASE_URL', 'REACT_APP_SUPABASE_URL') || 
   "https://fjvrfddgmzuunbxzcwmr.supabase.co";
 
-const SUPABASE_ANON_KEY = 
+export const SUPABASE_ANON_KEY = 
   getEnvVar('VITE_SUPABASE_ANON_KEY', 'REACT_APP_SUPABASE_ANON_KEY') || 
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqdnJmZGRnbXp1dW5ieHpjd21yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MjE5NDEsImV4cCI6MjA4NTE5Nzk0MX0.sbnhT94fuoNcCPD7RFDKd27xM8HFl07FfhF0DpytNRw";
 

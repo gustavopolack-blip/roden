@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, UserRole, UserStatus } from '../types';
 import { Shield, User as UserIcon, Phone, ShieldCheck, Plus, X, MessageCircle, Calendar, Hammer, Lock, Mail, Edit, Loader2, Trash2 } from 'lucide-react';
-import { supabase } from '../services/supabaseClient';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../services/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 interface StaffProps {
   users: User[];
@@ -79,39 +80,88 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
       e.preventDefault();
       setLoading(true);
 
-      if (isEditMode && editingUserId) {
-          // UPDATE MODE
-          const { error } = await supabase.from('users').update({
-              name: formData.name,
-              phone: formData.phone,
-              role: formData.role,
-              status: formData.status,
-              joinedDate: formData.joinedDate
-          }).eq('id', editingUserId);
+      try {
+          if (isEditMode && editingUserId) {
+              // UPDATE MODE (Lógica existente)
+              const { error } = await supabase.from('users').update({
+                  name: formData.name,
+                  phone: formData.phone,
+                  role: formData.role,
+                  status: formData.status,
+                  joinedDate: formData.joinedDate
+              }).eq('id', editingUserId);
 
-          if (error) {
-              alert("Error actualizando usuario: " + error.message);
+              if (error) throw error;
+              window.location.reload();
           } else {
-              window.location.reload(); 
-          }
-      } else {
-          // CREATE MODE
-          const newUser: User = {
-              id: crypto.randomUUID(), // Generate a valid UUID
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              role: formData.role,
-              status: formData.status,
-              joinedDate: formData.joinedDate,
-              avatarInitials: formData.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()
-          };
-          
-          onAddUser(newUser);
-      }
+              // CREATE MODE - ADMIN CREA USUARIO CON PASSWORD
+              
+              // 2. Crear usuario en Auth (Auth.users)
+              // NOTA: En un entorno cliente real, no podemos crear usuarios con contraseña directamente sin ser admin (service_role).
+              // La única forma segura desde el cliente es invitar al usuario o usar una Edge Function.
+              // Sin embargo, para este prototipo, intentaremos usar signUp. Si hay sesión activa, esto podría fallar o cambiar la sesión actual.
+              // La solución correcta es usar una segunda instancia de cliente PERO eso requiere anon key y no tiene permisos de admin.
+              // Por lo tanto, la creación de usuarios debe hacerse desde el panel de Supabase o mediante una función backend.
+              
+              // INTENTO DE SOLUCIÓN HÍBRIDA:
+              // Usamos signUp. Si funciona, genial. Si no, avisamos.
+              // ADVERTENCIA: signUp iniciará sesión automáticamente con el nuevo usuario, cerrando la del admin.
+              // Para evitar esto, deberíamos usar una Edge Function. Como no tenemos, avisaremos al usuario.
 
-      setLoading(false);
-      setIsModalOpen(false);
+              alert("AVISO: Al crear un usuario desde aquí, se cerrará tu sesión actual y quedarás logueado como el nuevo usuario. Esto es una limitación de seguridad de Supabase en el lado del cliente. Deberás volver a iniciar sesión como administrador.");
+
+              const { data: authData, error: authError } = await supabase.auth.signUp({
+                  email: formData.email,
+                  password: formData.password,
+                  options: {
+                      data: {
+                          name: formData.name,
+                          role: formData.role
+                      }
+                  }
+              });
+
+              if (authError) {
+                  if (authError.message.includes("already registered")) {
+                       // Si ya existe en Auth, intentamos crear solo el perfil en public.users
+                       // Pero necesitamos el ID. No podemos obtenerlo sin loguearnos.
+                       // Asumimos que el usuario debe contactar soporte o el admin debe borrarlo.
+                       throw new Error("El usuario ya existe en Auth. Por favor, bórralo desde el panel de Supabase o usa otro email.");
+                  }
+                  throw authError;
+              }
+              
+              if (!authData.user) throw new Error("No se pudo crear el usuario en Auth.");
+              
+              // 3. Crear perfil en Public (Public.users)
+              const newUserProfile: User = {
+                  id: authData.user.id,
+                  name: formData.name,
+                  email: formData.email,
+                  phone: formData.phone,
+                  role: formData.role,
+                  status: formData.status,
+                  joinedDate: formData.joinedDate,
+                  avatarInitials: formData.name.substring(0, 2).toUpperCase()
+              };
+
+              const { error: profileError } = await supabase
+                  .from('users')
+                  .upsert(newUserProfile);
+
+              if (profileError) throw profileError;
+              
+              onAddUser(newUserProfile);
+              alert(`Usuario creado exitosamente.\n\nEmail: ${formData.email}\nPassword: ${formData.password}\n\nTu sesión se ha cerrado. Por favor, vuelve a ingresar.`);
+              window.location.reload(); // Recargar para forzar login de nuevo o manejar el estado
+              setIsModalOpen(false);
+          }
+      } catch (error: any) {
+          console.error("Error creating user:", error);
+          alert("Error: " + (error.message || JSON.stringify(error)));
+      } finally {
+          setLoading(false);
+      }
   };
 
   const getWhatsappLink = (phone: string) => {
@@ -275,18 +325,19 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
           </table>
       </div>
 
-       {/* User Modal (Create/Edit) - Using Portal */}
-       {isModalOpen && createPortal(
-          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="flex min-h-full items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 relative">
-                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
-                          <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
-                          <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
-                              <X size={20} />
-                          </button>
-                      </div>
-                      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      {/* User Modal (Create/Edit) - Using Portal */}
+      {isModalOpen && createPortal(
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 relative flex flex-col max-h-[90vh]">
+                  <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10 rounded-t-2xl shrink-0">
+                      <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
+                      <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
+                          <X size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="overflow-y-auto p-6 space-y-4 grow">
+                      <form id="user-form" onSubmit={handleSubmit} className="space-y-4">
                           <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
                               <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
@@ -308,23 +359,25 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                                 </div>
                               </div>
                               
-                              {!isEditMode && (
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña Temporal</label>
-                                    <div className="relative">
-                                        <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                                        <input 
-                                            required 
-                                            type="password" 
-                                            className="w-full p-2.5 pl-10 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
-                                            placeholder="••••••••"
-                                            value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-1">Comparte esta contraseña con el usuario para su primer ingreso.</p>
-                                  </div>
-                              )}
-                          </div>
+                                  {!isEditMode && (
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña de Acceso</label>
+                                        <div className="relative">
+                                            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                            <input 
+                                                required 
+                                                type="text" 
+                                                className="w-full p-2.5 pl-10 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none font-mono text-sm"
+                                                placeholder="Ej: usuario123"
+                                                value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} 
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 mt-1">
+                                            <span className="font-bold text-roden-black">Importante:</span> Copia esta contraseña y entrégasela al usuario. Él podrá cambiarla después.
+                                        </p>
+                                      </div>
+                                  )}
+                              </div>
 
                           <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -357,16 +410,17 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                                     value={formData.joinedDate} onChange={e => setFormData({...formData, joinedDate: e.target.value})} />
                               </div>
                           </div>
-                          <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100 sticky bottom-0 rounded-b-2xl p-4 -mx-6 -mb-6 mt-2">
-                              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
-                                  Cancelar
-                              </button>
-                              <button type="submit" disabled={loading} className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg flex items-center gap-2">
-                                  {loading && <Loader2 size={16} className="animate-spin" />}
-                                  {isEditMode ? 'Guardar Cambios' : 'Confirmar Alta'}
-                              </button>
-                          </div>
                       </form>
+                  </div>
+
+                  <div className="p-6 border-t border-gray-100 bg-white rounded-b-2xl shrink-0 flex justify-end gap-3">
+                      <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
+                          Cancelar
+                      </button>
+                      <button form="user-form" type="submit" disabled={loading} className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg flex items-center gap-2">
+                          {loading && <Loader2 size={16} className="animate-spin" />}
+                          {isEditMode ? 'Guardar Cambios' : 'Confirmar Alta'}
+                      </button>
                   </div>
               </div>
           </div>,

@@ -28,6 +28,7 @@ const ORIGIN_ICONS: Record<ClientOrigin, any> = {
 };
 
 const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateClient, onDeleteClient }) => {
+  console.log("[Clients.tsx] Received clients:", clients);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -43,11 +44,16 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
       status: 'LEAD' as any
   });
 
-  // CORRECCIÓN ERROR 'SOME': Añadida validación opcional en tags
-  const filteredClients = (clients || []).filter(client => 
-    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    client.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // CORRECCIÓN ERROR 'SOME': Añadida validación robusta para evitar fallos con datos nulos
+  const filteredClients = (clients || []).filter(client => {
+    if (!searchTerm) return true; // Si no hay búsqueda, mostrar todos
+    const term = searchTerm.toLowerCase();
+    const nameMatch = (client.name || '').toLowerCase().includes(term);
+    const tagsMatch = Array.isArray(client.tags) && client.tags.some(tag => (tag || '').toLowerCase().includes(term));
+    return nameMatch || tagsMatch;
+  });
+
+  console.log("[Clients.tsx] filteredClients:", filteredClients);
 
   const handleOpenAddModal = () => {
     setEditingClient(null);
