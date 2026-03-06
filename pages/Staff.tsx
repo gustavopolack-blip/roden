@@ -238,14 +238,20 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                   <tr className="border-b border-gray-200 bg-gray-50/50">
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Usuario</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Contacto</th>
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Rol</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Rol (Base de Datos)</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha Alta</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Estado</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acción</th>
                   </tr>
               </thead>
               <tbody>
-                  {users.map((user) => (
+                  {users.length === 0 ? (
+                      <tr>
+                          <td colSpan={6} className="py-12 text-center text-gray-400 italic">
+                              No se encontraron usuarios en la base de datos.
+                          </td>
+                      </tr>
+                  ) : users.map((user) => (
                       <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                           <td className="py-4 px-6">
                               <div className="flex items-center gap-3">
@@ -273,7 +279,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                                   'bg-indigo-50 text-indigo-700 border-indigo-100'
                               }`}>
                                   {user.role === 'administrador' ? <Shield size={12} /> : user.role === 'gerente_taller' ? <Hammer size={12} /> : <UserIcon size={12} />}
-                                  {user.role === 'administrador' ? 'ADMINISTRADOR' : user.role === 'gerente_taller' ? 'GERENTE TALLER' : 'OPERARIO TALLER'}
+                                  {user.role ? user.role.toUpperCase().replace('_', ' ') : 'SIN ROL'}
                               </span>
                           </td>
                           <td className="py-4 px-6 text-sm text-gray-500">

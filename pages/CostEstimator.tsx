@@ -862,6 +862,31 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       }
   };
 
+  const handleEditItem = (item: EstimatorItem) => {
+      if (pendingModules.length > 0) {
+          if (!confirm("Hay módulos pendientes que se moverán al final de la lista si editas este item. ¿Continuar?")) {
+              return;
+          }
+      }
+      // Move item modules back to pending
+      setPendingModules(prev => [...prev, ...item.modules]);
+      
+      // Load item data into form for re-creation
+      setItemForm({
+          name: item.name,
+          workers: item.labor.workers,
+          days: item.labor.days,
+          marginWorkshop: item.margins.workshop,
+          marginRoden: item.margins.roden
+      });
+      
+      // Remove from items list
+      setItems(prev => prev.filter(i => i.id !== item.id));
+      
+      // Scroll to top or provide feedback? 
+      // The user will see modules back in the pending list.
+  };
+
   const toggleItemSelection = (id: string) => {
       const next = new Set(selectedItemIds);
       if (next.has(id)) next.delete(id);
@@ -2774,7 +2799,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <div className="text-xs text-gray-400">
                                                     Laqueado: {formatCurrency(item.scenarioPrices.lacquer)}
                                                 </div>
-                                                <button onClick={() => deleteItem(item.id)} className="text-red-400 hover:text-red-600 text-xs mt-2 underline">Eliminar</button>
+                                                <div className="flex justify-end gap-3 mt-2">
+                                                    <button onClick={() => handleEditItem(item)} className="text-indigo-600 hover:text-indigo-800 text-xs underline flex items-center gap-1">
+                                                        <Pencil size={10}/> Editar
+                                                    </button>
+                                                    <button onClick={() => deleteItem(item.id)} className="text-red-400 hover:text-red-600 text-xs underline flex items-center gap-1">
+                                                        <Trash2 size={10}/> Eliminar
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
