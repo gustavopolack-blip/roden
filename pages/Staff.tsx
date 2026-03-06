@@ -16,6 +16,39 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedAdmin = async () => {
+      setIsSeeding(true);
+      try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+              alert("Debes estar logueado para crear tu perfil.");
+              return;
+          }
+
+          const newProfile = {
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.user_metadata?.name || session.user.email?.split('@')[0],
+              role: 'administrador',
+              status: 'ACTIVE',
+              joined_date: new Date().toISOString().split('T')[0],
+              avatar_initials: (session.user.user_metadata?.name || session.user.email || '??').substring(0, 2).toUpperCase()
+          };
+
+          const { error } = await supabase.from('users').insert(newProfile);
+          if (error) throw error;
+          
+          alert("Perfil de administrador creado correctamente.");
+          window.location.reload();
+      } catch (error: any) {
+          console.error("Error seeding admin:", error);
+          alert("Error al crear perfil: " + error.message);
+      } finally {
+          setIsSeeding(false);
+      }
+  };
 
   const [formData, setFormData] = useState({
       name: '',
@@ -247,8 +280,16 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
               <tbody>
                   {users.length === 0 ? (
                       <tr>
-                          <td colSpan={6} className="py-12 text-center text-gray-400 italic">
-                              No se encontraron usuarios en la base de datos.
+                          <td colSpan={6} className="py-12 text-center">
+                               <p className="text-gray-400 italic mb-4">No se encontraron usuarios en la base de datos.</p>
+                               <button 
+                                  onClick={handleSeedAdmin}
+                                  disabled={isSeeding}
+                                  className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 mx-auto"
+                               >
+                                   {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                                   Crear mi Perfil de Administrador
+                               </button>
                           </td>
                       </tr>
                   ) : users.map((user) => (

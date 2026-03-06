@@ -903,8 +903,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       setIsPriceListModalOpen(true);
   };
 
-  const handleSelectPriceList = (listSettings: CostSettings) => {
-      setActiveSettings(listSettings);
+  const handleSelectPriceList = (listSettings: CostSettings, id?: string, name?: string) => {
+      setActiveSettings({ ...listSettings, id, name });
       setIsPriceListModalOpen(false);
       
       if (pendingPrintType === 'COSTS') {
@@ -937,6 +937,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               items: selectedItemsList,
               modules: [], // Not used for ECONOMIC but required by type
               settingsSnapshot: activeSettings,
+              priceListId: activeSettings.id,
               totalDirectCost: selectedItemsList.reduce((sum, item) => sum + (getRecalculatedItemPrices(item, activeSettings) as any).totalDirectCost, 0),
               finalPrice: totalRef,
               status: BudgetStatus.DRAFT,
@@ -1228,6 +1229,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               type: 'TECHNICAL',
               modules: selectedTechnicalItems as any,
               settingsSnapshot: settings,
+              priceListId: activeSettings.id,
               version: 1,
               isLatest: true
           };
@@ -1358,6 +1360,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       if (confirm("Cargar esta estimación reemplazará los items actuales en el área de trabajo. ¿Continuar?")) {
           setItems(estimate.modules as any); 
           setSettings(estimate.settingsSnapshot);
+          setActiveSettings({ ...estimate.settingsSnapshot, id: estimate.priceListId, name: estimate.priceListName });
           
           if (estimate.projectId) {
               setSelectedProjectId(estimate.projectId);
@@ -1659,12 +1662,16 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       }
       console.log("[handleSavePriceList] Success!");
       
+      setActiveSettings({ ...newList.settings, id: newList.id, name: newList.name });
       setPriceHistory([newList, ...priceHistory]);
       setNewListName('');
   };
   const handleLoadPriceList = (id: string) => {
       const h = priceHistory.find(x => x.id === id);
-      if (h && confirm('¿Cargar lista?')) setSettings({ ...h.settings });
+      if (h && confirm('¿Cargar lista?')) {
+          setSettings({ ...h.settings });
+          setActiveSettings({ ...h.settings, id: h.id, name: h.name });
+      }
   };
 
   const calculateGlobalSummary = (items: EstimatorItem[]) => {
@@ -3611,7 +3618,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             
                             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                                 <button 
-                                    onClick={() => handleSelectPriceList(settings)}
+                                    onClick={() => handleSelectPriceList(settings, 'current', 'Lista Actual')}
                                     className="w-full text-left p-4 rounded-xl border-2 border-indigo-100 bg-indigo-50 hover:border-indigo-300 transition-all group"
                                 >
                                     <div className="flex justify-between items-center">
@@ -3626,7 +3633,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 {priceHistory.map(list => (
                                     <button 
                                         key={list.id}
-                                        onClick={() => handleSelectPriceList(list.settings)}
+                                        onClick={() => handleSelectPriceList(list.settings, list.id, list.name)}
                                         className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-gray-50 transition-all group"
                                     >
                                         <div className="flex justify-between items-center">
