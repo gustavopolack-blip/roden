@@ -86,27 +86,18 @@ const App: React.FC = () => {
     return 'operario_taller';
   };
 
-  const fetchData = async (sessionOverride?: any) => {
+  const fetchData = async (sessionOverride?: Session | null) => {
     console.log("[fetchData] Started.");
     setIsSyncing(true);
     try {
       // Accept session as parameter to avoid stale closure over React state
-      let currentSession = sessionOverride || session;
-      
-      if (!currentSession) {
-        // Last resort: get from Supabase directly
-        const { data } = await supabase.auth.getSession();
-        currentSession = data.session;
-      }
+      const currentSession = sessionOverride ?? session ?? (await supabase.auth.getSession()).data.session;
       
       if (!currentSession) {
         console.warn("[fetchData] No hay sesión activa, abortando carga de datos.");
         setIsSyncing(false);
         return;
       }
-
-      // Wait for token to be fully propagated to Supabase API
-      await new Promise(res => setTimeout(res, 1000));
 
       console.log("[fetchData] Awaiting Promise.allSettled...");
       
@@ -193,7 +184,10 @@ const App: React.FC = () => {
     isFetchingProfileRef.current = true;
     setIsProfileLoading(true);
 
-    const fetchWithRetry = async (retries = 5, delay = 4000): Promise<any> => {
+    // Small delay to let the JWT token propagate to Supabase's API
+    await new Promise(res => setTimeout(res, 500));
+
+    const fetchWithRetry = async (retries = 3, delay = 3000): Promise<any> => {
       for (let i = 0; i < retries; i++) {
         try {
           const wakingUpTimeout = setTimeout(() => {
@@ -207,7 +201,7 @@ const App: React.FC = () => {
             .maybeSingle();
 
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("fetchUserProfile timeout (30s exceeded)")), 30000)
+            setTimeout(() => reject(new Error("fetchUserProfile timeout (10s exceeded)")), 10000)
           );
 
           console.log("[fetchUserProfile] Attempting Supabase query...");
