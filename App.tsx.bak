@@ -86,12 +86,12 @@ const App: React.FC = () => {
     return 'operario_taller';
   };
 
-  const fetchData = async (sessionOverride?: Session | null) => {
+  const fetchData = async () => {
     console.log("[fetchData] Started.");
     setIsSyncing(true);
     try {
-      // Accept session as parameter to avoid stale closure over React state
-      const currentSession = sessionOverride ?? session ?? (await supabase.auth.getSession()).data.session;
+      // Use the session we already have instead of calling getSession again
+      const currentSession = session || (await supabase.auth.getSession()).data.session;
       
       if (!currentSession) {
         console.warn("[fetchData] No hay sesión activa, abortando carga de datos.");
@@ -183,9 +183,6 @@ const App: React.FC = () => {
     
     isFetchingProfileRef.current = true;
     setIsProfileLoading(true);
-
-    // Small delay to let the JWT token propagate to Supabase's API
-    await new Promise(res => setTimeout(res, 500));
 
     const fetchWithRetry = async (retries = 3, delay = 3000): Promise<any> => {
       for (let i = 0; i < retries; i++) {
@@ -287,8 +284,8 @@ const App: React.FC = () => {
           supabase.auth.updateUser({ data: { role: resolvedUser.role } });
         }
 
-        // Trigger data fetch - pass session explicitly to avoid stale closure
-        fetchData(session);
+        // Trigger data fetch
+        fetchData();
       } else {
         throw new Error("Failed to resolve user object");
       }
@@ -309,7 +306,7 @@ const App: React.FC = () => {
       
       currentUserRef.current = fallbackUser;
       setCurrentUser(fallbackUser);
-      fetchData(session);
+      fetchData();
     } finally {
       console.log("[fetchUserProfile] FINISHED. Unblocking UI.");
       setIsAuthLoading(false);
