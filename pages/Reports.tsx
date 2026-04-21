@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, Client, Task, Report, ProductionStep, User } from '../types';
-import { FileText, Printer, Calendar, ArrowLeft, Hammer, CheckSquare, Plus, Search, X, Archive, Filter, Eye, Clock, Lock, MessageSquare, QrCode, PenTool, Zap } from 'lucide-react';
+import { FileText, Printer, Calendar, ArrowLeft, Hammer, CheckSquare, Plus, Search, X, Archive, Filter, Eye, Clock, Lock, MessageSquare, QrCode, PenTool, Zap, Trash2 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 
 interface ReportsProps {
@@ -11,6 +11,7 @@ interface ReportsProps {
   reports: Report[];
   user: User;
   onSaveReport: (report: Report) => void;
+  onDeleteReport?: (reportId: string) => void;
 }
 
 const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
@@ -22,7 +23,7 @@ const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
     'LISTO': 'Listo'
 };
 
-const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, user, onSaveReport }) => {
+const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, user, onSaveReport, onDeleteReport }) => {
   const [view, setView] = useState<'LIST' | 'CREATE' | 'VIEW'>('LIST');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
@@ -35,6 +36,32 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
 
   // Search for New Report Modal
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
+
+  // --- PRINT BACKGROUND FIX ---
+  // Fuerza fondo blanco vía DOM antes de imprimir, sin importar especificidad CSS
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const applyWhite = () => {
+      document.documentElement.style.setProperty('background', 'white', 'important');
+      document.body.style.setProperty('background', 'white', 'important');
+      const root = document.getElementById('root');
+      if (root) root.style.setProperty('background', 'white', 'important');
+      if (wrapperRef.current) wrapperRef.current.style.setProperty('background', 'white', 'important');
+    };
+    const restoreStyles = () => {
+      document.documentElement.style.removeProperty('background');
+      document.body.style.removeProperty('background');
+      const root = document.getElementById('root');
+      if (root) root.style.removeProperty('background');
+      if (wrapperRef.current) wrapperRef.current.style.removeProperty('background');
+    };
+    window.addEventListener('beforeprint', applyWhite);
+    window.addEventListener('afterprint', restoreStyles);
+    return () => {
+      window.removeEventListener('beforeprint', applyWhite);
+      window.removeEventListener('afterprint', restoreStyles);
+    };
+  }, []);
 
   // --- LOGIC ---
 
@@ -81,7 +108,10 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
         projectId: selectedProject.id,
         projectNameSnapshot: selectedProject.title,
         generatedDate: new Date().toISOString(),
-        observations: observations
+        observations: observations,
+        title: `Informe: ${selectedProject.title}`,
+        date: new Date().toISOString(),
+        content: observations
     };
 
     onSaveReport(newReport);
@@ -107,7 +137,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   const filteredReports = reports.filter(r => {
       const dateMatch = historyDateFilter ? r.generatedDate.startsWith(historyDateFilter) : true;
       const projectMatch = historySearchTerm 
-          ? r.projectNameSnapshot.toLowerCase().includes(historySearchTerm.toLowerCase()) 
+          ? (r.projectNameSnapshot || '').toLowerCase().includes(historySearchTerm.toLowerCase()) 
           : true;
       return dateMatch && projectMatch;
   });
@@ -116,7 +146,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   const allowedStatusesForReport = ['PRODUCTION', 'READY'];
   
   const filteredProjectsForModal = projects.filter(p => {
-      const nameMatch = p.title.toLowerCase().includes(projectSearchTerm.toLowerCase());
+      const nameMatch = (p.title || '').toLowerCase().includes(projectSearchTerm.toLowerCase());
       const statusMatch = allowedStatusesForReport.includes(p.status);
       return nameMatch && statusMatch;
   });
@@ -211,15 +241,22 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                                 </td>
                                 <td className="py-4 px-6 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button 
+                                        <button
                                             onClick={() => handleViewReport(report)}
                                             className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded hover:bg-indigo-100 transition-colors"
                                         >
                                             <Eye size={14} /> Ver / Imprimir
                                         </button>
-                                        <span className="inline-flex items-center gap-1 text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
-                                            <Archive size={12} />
-                                        </span>
+                                        {user.role === 'administrador' && onDeleteReport && (
+                                            <button
+                                                onClick={() => onDeleteReport(report.id)}
+                                                title="Eliminar informe"
+                                                aria-label="Eliminar informe"
+                                                className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 border border-red-100 transition-colors"
+                                            >
+                                                <Trash2 size={14} /> Borrar
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -306,26 +343,25 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   const isReadOnly = view === 'VIEW';
 
   return (
-    <div className="animate-fade-in min-h-screen bg-gray-100/50 print:bg-white flex flex-col items-center">
-        {/* Style block to force print layout */}
+    <div ref={wrapperRef} className="animate-fade-in min-h-screen bg-gray-100/50 print:bg-white flex flex-col items-center">
+        {/* Style block — idéntico al presupuesto */}
         <style>{`
             @media print {
-                @page { margin: 0; size: A4; }
-                body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                @page { size: A4; margin: 0; }
+                html, body, #root, .animate-fade-in, .min-h-screen { margin:0 !important; padding:0 !important; background:white !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
                 .no-print { display: none !important; }
-                .print-container { 
-                    width: 210mm !important; 
-                    height: 297mm !important; 
-                    margin: 0 !important; 
-                    padding: 0 !important;
-                    border: none !important; 
-                    box-shadow: none !important; 
-                    overflow: hidden !important;
-                    background: white !important;
-                    display: flex !important;
-                    flex-direction: column !important;
-                }
-                * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                head, header[role="banner"] { display: none !important; }
+                .rpt-page { width:210mm !important; height:297mm !important; overflow:hidden !important; display:flex !important; flex-direction:column !important; background:white !important; }
+                .rpt-hdr { flex-shrink:0; height:16mm !important; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+                .rpt-ftr { flex-shrink:0; height:10mm !important; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+                .rpt-body { flex:1; overflow:hidden !important; padding:6mm 10mm !important; }
+                * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+            }
+            @media screen {
+                .rpt-page { width:210mm; min-height:297mm; display:flex; flex-direction:column; background:white; box-shadow:0 4px 24px rgba(0,0,0,0.15); margin-bottom:28px; }
+                .rpt-hdr { flex-shrink:0; }
+                .rpt-ftr { flex-shrink:0; margin-top:auto; }
+                .rpt-body { flex:1; padding:6mm 10mm; }
             }
         `}</style>
 
@@ -358,33 +394,23 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
             </div>
         </div>
 
-        {/* REPORT CONTAINER (Visual representation of A4 Paper) */}
-        <div className="print-container relative w-[210mm] min-h-[297mm] bg-white shadow-2xl print:shadow-none flex flex-col text-black font-sans leading-tight">
-            
-            {/* 1. HEADER (REDUCED HEIGHT & LOGO SIZE) */}
-            <header className="h-[14mm] bg-black text-white flex items-center justify-between px-10 relative">
-                {/* Left Group */}
-                <div className="flex items-baseline gap-4">
-                    <h1 className="text-4xl font-bold tracking-tighter leading-none">rødën</h1>
-                    <span className="text-3xl font-light text-gray-500 pb-0.5">|</span>
-                    <span className="text-lg font-medium mb-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                        Informe avance de obra
-                    </span>
-                </div>
+        {/* DOCUMENT — idéntico al presupuesto */}
+        <div className="rpt-page text-black font-sans leading-tight">
 
-                {/* Right */}
-                <div className="text-right">
-                    <div className="text-sm font-bold">
-                        {new Date().toLocaleDateString('es-AR')}
-                    </div>
-                    <div className="text-xs opacity-70 mt-0.5">
-                        Página 1 de 1
-                    </div>
+            <div className="rpt-hdr bg-black text-white flex items-center justify-between"
+                 style={{ padding: '0 10mm' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                    <span style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.5px', lineHeight: 1 }}>rødën</span>
+                    <span style={{ fontSize: '16px', fontWeight: 300, color: '#666' }}>|</span>
+                    <span style={{ fontSize: '13px', fontWeight: 500 }}>Informe avance de obra</span>
                 </div>
-            </header>
+                <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{selectedProject.title}</div>
+                    <div style={{ fontSize: '10px', color: '#aaa' }}>{new Date().toLocaleDateString('es-AR')}</div>
+                </div>
+            </div>
 
-            {/* Content Padding */}
-            <div className="px-10 py-8 flex-1 flex flex-col gap-8">
+            <div className="rpt-body flex flex-col gap-6">
 
                 {/* 2. PROJECT IDENTITY (LARGE - NO UPPERCASE) */}
                 <section className="border-b border-gray-300 pb-4">
@@ -504,11 +530,11 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
 
             </div>
 
-            {/* 6. COMPACT FOOTER (ADJUSTED SIZES) */}
-            <footer className="h-[10mm] bg-gray-300 flex items-center justify-between px-10 mt-auto border-t border-gray-300 leading-none text-gray-800">
-                <span className="text-xs tracking-wider" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: '400' }}>Devoto | Buenos Aires | Argentina</span>
-                <span className="text-xl" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: '700' }}>www.rodenmobel.com</span>
-            </footer>
+            <div className="rpt-ftr bg-gray-300 text-gray-800 flex items-center justify-between border-t border-gray-300 leading-none"
+                 style={{ padding: '0 10mm' }}>
+                <span className="text-xs tracking-wider">Devoto | Buenos Aires | Argentina</span>
+                <span className="text-xl font-bold">www.rodenmobel.com</span>
+            </div>
 
         </div>
     </div>

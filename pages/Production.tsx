@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Project, ProductionStep, Client, ProjectStatus, User, ProductionNote, SavedEstimate, ProductionOrder, ProductionOrderStatus } from '../types';
-import { Hammer, Clock, ArrowRight, ArrowLeft, Check, Package, Palette, FileText, ShoppingCart, Truck, X, Info, Plus, HardDrive, Archive, Calendar, MessageSquare, Save, Lock, Printer, List, LayoutGrid, AlertTriangle, Zap } from 'lucide-react';
+import { Project, ProductionStep, Client, ProjectStatus, User, ProductionNote, SavedEstimate, ProductionOrder, ProductionOrderStatus, Task, TaskPriority } from '../types';
+import { Hammer, Clock, ArrowRight, ArrowLeft, Check, Package, Palette, FileText, ShoppingCart, Truck, X, Info, Plus, HardDrive, Archive, Calendar, MessageSquare, Save, Lock, Printer, List, LayoutGrid, AlertTriangle, Zap, Link2, ClipboardList, CheckSquare } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
+import { translateProductionOrderStatus, translateProjectStatus } from '../translations';
 
 interface ProductionProps {
   projects: Project[];
@@ -11,10 +12,13 @@ interface ProductionProps {
   user: User;
   savedEstimates?: SavedEstimate[]; // Need this to find the linked estimate data
   productionOrders?: ProductionOrder[];
+  tasks?: Task[];
+  users?: User[];
   onUpdateProject: (project: Project) => void;
   onAddProject: (project: Project) => void;
   onUpdateProductionOrder?: (order: ProductionOrder) => void;
   onAddProductionOrder?: (order: ProductionOrder) => void;
+  onAddTask?: (task: Task) => void;
 }
 
 const PRODUCTION_STEPS: { id: ProductionStep; label: string; icon: any }[] = [
@@ -32,18 +36,35 @@ const Production: React.FC<ProductionProps> = ({
   user, 
   savedEstimates = [], 
   productionOrders = [],
+  tasks = [],
+  users = [],
   onUpdateProject, 
   onAddProject,
-  onUpdateProductionOrder
+  onUpdateProductionOrder,
+  onAddTask
 }) => {
   const [viewMode, setViewMode] = useState<'PROJECTS' | 'ORDERS'>('PROJECTS');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(null);
+  const [assigningOrder, setAssigningOrder] = useState<ProductionOrder | null>(null);
+  const [taskModalProject, setTaskModalProject] = useState<Project | null>(null);
+  const [viewingOrderForProject, setViewingOrderForProject] = useState<ProductionOrder | null>(null);
+  const [newTaskForm, setNewTaskForm] = useState({ title: '', assignee: '', dueDate: '', priority: 'MEDIUM' as TaskPriority });
+  const [assignProjectId, setAssignProjectId] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
   
   // State for Technical View Modal
   const [viewingTechnicalEstimate, setViewingTechnicalEstimate] = useState<SavedEstimate | null>(null);
+
+  // Drive link editing state (admin only)
+  const [editingDriveProjectId, setEditingDriveProjectId] = useState<string | null>(null);
+  const [driveInputValue, setDriveInputValue] = useState('');
+
+  const handleSaveDriveLink = (project: Project) => {
+    onUpdateProject({ ...project, driveFolderUrl: driveInputValue.trim() });
+    setEditingDriveProjectId(null);
+  };
 
   // New Project Form State for Taller view
   const [selectedSourceProjectId, setSelectedSourceProjectId] = useState('');
@@ -274,6 +295,13 @@ const Production: React.FC<ProductionProps> = ({
      }
  };
 
+  const handleAssignOrderToProject = (order: ProductionOrder, projectId: string) => {
+      if (!onUpdateProductionOrder || !projectId) return;
+      onUpdateProductionOrder({ ...order, linkedProjectId: projectId, updatedAt: new Date().toISOString() } as any);
+      setAssigningOrder(null);
+      setAssignProjectId('');
+  };
+
   const handleUpdateOrderStatus = (order: ProductionOrder, newStatus: ProductionOrderStatus) => {
       if (onUpdateProductionOrder) {
           onUpdateProductionOrder({ ...order, status: newStatus, updatedAt: new Date().toISOString() });
@@ -288,20 +316,7 @@ const Production: React.FC<ProductionProps> = ({
             <h2 className="text-3xl font-bold text-roden-black tracking-tight">Producción</h2>
             <p className="text-roden-gray text-sm mt-1">Seguimiento en tiempo real del proceso productivo.</p>
           </div>
-          <div className="flex bg-gray-100 p-1 rounded-xl ml-8">
-            <button 
-              onClick={() => setViewMode('PROJECTS')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'PROJECTS' ? 'bg-white text-roden-black shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <LayoutGrid size={14} /> Proyectos
-            </button>
-            <button 
-              onClick={() => setViewMode('ORDERS')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'ORDERS' ? 'bg-white text-roden-black shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <List size={14} /> Órdenes de Producción
-            </button>
-          </div>
+
           <div className="ml-4">
             <RodenAIButton 
               mode="taller_checklist" 
@@ -323,7 +338,7 @@ const Production: React.FC<ProductionProps> = ({
         )}
       </header>
 
-      {viewMode === 'PROJECTS' ? (
+      {(
         <div className="grid grid-cols-1 gap-8">
           {productionProjects.map(project => {
               const currentStep = project.productionStep || 'ANTICIPO_PLANOS';
@@ -424,22 +439,88 @@ const Production: React.FC<ProductionProps> = ({
                       </div>
                   </div>
 
+                  {/* Drive link row — admin edit + botón visible a todos */}
+                  <div className="px-4 py-2 border-t border-gray-100 bg-white flex items-center gap-2">
+                      {editingDriveProjectId === project.id ? (
+                          <>
+                              <HardDrive size={14} className="text-gray-400 shrink-0" />
+                              <input
+                                  autoFocus
+                                  type="url"
+                                  value={driveInputValue}
+                                  onChange={e => setDriveInputValue(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleSaveDriveLink(project); if (e.key === 'Escape') setEditingDriveProjectId(null); }}
+                                  placeholder="https://drive.google.com/drive/folders/..."
+                                  className="flex-1 text-xs border border-indigo-300 rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-indigo-400"
+                              />
+                              <button onClick={() => handleSaveDriveLink(project)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">Guardar</button>
+                              <button onClick={() => setEditingDriveProjectId(null)} className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-gray-500 rounded-lg hover:bg-gray-50">Cancelar</button>
+                          </>
+                      ) : (
+                          <>
+                              {project.driveFolderUrl ? (
+                                  <a
+                                      href={project.driveFolderUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-colors"
+                                  >
+                                      <HardDrive size={13} className="text-indigo-500" /> Ver Planos en Drive
+                                  </a>
+                              ) : (
+                                  <span className="text-xs text-gray-400 italic flex items-center gap-1.5">
+                                      <HardDrive size={13} /> Sin carpeta Drive asignada
+                                  </span>
+                              )}
+                              {user.role === 'administrador' && (
+                                  <button
+                                      onClick={() => { setEditingDriveProjectId(project.id); setDriveInputValue(project.driveFolderUrl || ''); }}
+                                      className="ml-auto text-xs text-gray-400 hover:text-indigo-600 flex items-center gap-1 transition-colors"
+                                  >
+                                      <Link2 size={12} /> {project.driveFolderUrl ? 'Editar link' : 'Agregar link'}
+                                  </button>
+                              )}
+                          </>
+                      )}
+                  </div>
+
                   <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center gap-3">
                        {canManageProduction ? (
-                           <button 
+                           <button
                               onClick={() => handleRegressStep(project)}
                               disabled={!project.productionStep || project.productionStep === 'ANTICIPO_PLANOS'}
                               className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-black hover:border-gray-300 shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                               <ArrowLeft size={14} /> Retroceder
                            </button>
                        ) : <div></div>}
-                       
+
                        <div className="flex gap-3">
                           <button 
                               onClick={() => openDetails(project)}
                               className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-black hover:border-gray-300 shadow-sm transition-colors">
                               Ver Detalles y Notas
                           </button>
+
+                          {/* Ver OP: si tiene OP asociada */}
+                          {(() => {
+                              const op = productionOrders.find((o: any) => o.linkedProjectId === project.id);
+                              return op ? (
+                                  <button
+                                      onClick={() => setViewingOrderForProject(op as any)}
+                                      className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-colors flex items-center gap-1.5">
+                                      <ClipboardList size={13} /> Ver OP
+                                  </button>
+                              ) : null;
+                          })()}
+
+                          {/* Nueva Tarea */}
+                          {onAddTask && (
+                              <button
+                                  onClick={() => { setTaskModalProject(project); setNewTaskForm({ title: '', assignee: '', dueDate: '', priority: 'MEDIUM' }); }}
+                                  className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-colors flex items-center gap-1.5">
+                                  <CheckSquare size={13} /> Nueva Tarea
+                              </button>
+                          )}
                           
                           {canManageProduction && (
                               <button 
@@ -467,74 +548,6 @@ const Production: React.FC<ProductionProps> = ({
                <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                    <p>No hay proyectos activos en taller actualmente.</p>
                </div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {productionOrders.map(order => (
-            <div key={order.id} className="bg-white border border-roden-border rounded-xl p-6 shadow-sm hover:shadow-md transition-all">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Orden #{order.orderNumber}</span>
-                  <h3 className="text-lg font-bold text-roden-black">{order.clientName}</h3>
-                </div>
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
-                  order.status === ProductionOrderStatus.PENDING ? 'bg-yellow-100 text-yellow-700' :
-                  order.status === ProductionOrderStatus.IN_PROCESS ? 'bg-blue-100 text-blue-700' :
-                  order.status === ProductionOrderStatus.FINISHED ? 'bg-emerald-100 text-emerald-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {order.status}
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-start gap-2">
-                  <FileText size={14} className="text-gray-400 mt-0.5" />
-                  <p className="text-sm text-gray-600 line-clamp-2">{order.itemDescription}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-gray-400" />
-                  <p className="text-xs text-gray-500">Entrega: <span className="font-bold text-roden-black">{order.estimatedDeliveryDate}</span></p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Hammer size={14} className="text-gray-400" />
-                  <p className="text-xs text-gray-500">Operarios: <span className="font-bold text-roden-black">{order.assignedOperators?.join(', ') || 'Sin asignar'}</span></p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                <select 
-                  value={order.status}
-                  onChange={(e) => handleUpdateOrderStatus(order, e.target.value as ProductionOrderStatus)}
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-black"
-                >
-                  {Object.values(ProductionOrderStatus).map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-                <button 
-                  onClick={() => setSelectedOrder(order)}
-                  className="p-2 bg-roden-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-                  title="Ver Detalles"
-                >
-                  <Info size={16} />
-                </button>
-                <button 
-                  onClick={() => setSelectedOrder(order)}
-                  className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors no-print"
-                  title="Imprimir Orden"
-                >
-                  <Printer size={16} />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {productionOrders.length === 0 && (
-            <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
-              <p>No hay órdenes de producción generadas.</p>
-            </div>
           )}
         </div>
       )}
@@ -736,7 +749,7 @@ const Production: React.FC<ProductionProps> = ({
                               >
                                  <option value="">-- Seleccionar Proyecto --</option>
                                  {availableForProduction.map(p => (
-                                     <option key={p.id} value={p.id}>{p.title} ({p.status})</option>
+                                     <option key={p.id} value={p.id}>{p.title} ({translateProjectStatus(p.status)})</option>
                                  ))}
                               </select>
                               <p className="text-xs text-gray-400 mt-1">Selecciona proyectos en etapa de Diseño o Presupuesto para pasarlos a Taller.</p>
@@ -894,6 +907,199 @@ const Production: React.FC<ProductionProps> = ({
           </div>,
           document.body
         )}
+
+      {/* ── MODAL: ASOCIAR ORDEN A PROYECTO ── */}
+      {assigningOrder && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-bold text-roden-black flex items-center gap-2">
+                  <Link2 size={18} /> Asociar Orden a Proyecto
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">OP #{assigningOrder.orderNumber} — {assigningOrder.clientName}</p>
+              </div>
+              <button onClick={() => setAssigningOrder(null)} className="text-gray-400 hover:text-black">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar Proyecto en Producción</label>
+                <select
+                  value={assignProjectId}
+                  onChange={e => setAssignProjectId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-1 focus:ring-black outline-none bg-white"
+                >
+                  <option value="">— Seleccionar proyecto —</option>
+                  {projects
+                    .filter(p => ['PRODUCTION', 'READY'].includes(p.status))
+                    .map(p => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))
+                  }
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setAssigningOrder(null)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => assignProjectId && handleAssignOrderToProject(assigningOrder, assignProjectId)}
+                  disabled={!assignProjectId}
+                  className="flex-1 px-4 py-2 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Asociar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── MODAL: VER ORDEN DE PRODUCCIÓN DEL PROYECTO ── */}
+      {viewingOrderForProject && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Orden de Producción</p>
+                <h3 className="text-lg font-bold text-roden-black">#{(viewingOrderForProject as any).orderNumber} — {(viewingOrderForProject as any).clientName}</h3>
+              </div>
+              <button onClick={() => setViewingOrderForProject(null)} className="text-gray-400 hover:text-black p-1"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              {(viewingOrderForProject as any).itemDescription && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Descripción</p>
+                  <p className="text-gray-700">{(viewingOrderForProject as any).itemDescription}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Inicio</p>
+                  <p className="font-medium">{(viewingOrderForProject as any).startDate || (viewingOrderForProject as any).start_date || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Entrega Estimada</p>
+                  <p className="font-medium">{(viewingOrderForProject as any).estimatedDeliveryDate || (viewingOrderForProject as any).delivery_date || '—'}</p>
+                </div>
+              </div>
+              {(() => {
+                const ops = (viewingOrderForProject as any).assignedOperators;
+                const opsList = Array.isArray(ops) ? ops : (typeof ops === 'string' && ops ? ops.split(',').map((s: string) => s.trim()) : []);
+                return opsList.length > 0 ? (
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Operarios</p>
+                    <p className="text-gray-700">{opsList.join(', ')}</p>
+                  </div>
+                ) : null;
+              })()}
+              <div className="pt-2 border-t border-gray-100 flex justify-end">
+                <button onClick={() => setViewingOrderForProject(null)} className="px-4 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors">
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── MODAL: NUEVA TAREA DESDE TALLER ── */}
+      {taskModalProject && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+              <div>
+                <h3 className="text-xl font-bold text-roden-black">Nueva Tarea</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Proyecto: {taskModalProject.title}</p>
+              </div>
+              <button onClick={() => setTaskModalProject(null)} className="text-gray-400 hover:text-black"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción de la Tarea</label>
+                <input
+                  autoFocus
+                  type="text"
+                  className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                  placeholder="Ej: Verificar medidas de obra"
+                  value={newTaskForm.title}
+                  onChange={e => setNewTaskForm(p => ({ ...p, title: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Asignar a</label>
+                  <select
+                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                    value={newTaskForm.assignee}
+                    onChange={e => setNewTaskForm(p => ({ ...p, assignee: e.target.value }))}
+                  >
+                    <option value="">Seleccionar usuario...</option>
+                    {users.map((u: any) => <option key={u.id} value={u.name}>{u.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Límite</label>
+                  <input
+                    type="date"
+                    className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                    value={newTaskForm.dueDate}
+                    onChange={e => setNewTaskForm(p => ({ ...p, dueDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                <select
+                  className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
+                  value={newTaskForm.priority}
+                  onChange={e => setNewTaskForm(p => ({ ...p, priority: e.target.value as TaskPriority }))}
+                >
+                  <option value="LOW">Baja</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="HIGH">Alta</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4 border-t border-gray-100">
+                <button onClick={() => setTaskModalProject(null)} className="flex-1 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  disabled={!newTaskForm.title || !newTaskForm.assignee || !newTaskForm.dueDate}
+                  onClick={() => {
+                    if (!onAddTask || !newTaskForm.title || !newTaskForm.assignee || !newTaskForm.dueDate) return;
+                    const task: Task = {
+                      id: `t${Date.now()}`,
+                      title: newTaskForm.title,
+                      assignee: newTaskForm.assignee,
+                      dueDate: newTaskForm.dueDate,
+                      priority: newTaskForm.priority,
+                      projectId: taskModalProject.id,
+                      completed: false,
+                      status: 'TODO',
+                      createdBy: user.name,
+                    };
+                    onAddTask(task);
+                    setTaskModalProject(null);
+                    setNewTaskForm({ title: '', assignee: '', dueDate: '', priority: 'MEDIUM' });
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-bold bg-roden-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Crear Tarea
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
