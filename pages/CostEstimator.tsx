@@ -5,7 +5,6 @@ import {
   CostModule, CostSnapshot, CommercialConfig, MaterialConfig, BudgetStatus, ProductionOrder, ProductionOrderStatus,
   CommercialStatus, ProductionStatus, AuditEntry, Client, User
 } from '../types';
-import { calculateModuleFull } from '../utils/costEngine'; // NEW ENGINE
 import { 
   Database, Plus, Trash2, 
   DollarSign, Calculator, Box, FileText,
@@ -14,6 +13,7 @@ import {
 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem } from '../utils/specialModules';
 import { supabase } from '../services/supabaseClient';
 
 interface CostEstimatorProps {
@@ -68,6 +68,7 @@ interface EstimatorItem {
         colorMDF: number;
         lacquer: number;
         veneer: number;
+        baseConfig?: number; // legacy field from old saved estimates
     };
     details: {
         totalHardwareCost: number;
@@ -146,13 +147,13 @@ const BACKING_OPTIONS = [
 ];
 
 const BOARD_OPTIONS = [
-    { label: 'Melamina Blanca Aglo 18mm', value: 'priceBoard18WhiteAglo' },
+    { label: 'Melamina Blanca MDP 18mm', value: 'priceBoard18WhiteAglo' },
     { label: 'Melamina Blanca MDF 18mm', value: 'priceBoard18WhiteMDF' },
-    { label: 'Melamina Color Aglo 18mm', value: 'priceBoard18ColorAglo' },
+    { label: 'Melamina Color MDP 18mm', value: 'priceBoard18ColorAglo' },
     { label: 'Melamina Color MDF 18mm', value: 'priceBoard18ColorMDF' },
     { label: 'MDF Crudo 1 Cara Blanca 18mm', value: 'priceBoard18MDFCrudo1Face' },
-    { label: 'Madera Enchapada MDF 18mm', value: 'priceBoard18VeneerMDF' },
-    { label: 'Melamina Blanca 15mm Aglo', value: 'priceBoard15WhiteAglo' },
+    { label: 'Enchapado Kiri 18mm MDF', value: 'priceBoard18VeneerMDF' },
+    { label: 'Melamina Blanca 15mm MDP', value: 'priceBoard15WhiteAglo' },
     { label: 'Fondo Blanco 3mm', value: 'priceBacking3White' },
     { label: 'Fondo Color 5.5mm', value: 'priceBacking55Color' },
 ];
@@ -167,8 +168,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
     onAddProductionOrder,
     initialProjectId
 }) => {
-  const [view, setView] = useState<'SETUP' | 'MODULES' | 'RESULTS' | 'HISTORY' | 'PROJECTS'>('MODULES');
-    const [printMode, setPrintMode] = useState<'NONE' | 'SUPPLIES' | 'CUTTING' | 'COSTS' | 'ECONOMIC' | 'PRODUCTION_ORDER'>('NONE');
+  const [view, setView] = useState<'SETUP' | 'MODULES' | 'RESULTS' | 'HISTORY'>('MODULES');
+    const [printMode, setPrintMode] = useState<'NONE' | 'SUPPLIES' | 'CUTTING' | 'COSTS' | 'COSTS_CUTS' | 'ECONOMIC' | 'PRODUCTION_ORDER'>('NONE');
     
     // Use initialProjectId if provided
     const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
@@ -227,7 +228,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       startDate: string;
       estimatedDeliveryDate: string;
       assignedOperators: string;
-  }>({ itemDescription: '', startDate: '', estimatedDeliveryDate: '', assignedOperators: '' });
+      observations: string;
+      linkedProjectId: string;
+  }>({ itemDescription: '', startDate: '', estimatedDeliveryDate: '', assignedOperators: '', observations: '', linkedProjectId: '' });
 
   // OPTIMIZATION STATE
   const [optimizationResult, setOptimizationResult] = useState<Record<string, Sheet[]>>({});
@@ -259,6 +262,30 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   const [moduleForm, setModuleForm] = useState<Partial<ExtendedCabinetModule>>(INITIAL_MODULE_FORM);
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
   const [newExtra, setNewExtra] = useState<ModuleExtra>({ id: '', description: '', quantity: 1, unit: 'un', unitPrice: 0 });
+
+  // Estado item templates (historial)
+  const [itemTemplates, setItemTemplates] = useState<any[]>([]);
+  const [isTemplatesPanelOpen, setIsTemplatesPanelOpen] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState('');
+
+  // Cargar templates desde Supabase al montar
+  useEffect(() => {
+      const loadTemplates = async () => {
+          const { data, error } = await supabase
+              .from('item_templates')
+              .select('*')
+              .order('created_at', { ascending: false });
+          if (!error && data) setItemTemplates(data);
+      };
+      loadTemplates();
+  }, []);
+
+  // Estado módulos especiales
+  const [moduleKind, setModuleKind] = useState<'STANDARD' | 'SPECIAL' | 'MANUAL'>('STANDARD');
+  const [specialTemplateId, setSpecialTemplateId] = useState<string>('');
+  const [specialOptions, setSpecialOptions] = useState<Record<string, string>>({});
+  const [manualItems, setManualItems] = useState<ManualItem[]>([]);
+  const [newManualItem, setNewManualItem] = useState<ManualItem>({ id: '', description: '', quantity: 1, unit: 'un', unitPrice: 0 });
 
   // Quote Meta Data
   const [quoteReference, setQuoteReference] = useState(''); 
@@ -300,42 +327,42 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   // Default Pricing
   const [settings, setSettings] = useState<CostSettings>({
-      // PLACAS
-      priceBoard18WhiteAglo: 28000,
-      priceBoard18WhiteMDF: 32000,
-      priceBoard18ColorAglo: 42000,
-      priceBoard18ColorMDF: 55000,
-      priceBoard18MDFCrudo1Face: 18000,
-      priceBoard18VeneerMDF: 65000,
-      priceBoard15WhiteAglo: 26000,
-      priceBacking3White: 12000,
-      priceBacking55Color: 15000,
+      // PLACAS — Lista Mech Feb 2026 + IVA 21%
+      priceBoard18WhiteAglo: 78460,      // Faplac 18mm Aglo Blanco
+      priceBoard18WhiteMDF: 97595,       // Faplac 18mm MDF Blanco
+      priceBoard18ColorAglo: 93651,      // Faplac 18mm Aglo Clásicas
+      priceBoard18ColorMDF: 114475,      // Faplac 18mm MDF Clásicas
+      priceBoard18MDFCrudo1Face: 93308,  // Faplac 18mm 1C MDF Blanco
+      priceBoard18VeneerMDF: 150105,     // Kiri 18mm MDF (enchapado)
+      priceBoard15WhiteAglo: 70323,      // Faplac 15mm Tundra Aglo
+      priceBacking3White: 33152,         // Fondo MDF 3mm Blanco Laca
+      priceBacking55Color: 26775,        // Trupan 5.5mm 260x183
 
-      // TAPACANTOS
-      priceEdge22White045: 250,
-      priceEdge45White045: 450,
-      priceEdge22Color045: 350,
-      priceEdge45Color045: 600,
-      priceEdge2mm: 900,
+      // TAPACANTOS — Lista Mech Feb 2026 + IVA 21%
+      priceEdge22White045: 284,          // Rehau 0,45x22 Blanco
+      priceEdge45White045: 419,          // Rehau 0,45x29 Blanco (estándar)
+      priceEdge22Color045: 551,          // Rehau 0,45x22 Color (promedio)
+      priceEdge45Color045: 877,          // Rehau 0,45x29 Color (promedio)
+      priceEdge2mm: 1764,                // Rehau 2mm (promedio)
 
-      // HERRAJES
-      priceHingeStandard: 1500,
-      priceHingeSoftClose: 2800,
-      priceHingePush: 2200,
-      
-      priceSlide300Std: 3500,
-      priceSlide300Soft: 5500,
-      priceSlide300Push: 6000,
-      priceSlide400Std: 4000,
-      priceSlide400Soft: 6000,
-      priceSlide400Push: 6500,
-      priceSlide500Std: 4500,
-      priceSlide500Soft: 6500,
-      priceSlide500Push: 7000,
+      // HERRAJES — IVA incluido
+      priceHingeStandard: 1000,
+      priceHingeSoftClose: 1600,
+      priceHingePush: 1400,
 
-      priceGasPiston: 4500,
-      priceGlueTin: 8500,
-      priceScrews: 500, // Fixed per module estimate
+      priceSlide300Std: 3300,
+      priceSlide300Soft: 7000,
+      priceSlide300Push: 7000,
+      priceSlide400Std: 4300,
+      priceSlide400Soft: 8500,
+      priceSlide400Push: 8500,
+      priceSlide500Std: 5500,
+      priceSlide500Soft: 10000,
+      priceSlide500Push: 10000,
+
+      priceGasPiston: 3000,
+      priceGlueTin: 30250,
+      priceScrews: 30000, // Tornillería fija por Item (no por módulo)
 
       // ACABADOS
       priceFinishLacquerSemi: 45000,
@@ -357,12 +384,13 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   };
 
   const formatCurrency = (amount: number) => {
-      return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      const safe = (amount == null || isNaN(amount as number)) ? 0 : (amount as number);
+      return `$${safe.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
   const getProjectTitleById = (id?: string) => {
       const p = projects.find(prj => prj.id === id);
-      return p ? p.title : 'Desconocido';
+      return (p ? p.title : 'Desconocido') || 'Sin Título';
   };
 
   const getActiveProjectName = () => {
@@ -402,6 +430,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   // --- CALCULATIONS ---
 
     const calculateModuleParts = (mod: ExtendedCabinetModule): CalculatedPart[] => {
+        // Módulo especial: usar las piezas pre-calculadas por el template
+        if ((mod as any).isSpecialModule && (mod as any).specialParts?.length > 0) {
+            return (mod as any).specialParts as CalculatedPart[];
+        }
         const parts: CalculatedPart[] = [];
         const W = mod.width || 0;
         const H = mod.height || 0;
@@ -423,11 +455,22 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             carcassMat = isWhiteStruct ? '18mm_White' : '18mm_Color';
         }
 
-        let frontMat: '18mm_Color' | '18mm_MDF';
-        if (frontsCore === 'MDF') {
+        let frontMat: '18mm_White' | '18mm_Color' | '18mm_MDF' | '18mm_MDFCrudo' | '18mm_Kiri';
+        const mTypeForFront = mod.moduleType || 'MELAMINE_FULL';
+        if (mTypeForFront.includes('LACQUER')) {
+            // Frentes laqueados: MDF crudo 1 cara
+            frontMat = '18mm_MDFCrudo';
+        } else if (mTypeForFront.includes('VENEER')) {
+            // Frentes enchapados: placa Kiri MDF
+            frontMat = '18mm_Kiri';
+        } else if (frontsCore === 'MDF') {
             frontMat = '18mm_MDF';
         } else {
-            frontMat = '18mm_Color';
+            const frontName = (mod.materialFrontName || '').toLowerCase();
+            const isFrontWhite = frontName
+                ? (frontName.includes('blanc') || frontName.includes('white'))
+                : !!mod.isWhiteStructure;
+            frontMat = isFrontWhite ? '18mm_White' : '18mm_Color';
         }
 
         // 1. Tapas y Bases: SIEMPRE pasan completas (sin descuentos)
@@ -596,13 +639,18 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           totalComplexityFactor += modComplexity * modArea * qty;
           totalAreaForComplexity += modArea * qty;
 
-          let finishAreaPerModule = 0;
+          // Área de terminación según tipo + coeficiente de seguridad 1.15
+          // MELAMINE_STRUCT_LACQUER/VENEER → solo frentes (W×H)
+          // LACQUER_FULL / VENEER_FULL     → exterior completo (frente + laterales + techo + piso)
+          const FINISH_SAFETY = 1.15;
+          const visibleExteriorArea = frontArea + sidesArea + topBottomArea;
+          const baseFinishArea = (mType === 'LACQUER_FULL' || mType === 'VENEER_FULL')
+              ? visibleExteriorArea
+              : frontArea; // MELAMINE_STRUCT → solo frente
+          const finishArea = baseFinishArea * FINISH_SAFETY;
 
-          if (mType === 'LACQUER_FULL' || mType === 'VENEER_FULL') {
-              finishAreaPerModule = frontArea + sidesArea + topBottomArea;
-          }
-          if (mType && mType.includes('LACQUER')) lacquerArea += finishAreaPerModule * qty;
-          else if (mType && mType.includes('VENEER')) veneerArea += finishAreaPerModule * qty;
+          if (mType && mType.includes('LACQUER')) lacquerArea += finishArea * qty;
+          else if (mType && mType.includes('VENEER')) veneerArea += finishArea * qty;
 
           parts.forEach(p => {
               const area = p.width * p.height * p.quantity * qty;
@@ -616,49 +664,71 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
               if (isTechnicalMode) {
                   currentCore = isFront ? (mod.frontsCore || 'AGLO') : (mod.structureCore || 'AGLO');
-                  const colorName = mod.materialColorName || 'Estándar';
+                  const colorName = mod.materialColorName || (mod.isWhiteStructure ? 'Melamina Blanca' : 'Melamina Color');
+                  // materialFrontName es independiente de la estructura — puede ser blanca aunque estructura sea color
                   const frontName = mod.materialFrontName || colorName;
                   currentMatName = isFront ? frontName : colorName;
               } else {
-                  currentCore = mod.isMDFCore ? 'MDF' : 'AGLO';
-                  currentMatName = isFront ? 'Color/Terminación' : (mod.isWhiteStructure ? 'Blanco' : 'Color');
+                  // En modo override, MDFCrudo y Kiri siempre son MDF
+                  const isSpecialMat = p.material === '18mm_MDFCrudo' || p.material === '18mm_Kiri';
+                  currentCore = isSpecialMat ? 'MDF' : (mod.isMDFCore ? 'MDF' : 'AGLO');
+                  // En modo scenario: frentes usan materialFrontName si existe, si no hereda estructura
+                  const frontMatName = mod.materialFrontName || '';
+                  const isFrontWhite = frontMatName.toLowerCase().includes('blanca') || frontMatName.toLowerCase().includes('white')
+                      || (!frontMatName && mod.isWhiteStructure);
+                  currentMatName = isFront ? (isFrontWhite ? 'Blanco' : 'Color') : (mod.isWhiteStructure ? 'Blanco' : 'Color');
               }
 
-              if (p.material.includes('Color')) totalBoard18ColorArea += area;
-              else if (p.material.includes('White')) totalBoard18WhiteArea += area;
-              else if (p.material.includes('MDF')) totalBoard18MDFArea += area;
-              else if (p.material.includes('15mm')) totalBoard15Area += area;
-              else if (p.material.includes('5.5mm')) totalBacking55Area += area;
-              else if (p.material.includes('3mm')) totalBacking3Area += area;
+              // Acumular área por tipo de material
+              if      (p.material.includes('15mm'))          totalBoard15Area     += area;
+              else if (p.material.includes('5.5mm'))         totalBacking55Area   += area;
+              else if (p.material.includes('3mm'))           totalBacking3Area    += area;
+              else if (p.material === '18mm_MDFCrudo')       totalBoard18MDFArea  += area;  // laca
+              else if (p.material === '18mm_Kiri')           totalBoard18MDFArea  += area;  // enchapado
+              else if (p.material.includes('Color'))         totalBoard18ColorArea += area;
+              else if (p.material.includes('White'))         totalBoard18WhiteArea += area;
+              else if (p.material.includes('MDF'))           totalBoard18MDFArea  += area;
 
+              // Tapacanto: distinguir 22mm (interior) vs 45mm (visible/frentes)
+              // — Frentes (Puerta, Frente*, Abatible): tapacanto visible 45mm
+              // — Estructura, cajones e interiores: tapacanto interior 22mm
+              // — MDFCrudo y Kiri: siempre tapacanto color visible 45mm
               if (mod.edgeCategory === 'PVC_2MM') {
                   if (p.material.includes('18mm') || p.material.includes('15mm')) linear2mm += perimeter;
               } else {
                   const safeMatName = (currentMatName || '').toLowerCase();
-                  const isWhiteMat = safeMatName.includes('blanco') || safeMatName.includes('white');
-                  if (isWhiteMat) linearWhite22 += perimeter;
-                  else linearColor22 += perimeter;
+                  const isSpecialFront = p.material === '18mm_MDFCrudo' || p.material === '18mm_Kiri';
+                  const isWhiteMat = !isSpecialFront && (safeMatName.includes('blanco') || safeMatName.includes('white'));
+                  const isFrontPiece = p.name.includes('Frente') || p.name.includes('Puerta');
+                  if (isSpecialFront) {
+                      // MDFCrudo/Kiri: siempre tapacanto color visible 45mm (nunca blanco)
+                      linearColor45 += perimeter;
+                  } else if (isFrontPiece) {
+                      // Frentes melamina: tapacanto visible 45mm, blanco o color según material
+                      if (isWhiteMat) linearWhite45 += perimeter;
+                      else            linearColor45 += perimeter;
+                  } else {
+                      // Estructura, cajones, estantes: tapacanto interior 22mm
+                      if (isWhiteMat) linearWhite22 += perimeter;
+                      else            linearColor22 += perimeter;
+                  }
               }
 
+              // Clave del reporte — basada en el material de la pieza, no en mType del módulo
               let reportKey = '';
-              
-              // Helper to consolidate material name logic for the report
-              if (p.material.includes('18mm') || p.material.includes('MDF')) {
-                  let type = 'Melamina';
-                  if (mType.includes('LACQUER')) type = 'Para Laquear';
-                  if (mType.includes('VENEER')) type = 'Para Enchapar';
-                  
-                  const safeMatName = (currentMatName || '').toLowerCase();
-                  if (safeMatName.includes('blanco')) type = 'Melamina Blanca';
-                  
-                  const cleanName = type === 'Melamina' || type.includes('Para') ? currentMatName : type;
-                  const displayCore = currentCore === 'AGLO' ? 'Aglomerado' : 'MDF';
-                  
-                  reportKey = `${cleanName} (18mm ${displayCore})`;
-              } 
-              else if (p.material.includes('15mm')) reportKey = 'Melamina Blanca (15mm)';
+              if (p.material === '18mm_MDFCrudo') {
+                  reportKey = `MDF Crudo (para laquear) 18mm MDF`;
+              } else if (p.material === '18mm_Kiri') {
+                  reportKey = `Enchapado Kiri 18mm MDF`;
+              } else if (p.material.includes('18mm') || (p.material.includes('MDF') && !p.material.includes('3mm'))) {
+                  const isWhitePiece = p.material.includes('White') || p.material === '18mm_White';
+                  const matLabel = isWhitePiece ? 'Melamina Blanca' : 'Melamina Color';
+                  const displayCore = currentCore === 'AGLO' ? 'MDP' : 'MDF';
+                  reportKey = `${matLabel} 18mm ${displayCore}`;
+              }
+              else if (p.material.includes('15mm'))  reportKey = 'Melamina Blanca 15mm MDP';
               else if (p.material.includes('5.5mm')) reportKey = `Fondo ${currentMatName} (5.5mm)`;
-              else if (p.material.includes('3mm')) reportKey = 'Fondo Blanco (3mm)';
+              else if (p.material.includes('3mm'))   reportKey = 'Fondo Blanco (3mm)';
 
               if (reportKey) {
                   detailedMaterialsArea[reportKey] = (detailedMaterialsArea[reportKey] || 0) + area;
@@ -686,8 +756,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           linearColor22: Math.ceil(linearColor22 / 1000),
           linearColor45: Math.ceil(linearColor45 / 1000),
           linear2mm: Math.ceil(linear2mm / 1000),
-          lacquerAreaM2: Math.ceil(lacquerArea / 1000000 * 10) / 10,
-          veneerAreaM2: Math.ceil(veneerArea / 1000000 * 10) / 10,
+          lacquerAreaM2: Math.round(lacquerArea * 100) / 100,  // ya está en m²
+          veneerAreaM2:  Math.round(veneerArea  * 100) / 100,  // ya está en m²
           totalHinges, totalPistons, totalSlides, totalExtrasCost,
           // Report Details
           detailedBoards,
@@ -696,107 +766,212 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       };
   };
 
+  // ─────────────────────────────────────────────────────────────
+  // ENGINE ÚNICO — calcula costo directo y precio taller
+  // para un conjunto de módulos con override de escenario.
+  // Usa calculateModuleParts (Engine A) como única fuente de verdad
+  // geométrica. La MO siempre viene del parámetro laborCost (workers×days×rate).
+  // ─────────────────────────────────────────────────────────────
   const calculateFinancialsForScenario = (
-      currentModules: ExtendedCabinetModule[], 
-      laborCost: number, 
+      currentModules: ExtendedCabinetModule[],
+      laborCost: number,
       margins: { workshop: number; roden: number },
       scenarioOverride: Partial<CabinetModule> = {},
       snapshotOverride?: CostSnapshot
   ) => {
-      // 1. Create Snapshot from current settings or override
-      const snapshot: CostSnapshot = snapshotOverride || {
-          ...settings,
-          currency: 'ARS',
-          timestamp: new Date().toISOString()
-      };
+      const S: any = snapshotOverride || activeSettings;
+      const SHEET_AREA = 2750 * 1830;
+      const WASTE = 1.20;
+      const WASTE_VENEER = 1.25;
+      const WASTE_3MM = 1.10;
+      const WASTE_55MM = 1.10;
+      const WASTE_15MM = 1.20;
 
-      // 2. Commercial Config
-      const commercial: CommercialConfig = {
-          marginWorkshop: margins.workshop,
-          marginCommercial: margins.roden,
-          taxRate: 0
+      // Resolver precio de placa por tipo de material
+      // IMPORTANTE: los precios en la lista son por PLACA ENTERA (2750×1830mm = 5.0325m²)
+      // El costo por m² = precio_placa / SHEET_AREA_M2
+      const SHEET_AREA_M2 = (2750 * 1830) / 1_000_000; // 5.0325 m²
+      const SHEET_AREA_M2_55 = (2600 * 1830) / 1_000_000; // 4.758 m² — Trupan 5.5mm
+
+      const pricePerM2 = (pricePerSheet: number): number => pricePerSheet / SHEET_AREA_M2;
+      const pricePerM2_55 = (pricePerSheet: number): number => pricePerSheet / SHEET_AREA_M2_55;
+
+      const resolvePriceBody = (isWhite: boolean, isMDF: boolean): number => {
+          if (isMDF)    return pricePerM2(isWhite ? S.priceBoard18WhiteMDF   : S.priceBoard18ColorMDF);
+          return               pricePerM2(isWhite ? S.priceBoard18WhiteAglo  : S.priceBoard18ColorAglo);
+      };
+      const resolvePriceFront = (frontMat: '18mm_White' | '18mm_Color' | '18mm_MDF', frontIsMDF: boolean): number => {
+          if (frontMat === '18mm_MDF')   return pricePerM2(S.priceBoard18MDFCrudo1Face || S.priceBoard18ColorMDF);
+          if (frontMat === '18mm_White') return pricePerM2(frontIsMDF ? S.priceBoard18WhiteMDF : S.priceBoard18WhiteAglo);
+          return pricePerM2(frontIsMDF ? S.priceBoard18ColorMDF : S.priceBoard18ColorAglo);
       };
 
       let totalDirectCost = 0;
-      let totalHardwareCost = 0;
       let totalMaterialCostBase = 0;
-      
-      // Note: We use the Engine's calculated labor instead of the manual 'laborCost' param
-      // to strictly follow the requested architecture where Labor = BaseDays * Complexity.
+      let totalHardwareCost = 0;
 
-      currentModules.forEach(mod => {
-          // Apply overrides
-          const effectiveMod = { ...mod, ...scenarioOverride };
+      currentModules.forEach(rawMod => {
+          const mod = { ...rawMod, ...scenarioOverride };
+          const qty = mod.quantity || 1;
+
+          // ── Resolver materiales del escenario ──
+          // Si el scenarioOverride fuerza isMDFCore, tiene prioridad sobre los valores del módulo
+          const overridesMDF = 'isMDFCore' in scenarioOverride;
+          const structCore = overridesMDF
+              ? (scenarioOverride.isMDFCore ? 'MDF' : 'AGLO')
+              : (mod.structureCore || (mod.isMDFCore ? 'MDF' : 'AGLO'));
+          const frontsCore = overridesMDF
+              ? (scenarioOverride.isMDFCore ? 'MDF' : 'AGLO')
+              : (mod.frontsCore || (mod.isMDFCore ? 'MDF' : 'AGLO'));
+          const isWhiteStruct = !!mod.isWhiteStructure;
+          const mType = mod.moduleType || 'MELAMINE_FULL';
+
+          let carcassMat: '18mm_White' | '18mm_Color' | '18mm_MDF';
+          if (structCore === 'MDF') carcassMat = '18mm_MDF';
+          else carcassMat = isWhiteStruct ? '18mm_White' : '18mm_Color';
+
+          let frontMat: '18mm_White' | '18mm_Color' | '18mm_MDF';
+          if (mType.includes('LACQUER') || mType.includes('VENEER') || frontsCore === 'MDF') {
+              frontMat = '18mm_MDF';
+          } else {
+              const frontName = (mod.materialFrontName || '').toLowerCase();
+              const isFrontWhite = frontName
+                  ? (frontName.includes('blanc') || frontName.includes('white'))
+                  : isWhiteStruct;
+              frontMat = isFrontWhite ? '18mm_White' : '18mm_Color';
+          }
+
+          const isVeneer  = mType.includes('VENEER');
+          const isLacquer = mType.includes('LACQUER');
+
+          // ── Precio por placa ──
+          // isWhiteStruct determina blanca/color independientemente del core (MDF/MDP)
+          const priceBody  = resolvePriceBody(
+              isWhiteStruct,           // blanca o color — independiente del core
+              structCore === 'MDF'     // MDF o MDP
+          );
+          // Para frentes: isFrontWhite también independiente del core
+          const isFrontWhiteForPrice = frontMat === '18mm_White' || 
+              (frontMat !== '18mm_MDF' && (mod.materialFrontName ? 
+                  (mod.materialFrontName.toLowerCase().includes('blanc') || mod.materialFrontName.toLowerCase().includes('white')) 
+                  : isWhiteStruct));
+          const priceFront = resolvePriceFront(frontMat, frontsCore === 'MDF');
+
+          // ── Calcular piezas ──
+          const parts = calculateModuleParts(mod);
           
-          // Map to CostModule
-          const costMod: CostModule = {
-              id: effectiveMod.id || 'temp',
-              name: effectiveMod.name || 'Module',
-              quantity: effectiveMod.quantity || 1,
-              geometry: {
-                  width: effectiveMod.width || 0,
-                  height: effectiveMod.height || 0,
-                  depth: effectiveMod.depth || 0
-              },
-              components: {
-                  doors: effectiveMod.cntDoors || 0,
-                  drawers: effectiveMod.cntDrawers || 0,
-                  shelves: 0, 
-                  flaps: effectiveMod.cntFlaps || 0,
-                  hingeType: effectiveMod.hingeType || 'COMMON',
-                  slideType: effectiveMod.slideType || 'TELESCOPIC',
-                  hasGasPistons: effectiveMod.hasGasPistons || false
-              },
-              materials: {
-                  bodyMaterial: effectiveMod.materialColorName || (effectiveMod.isWhiteStructure ? 'Melamina Blanca' : 'Melamina Color'),
-                  frontsMaterial: effectiveMod.materialFrontName || effectiveMod.materialColorName || (effectiveMod.isWhiteStructure ? 'Melamina Blanca' : 'Melamina Color'),
-                  edgeType: effectiveMod.edgeCategory || 'PVC_045',
-                  structureCore: effectiveMod.structureCore || (effectiveMod.isMDFCore ? 'MDF' : 'AGLO'),
-                  frontsCore: effectiveMod.frontsCore || (effectiveMod.isMDFCore ? 'MDF' : 'AGLO')
+
+
+          let costMat = 0;
+          let linearEdge22 = 0; // tapacanto interior 22mm — estructura y cajones
+          let linearEdge45 = 0; // tapacanto visible 45mm  — frentes y piezas especiales
+
+          parts.forEach(p => {
+              const areaMM2 = p.width * p.height * p.quantity * qty;
+              const areaM2  = areaMM2 / 1_000_000;
+              const isFront = p.name.includes('Frente') || p.name.includes('Puerta');
+              const perimMM = (p.width + p.height) * 2 * p.quantity * qty;
+
+              if (p.material === '18mm_White' || p.material === '18mm_Color' || p.material === '18mm_MDF') {
+                  if (isFront) {
+                      costMat += areaM2 * priceFront * (isVeneer ? WASTE_VENEER : WASTE);
+                      linearEdge45 += perimMM / 1000; // frentes melamina: tapacanto visible 45mm
+                  } else {
+                      costMat += areaM2 * priceBody * WASTE;
+                      linearEdge22 += perimMM / 1000; // estructura/cajones: tapacanto interior 22mm
+                  }
+              } else if (p.material === '18mm_MDFCrudo') {
+                  // Frentes para laquear: MDF crudo 1 cara blanca
+                  costMat += areaM2 * pricePerM2(S.priceBoard18MDFCrudo1Face || 0) * WASTE;
+                  linearEdge45 += perimMM / 1000; // siempre tapacanto color visible 45mm
+              } else if (p.material === '18mm_Kiri') {
+                  // Frentes enchapados: placa Kiri MDF
+                  costMat += areaM2 * pricePerM2(S.priceBoard18VeneerMDF || 0) * WASTE_VENEER;
+                  linearEdge45 += perimMM / 1000; // siempre tapacanto color visible 45mm
+              } else if (p.material === '3mm_White') {
+                  costMat += areaM2 * pricePerM2(S.priceBacking3White  || 0) * WASTE_3MM;
+              } else if (p.material === '5.5mm_Color' || p.material.includes('55')) {
+                  costMat += areaM2 * pricePerM2_55(S.priceBacking55Color || 0) * WASTE_55MM;
+              } else if (p.material === '15mm_White') {
+                  costMat += areaM2 * pricePerM2(S.priceBoard15WhiteAglo || 0) * WASTE_15MM;
               }
-          };
+          });
 
-          // Override material logic for specific scenarios
-          if (effectiveMod.moduleType === 'LACQUER_FULL') {
-              costMod.materials.frontsMaterial = 'Laqueado Semi';
-              costMod.materials.frontsCore = 'MDF';
-          } else if (effectiveMod.moduleType === 'VENEER_FULL') {
-              costMod.materials.frontsMaterial = 'Enchapado Paraiso';
-              costMod.materials.frontsCore = 'MDF';
+          // ── Tapacanto ──
+          // 22mm: bordes interiores (estructura, cajones)  — precio más económico
+          // 45mm: bordes visibles (frentes, piezas especiales) — precio estándar visible
+          let costEdge = 0;
+          if (mod.edgeCategory === 'PVC_2MM') {
+              costEdge = (linearEdge22 + linearEdge45) * (S.priceEdge2mm || 0);
+          } else {
+              const bodyIsWhite = carcassMat === '18mm_White';
+              // Frentes laqueados/enchapados: siempre tapacanto color (MDFCrudo y Kiri no son blancos)
+              const frontsAreWhite = frontMat === '18mm_White' && !isLacquer && !isVeneer;
+              const price22 = bodyIsWhite  ? (S.priceEdge22White045 || 0) : (S.priceEdge22Color045 || 0);
+              const price45 = frontsAreWhite ? (S.priceEdge45White045 || 0) : (S.priceEdge45Color045 || 0);
+              costEdge = linearEdge22 * price22 + linearEdge45 * price45;
           }
 
-          // Calculate using the new Engine
-          const result = calculateModuleFull(costMod, snapshot, commercial);
-          
-          if (result.costs) {
-              const qty = costMod.quantity;
-              totalDirectCost += result.costs.totalDirectCost * qty;
-              totalHardwareCost += result.costs.costHardware * qty;
-              totalMaterialCostBase += (result.costs.costMaterials + result.costs.costFinish) * qty;
+          // ── Acabado (laca / enchapado) ──
+          const frontAreaM2 = parts
+              .filter(p => p.name.includes('Frente') || p.name.includes('Puerta'))
+              .reduce((a, p) => a + (p.width * p.height * p.quantity * qty) / 1_000_000, 0);
+
+          let costFinish = 0;
+          if (isLacquer) costFinish = frontAreaM2 * 1.15 * (S.priceFinishLacquerSemi || 0);
+          else if (isVeneer) costFinish = frontAreaM2 * 1.15 * (S.priceFinishLustreSemi || 0);
+
+          // ── Herrajes ──
+          let costHW = 0;
+          if (mod.calculateHinges) {
+              const H = mod.height || 0;
+              const hingesPerDoor = H > 1500 ? 4 : H > 900 ? 3 : 2;
+              const hingeCount = ((mod.cntDoors || 0) * hingesPerDoor) + ((mod.cntFlaps || 0) * 2);
+              const priceHinge = mod.hingeType === 'SOFT_CLOSE' ? (S.priceHingeSoftClose || 0)
+                               : mod.hingeType === 'PUSH'       ? (S.priceHingePush || 0)
+                               : (S.priceHingeStandard || 0);
+              costHW += hingeCount * priceHinge * qty;
           }
-          
-          // Add Extras (Manual extras not handled by engine)
-          if (effectiveMod.extras) {
-             effectiveMod.extras.forEach(extra => {
-                 const extraCost = extra.unitPrice * extra.quantity * costMod.quantity;
-                 totalDirectCost += extraCost;
-                 totalHardwareCost += extraCost; 
-             });
+          if (mod.calculateSlides) {
+              const depth = mod.depth || 0;
+              let priceSlide = S.priceSlide500Std || 0;
+              if (depth < 400) priceSlide = mod.slideType === 'TELESCOPIC_SOFT' ? (S.priceSlide300Soft || 0) : (S.priceSlide300Std || 0);
+              else if (depth < 500) priceSlide = mod.slideType === 'TELESCOPIC_SOFT' ? (S.priceSlide400Soft || 0) : (S.priceSlide400Std || 0);
+              else priceSlide = mod.slideType === 'TELESCOPIC_SOFT' ? (S.priceSlide500Soft || 0) : (S.priceSlide500Std || 0);
+              costHW += (mod.cntDrawers || 0) * priceSlide * qty;
           }
+          if (mod.hasGasPistons) {
+              costHW += (mod.cntFlaps || 0) * (S.priceGasPiston || 0) * qty;
+          }
+          // Extras del módulo
+          (mod.extras || []).forEach((ex: any) => {
+              costHW += ex.unitPrice * ex.quantity;
+          });
+
+          const modDirectCost = costMat + costEdge + costFinish + costHW;
+          totalMaterialCostBase += costMat + costEdge + costFinish;
+          totalHardwareCost     += costHW;
+          totalDirectCost       += modDirectCost;
       });
 
-      const profitWorkshopValue = totalDirectCost * (margins.workshop / 100);
-      const priceWorkshop = totalDirectCost + profitWorkshopValue;
-      const profitRodenValue = priceWorkshop * (margins.roden / 100);
-      const finalPrice = priceWorkshop + profitRodenValue;
+      // ── Agregar MO y costos fijos ──
+      // Costos fijos por ítem: tornillería + cemento (igual que la planilla de costos)
+      const fixedCosts = (S.priceScrews || 0) + (S.priceGlueTin || 0);
+      totalDirectCost += laborCost + fixedCosts;
+
+      const priceWorkshop = totalDirectCost * (1 + (margins.workshop ?? 35) / 100);
+      const finalPrice    = priceWorkshop   * (1 + (margins.roden ?? 0) / 100);
 
       return {
           finalPrice,
           totalHardwareCost,
           totalMaterialCostBase,
-          totalDirectCost
+          totalDirectCost,
+          d: totalDirectCost,
+          w: priceWorkshop,
       };
   };
+
 
   // --- HANDLERS ---
 
@@ -818,42 +993,146 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   const handleCreateItem = (e: React.FormEvent) => {
       e.preventDefault();
       
-      const laborCost = itemForm.workers * itemForm.days * settings.costLaborDay;
+      const laborCost = itemForm.workers * itemForm.days * activeSettings.costLaborDay;
       const margins = { workshop: itemForm.marginWorkshop, roden: itemForm.marginRoden };
 
-      // Calculate All 6 Scenarios
-      const whiteAglo = calculateFinancialsForScenario(pendingModules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: true, isMDFCore: false });
-      const whiteMDF = calculateFinancialsForScenario(pendingModules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: true, isMDFCore: true });
-      const colorAglo = calculateFinancialsForScenario(pendingModules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: false, isMDFCore: false });
-      const colorMDF = calculateFinancialsForScenario(pendingModules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: false, isMDFCore: true });
-      const lacquer = calculateFinancialsForScenario(pendingModules, laborCost, margins, { moduleType: 'LACQUER_FULL', isWhiteStructure: false, isMDFCore: false });
-      const veneer = calculateFinancialsForScenario(pendingModules, laborCost, margins, { moduleType: 'VENEER_FULL', isWhiteStructure: false, isMDFCore: false });
+      // Detectar si todos los módulos son manuales
+      const isFullyManual = pendingModules.length > 0 &&
+          pendingModules.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
 
-      const standardCalc = calculateFinancialsForScenario(pendingModules, laborCost, margins, {});
+      let newItem: EstimatorItem;
 
-      const newItem: EstimatorItem = {
-          id: `item${Date.now()}`,
-          name: itemForm.name,
-          modules: [...pendingModules],
-          labor: { workers: itemForm.workers, days: itemForm.days },
-          margins: margins,
-          scenarioPrices: {
-              whiteAglo: whiteAglo.finalPrice,
-              whiteMDF: whiteMDF.finalPrice,
-              colorAglo: colorAglo.finalPrice,
-              colorMDF: colorMDF.finalPrice,
-              lacquer: lacquer.finalPrice,
-              veneer: veneer.finalPrice
-          },
-          details: {
-              totalHardwareCost: standardCalc.totalHardwareCost,
-              totalMaterialCostBase: standardCalc.totalMaterialCostBase
-          }
-      };
+      if (isFullyManual) {
+          // Ítem manual: costo directo = suma de ítems del módulo (materiales) + mano de obra
+          // Sobre ese costo directo se aplican beneficio taller y beneficio roden
+          const totalExtras = pendingModules.reduce((sum, m) => {
+              return sum + (m.extras || []).reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0);
+          }, 0);
+          const costoDirecto = totalExtras + laborCost;
+          const wm = 1 + (margins.workshop / 100);
+          const wr = 1 + (margins.roden / 100);
+          const precioTaller  = costoDirecto * wm;
+          const manualFinalPrice = precioTaller * wr;
+
+          newItem = {
+              id: `item${Date.now()}`,
+              name: itemForm.name,
+              modules: [...pendingModules],
+              labor: { workers: itemForm.workers, days: itemForm.days },
+              margins: margins,
+              isManualItem: true,
+              scenarioPrices: {
+                  whiteAglo: manualFinalPrice,
+                  whiteMDF: manualFinalPrice,
+                  colorAglo: manualFinalPrice,
+                  colorMDF: manualFinalPrice,
+                  whiteLacqAglo: manualFinalPrice,
+                  whiteLacqMDF: manualFinalPrice,
+                  colorLacqAglo: manualFinalPrice,
+                  colorLacqMDF: manualFinalPrice,
+                  whiteVenrAglo: manualFinalPrice,
+                  whiteVenrMDF: manualFinalPrice,
+                  colorVenrAglo: manualFinalPrice,
+                  colorVenrMDF: manualFinalPrice,
+                  baseConfig: precioTaller, // precio taller (sin beneficio Roden)
+              },
+              details: {
+                  totalHardwareCost: laborCost,
+                  totalMaterialCostBase: totalExtras,
+                  manualCostoDirecto: costoDirecto,
+                  manualPrecioTaller: precioTaller,
+                  manualPrecioFinal: manualFinalPrice,
+              }
+          } as any;
+      } else {
+          // Ítem estándar: 12 escenarios — engine unificado (mismo que planilla de costos).
+          // Se construye un ítem temporal y se llama a getRecalculatedItemPrices con activeSettings.
+          const tempItem: EstimatorItem = {
+              id: 'temp',
+              name: itemForm.name,
+              modules: [...pendingModules],
+              labor: { workers: itemForm.workers, days: itemForm.days },
+              margins: margins,
+              scenarioPrices: { whiteAglo: 0, whiteMDF: 0, colorAglo: 0, colorMDF: 0, lacquer: 0, veneer: 0 },
+              details: { totalHardwareCost: 0, totalMaterialCostBase: 0 }
+          };
+          const rp = getRecalculatedItemPrices(tempItem, activeSettings);
+
+          newItem = {
+              id: `item${Date.now()}`,
+              name: itemForm.name,
+              modules: [...pendingModules],
+              labor: { workers: itemForm.workers, days: itemForm.days },
+              margins: margins,
+              scenarioPrices: {
+                  whiteAglo:     rp.whiteAglo,
+                  whiteMDF:      rp.whiteMDF,
+                  colorAglo:     rp.colorAglo,
+                  colorMDF:      rp.colorMDF,
+                  whiteLacqAglo: rp.whiteLacqAglo,
+                  whiteLacqMDF:  rp.whiteLacqMDF,
+                  colorLacqAglo: rp.colorLacqAglo,
+                  colorLacqMDF:  rp.colorLacqMDF,
+                  whiteVenrAglo: rp.whiteVenrAglo,
+                  whiteVenrMDF:  rp.whiteVenrMDF,
+                  colorVenrAglo: rp.colorVenrAglo,
+                  colorVenrMDF:  rp.colorVenrMDF,
+                  baseConfig: rp.colorAglo,
+                  lacquer: rp.lacquer,
+                  veneer:  rp.veneer,
+              } as any,
+              details: {
+                  totalHardwareCost: (rp as any).totalDirectCost,
+                  totalMaterialCostBase: 0
+              }
+          };
+      }
 
       setItems(prev => [...prev, newItem]);
-      setPendingModules([]); 
+      setPendingModules([]);
       setIsItemModalOpen(false);
+
+      // Guardar automáticamente en Supabase como template reutilizable
+      const templateToSave = {
+          name:    newItem.name,
+          modules: newItem.modules,
+          labor:   newItem.labor,
+          margins: newItem.margins,
+      };
+      supabase.from('item_templates').insert(templateToSave).then(({ data, error }) => {
+          if (!error) {
+              setItemTemplates(prev => [{
+                  ...templateToSave,
+                  id:         `tpl_${Date.now()}`,
+                  created_at: new Date().toISOString()
+              }, ...prev]);
+          }
+      });
+  };
+
+  // Cargar template: copia módulos al área de trabajo
+  const handleLoadTemplate = (template: any, editMode: boolean = false) => {
+      if (pendingModules.length > 0) {
+          if (!confirm('Hay módulos pendientes. Se reemplazarán con los del template. ¿Continuar?')) return;
+      }
+      const clonedModules = JSON.parse(JSON.stringify(template.modules)).map((m: any) => ({
+          ...m,
+          id: `m${Date.now()}_${Math.random().toString(36).slice(2,6)}`
+      }));
+      setPendingModules(clonedModules);
+      setItemForm({
+          name:          template.name,
+          workers:       template.labor?.workers  ?? 2,
+          days:          template.labor?.days      ?? 3,
+          marginWorkshop:template.margins?.workshop ?? 35,
+          marginRoden:   template.margins?.roden    ?? 25,
+      });
+      setIsTemplatesPanelOpen(false);
+      if (!editMode) {
+          // En modo copia directa, abre modal de Item pre-cargado
+          setIsItemModalOpen(true);
+      }
+      // En modo edición, el usuario modifica los módulos pendientes y crea el Item manualmente
   };
 
   const deleteItem = (id: string) => {
@@ -899,22 +1178,22 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           alert("Debe seleccionar al menos un item para generar el presupuesto.");
           return;
       }
-      setPendingPrintType('ECONOMIC');
-      setIsPriceListModalOpen(true);
+      // Usar lista activa directamente — sin modal de selección
+      setQuoteItemTitle("Amoblamiento Integral");
+      setQuoteReference(getActiveProjectName());
+      setQuoteId(generateQuoteId());
+      setShowQuoteModal(true);
   };
 
   const handleSelectPriceList = (listSettings: CostSettings, id?: string, name?: string) => {
+      // Si hay un presupuesto pendiente de actualización, ejecutar eso
+      if (updatePricesEstimate) {
+          handleConfirmUpdatePrices(listSettings, id, name);
+          return;
+      }
+      // Caso legacy (no debería usarse para nuevos flujos)
       setActiveSettings({ ...listSettings, id, name });
       setIsPriceListModalOpen(false);
-      
-      if (pendingPrintType === 'COSTS') {
-          setPrintMode('COSTS');
-      } else if (pendingPrintType === 'ECONOMIC') {
-          setQuoteItemTitle("Amoblamiento Integral");
-          setQuoteReference(getActiveProjectName());
-          setQuoteId(generateQuoteId());
-          setShowQuoteModal(true);
-      }
       setPendingPrintType(null);
   };
 
@@ -937,7 +1216,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               items: selectedItemsList,
               modules: [], // Not used for ECONOMIC but required by type
               settingsSnapshot: activeSettings,
-              priceListId: activeSettings.id,
+              priceListId: (activeSettings.id && activeSettings.id !== 'current') ? activeSettings.id : null,
               totalDirectCost: selectedItemsList.reduce((sum, item) => sum + (getRecalculatedItemPrices(item, activeSettings) as any).totalDirectCost, 0),
               finalPrice: totalRef,
               status: BudgetStatus.DRAFT,
@@ -1039,29 +1318,39 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       }
   };
 
+  const [updatePricesEstimate, setUpdatePricesEstimate] = useState<SavedEstimate | null>(null);
+
   const handleUpdatePrices = (originalEstimate: SavedEstimate) => {
-    if (onSaveEstimate) {
+      // Abrir modal de selección de lista para recalcular
+      setUpdatePricesEstimate(originalEstimate);
+      setIsPriceListModalOpen(true);
+  };
+
+  const handleConfirmUpdatePrices = (listSettings: CostSettings, id?: string, name?: string) => {
+      if (!updatePricesEstimate || !onSaveEstimate) return;
       const newVersion: SavedEstimate = {
-        ...originalEstimate,
-        id: `est${Date.now()}`,
-        date: new Date().toISOString(),
-        version: (originalEstimate.version || 1) + 1,
-        parentId: originalEstimate.id,
-        isLatest: true,
-        settingsSnapshot: { ...settings }, // Aplica precios actuales
-        auditLog: [
-          ...(originalEstimate.auditLog || []),
-          {
-            from: originalEstimate.commercialStatus || 'N/A',
-            to: originalEstimate.commercialStatus || 'N/A',
-            timestamp: new Date().toISOString(),
-            user: 'Sistema (Actualización de Precios)'
-          }
-        ]
+          ...updatePricesEstimate,
+          id: `est${Date.now()}`,
+          date: new Date().toISOString(),
+          version: (updatePricesEstimate.version || 1) + 1,
+          parentId: updatePricesEstimate.id,
+          isLatest: true,
+          settingsSnapshot: { ...listSettings, id, name } as any,
+          priceListId: (id && id !== 'current') ? id : null,
+          auditLog: [
+              ...(updatePricesEstimate.auditLog || []),
+              {
+                  from: updatePricesEstimate.commercialStatus || 'N/A',
+                  to: updatePricesEstimate.commercialStatus || 'N/A',
+                  timestamp: new Date().toISOString(),
+                  user: `Sistema (Actualización de Precios — ${name || 'Lista Actual'})`
+              }
+          ]
       };
       onSaveEstimate(newVersion);
-      alert(`Nueva versión v${newVersion.version} con precios actualizados.`);
-    }
+      setUpdatePricesEstimate(null);
+      setIsPriceListModalOpen(false);
+      alert(`Nueva versión v${newVersion.version} con precios de "${name || 'Lista Actual'}".`);
   };
 
   const handleSetFinalTermination = (scenario: 'white' | 'textured' | 'lacquer' | 'veneer') => {
@@ -1090,15 +1379,44 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           return;
       }
 
+      // Si todos los ítems son manuales: no hay recálculo ni comparación de costos.
+      // El precio queda exactamente igual al presupuesto aprobado.
+      const allManual = technicalItems.length > 0 && technicalItems.every(item =>
+          (item as any).isManualItem ||
+          item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID)
+      );
+
+      if (allManual) {
+          const updatedEstimate: SavedEstimate = {
+              ...originalEstimateForComparison,
+              items: technicalItems,
+              hasTechnicalDefinition: true,
+              date: new Date().toISOString(),
+          };
+          onSaveEstimate(updatedEstimate);
+          setIsTechnicalModalOpen(false);
+          return;
+      }
+
       // 1. Calculate the updated cost based on technicalItems
+      // Ítems manuales dentro de un presupuesto mixto: conservan su precio original
+      // Usar el mismo engine unificado (getRecalculatedItemPrices) con el snapshot histórico del presupuesto.
+      const budgetHistSnap = (originalEstimateForComparison.settingsSnapshot || activeSettings) as CostSettings;
       const updatedTotalDirectCost = technicalItems.reduce((sum, item) => {
-          const prices = calculateFinancialsForScenario(item.modules, item.labor.workers * item.labor.days * settings.costLaborDay, item.margins, {}, { ...originalEstimateForComparison.settingsSnapshot, currency: 'ARS', timestamp: originalEstimateForComparison.date });
-          return sum + prices.totalDirectCost;
+          if ((item as any).isManualItem || item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID)) {
+              return sum + (item.details?.totalMaterialCostBase || 0) + (item.details?.totalHardwareCost || 0);
+          }
+          const prices = getRecalculatedItemPrices(item, budgetHistSnap);
+          return sum + (prices as any).totalDirectCost;
       }, 0);
 
       const updatedFinalPrice = technicalItems.reduce((sum, item) => {
-          const prices = calculateFinancialsForScenario(item.modules, item.labor.workers * item.labor.days * settings.costLaborDay, item.margins, {}, { ...originalEstimateForComparison.settingsSnapshot, currency: 'ARS', timestamp: originalEstimateForComparison.date });
-          return sum + prices.finalPrice;
+          if ((item as any).isManualItem || item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID)) {
+              // Precio manual: preservar el del presupuesto aprobado
+              return sum + (item.scenarioPrices?.colorAglo || (item as any).details?.manualPrecioFinal || 0);
+          }
+          const prices = getRecalculatedItemPrices(item, budgetHistSnap);
+          return sum + prices.colorAglo;
       }, 0);
 
       const originalCost = originalEstimateForComparison.finalPrice || 0;
@@ -1149,14 +1467,22 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   const handleGenerateProductionOrder = (budgetId: string) => {
       const budget = savedEstimates?.find(b => b.id === budgetId);
-      if (budget) {
-          setProductionOrderForm({
-              itemDescription: budget.customProjectName || '',
-              startDate: new Date().toISOString().split('T')[0],
-              estimatedDeliveryDate: '',
-              assignedOperators: ''
-          });
+      if (!budget) return;
+
+      // Validar que tenga definición técnica antes de enviar a producción
+      if (!budget.hasTechnicalDefinition) {
+          alert('Este presupuesto no tiene Definición Técnica confirmada.\nDefiní materiales, colores y cores antes de generar la Orden de Producción.');
+          return;
       }
+
+      setProductionOrderForm({
+          itemDescription: budget.quoteData?.title || budget.customProjectName || '',
+          startDate: new Date().toISOString().split('T')[0],
+          estimatedDeliveryDate: '',
+          assignedOperators: '',
+          observations: '',
+          linkedProjectId: (budget.projectId && budget.projectId !== 'NEW') ? budget.projectId : '',
+      });
       setSelectedBudgetIdForProduction(budgetId);
       setIsProductionOrderModalOpen(true);
   };
@@ -1167,17 +1493,35 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       const budget = savedEstimates?.find(b => b.id === selectedBudgetIdForProduction);
       if (!budget) return;
 
+      // Extraer módulos desde items (presupuestos ECONOMIC tienen módulos en items[n].modules)
+      const allModules = budget.items
+          ? budget.items.flatMap((item: any) => item.modules || [])
+          : budget.modules || [];
+
+      // Calcular lista de materiales y herrajes desde los módulos técnicos
+      const materialsSummary = allModules.length > 0
+          ? calculateItemQuantities(allModules)
+          : null;
+
       const newOrder = {
-          budgetId: budget.id,
-          clientId: budget.projectId === 'NEW' ? null : budget.projectId,
-          clientName: budget.customProjectName || 'Cliente Desconocido',
+          // Columnas existentes en DB
+          order_number: `OP-${Date.now().toString().slice(-6)}`,
+          project_id: productionOrderForm.linkedProjectId || (budget.projectId === 'NEW' ? null : budget.projectId),
+          start_date: productionOrderForm.startDate,
+          delivery_date: productionOrderForm.estimatedDeliveryDate,
+          status: ProductionOrderStatus.PENDING,
+          items: allModules,
+          assigned_operators: productionOrderForm.assignedOperators.split(',').map((s: string) => s.trim()).filter(Boolean),
+          // Columnas adicionales
+          clientName: (() => {
+              const pid = productionOrderForm.linkedProjectId || (budget.projectId !== 'NEW' ? budget.projectId : null);
+              return pid ? getProjectTitleById(pid) : budget.customProjectName || 'Sin Nombre';
+          })(),
           itemDescription: productionOrderForm.itemDescription,
-          technicalDetails: budget.modules,
-          materialsList: budget.items,
-          startDate: productionOrderForm.startDate,
           estimatedDeliveryDate: productionOrderForm.estimatedDeliveryDate,
-          assignedOperators: productionOrderForm.assignedOperators.split(',').map(s => s.trim()).filter(Boolean),
-          status: ProductionOrderStatus.PENDING
+          budgetId: budget.id,
+          linkedProjectId: productionOrderForm.linkedProjectId || (budget.projectId === 'NEW' ? null : budget.projectId),
+          observations: productionOrderForm.observations,
       };
 
       const { error } = await supabase.from('production_orders').insert(newOrder);
@@ -1229,7 +1573,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               type: 'TECHNICAL',
               modules: selectedTechnicalItems as any,
               settingsSnapshot: settings,
-              priceListId: activeSettings.id,
+              priceListId: (activeSettings.id && activeSettings.id !== 'current') ? activeSettings.id : null,
               version: 1,
               isLatest: true
           };
@@ -1245,43 +1589,61 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   const handleOptimizeCut = () => {
       const itemsToProcess = technicalItems.length > 0 ? technicalItems : items;
-      const groupedByMaterial: Record<string, { id: string, width: number, height: number, quantity: number }[]> = {};
+      const groupedByMaterial: Record<string, { id: string, label: string, width: number, height: number, quantity: number, grain: 'horizontal' | 'vertical' | 'free' }[]> = {};
 
       itemsToProcess.forEach(item => {
           item.modules.forEach(mod => {
               const parts = calculateModuleParts(mod);
               parts.forEach(part => {
+                  // Resolver clave de material legible
                   let materialKey = part.material as string;
-                  if (materialKey.includes('18mm_Color')) materialKey = mod.materialColorName || 'Melamina Color';
-                  if (materialKey.includes('15mm_White')) materialKey = 'Melamina Blanca 15mm';
-                  if (materialKey.includes('3mm_White')) materialKey = 'Fondo 3mm Blanco';
-                  
-                  if (!groupedByMaterial[materialKey]) {
-                      groupedByMaterial[materialKey] = [];
-                  }
-                  
+                  if (materialKey === '18mm_White')    materialKey = mod.materialColorName?.includes('blanc') ? mod.materialColorName : 'Melamina Blanca 18mm';
+                  else if (materialKey === '18mm_Color')    materialKey = mod.materialColorName || 'Melamina Color 18mm';
+                  else if (materialKey === '18mm_MDF')      materialKey = 'Melamina Blanca MDF 18mm';
+                  else if (materialKey === '18mm_MDFCrudo') materialKey = 'MDF Crudo 1 Cara 18mm';
+                  else if (materialKey === '18mm_Kiri')     materialKey = 'Enchapado Kiri 18mm';
+                  else if (materialKey === '15mm_White')    materialKey = 'Melamina Blanca 15mm';
+                  else if (materialKey === '3mm_White')     materialKey = 'Fondo 3mm Blanco';
+                  else if (materialKey === '5.5mm_Color' || materialKey.includes('55mm')) materialKey = 'Fondo 5.5mm Color';
+
+                  if (!groupedByMaterial[materialKey]) groupedByMaterial[materialKey] = [];
+
+                  // Pasar el grain de la pieza al optimizador
+                  const grain = (part.grain === 'horizontal' || part.grain === 'vertical') ? part.grain : 'free';
+
                   groupedByMaterial[materialKey].push({
-                      id: `${mod.name.substring(0,3)}_${part.name.substring(0,3)}`,
-                      width: Math.floor(part.width),
-                      height: Math.floor(part.height),
-                      quantity: part.quantity * (mod.quantity || 1)
+                      id:       `${mod.name.substring(0,4)}_${part.name.substring(0,4)}`,
+                      label:    `${part.name} (${mod.name})`,
+                      width:    Math.round(part.width),
+                      height:   Math.round(part.height),
+                      quantity: part.quantity * (mod.quantity || 1),
+                      grain,
                   });
               });
           });
       });
 
       const results: Record<string, Sheet[]> = {};
-      
+      const allUnplaceable: { material: string; id: string; label?: string; reason: string }[] = [];
+
       Object.keys(groupedByMaterial).forEach(material => {
+          const n = material.toLowerCase();
+          const isTrupan = n.includes('5.5') || n.includes('trupan') || n.includes('kiri');
           const input = {
-              pieces: groupedByMaterial[material],
-              sheetWidth: 2750,
+              pieces:      groupedByMaterial[material],
+              sheetWidth:  isTrupan ? 2600 : 2750,
               sheetHeight: 1830,
-              kerf: 3 // Blade kerf thickness
+              kerf:        3,
           };
-          const { sheets } = generateCutPlan(input);
+          const { sheets, unplaceable } = generateCutPlan(input);
           results[material] = sheets;
+          unplaceable.forEach(u => allUnplaceable.push({ material, ...u }));
       });
+
+      if (allUnplaceable.length > 0) {
+          const msg = allUnplaceable.map(u => `• ${u.label || u.id} (${u.material}): ${u.reason}`).join('\n');
+          alert(`Atención — Piezas que no pudieron ubicarse:\n\n${msg}`);
+      }
 
       setOptimizationResult(results);
       if (Object.keys(results).length > 0) {
@@ -1376,52 +1738,115 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   };
 
   const executeViewQuote = (estimate: SavedEstimate) => {
-      // Open the edit modal directly so the user can review/edit before viewing
-      setEditingEstimate({
-          ...estimate,
-          quoteData: estimate.quoteData || {
-              id: estimate.id,
-              title: 'Amoblamiento Integral',
-              reference: estimate.customProjectName || getProjectTitleById(estimate.projectId || ''),
-              observations: DEFAULT_OBSERVATIONS,
-              conditions: DEFAULT_CONDITIONS,
-              enabledScenarios: { white: true, textured: true, lacquer: false, veneer: false }
-          }
-      });
-      setIsEditEstimateModalOpen(true);
+      // Abrir directamente sin pasar por modal de edición — usar datos guardados tal cual
+      const qd = estimate.quoteData;
+      setItems((estimate.items || estimate.modules || []) as any);
+      setSettings(estimate.settingsSnapshot);
+      setActiveSettings({ ...estimate.settingsSnapshot, id: estimate.priceListId, name: (estimate as any).priceListName });
+      setSelectedItemIds(new Set(((estimate.items || estimate.modules || []) as any[]).map((i: any) => i.id)));
+      setQuoteItemTitle(qd?.title || 'Amoblamiento Integral');
+      setQuoteReference(qd?.reference || estimate.customProjectName || getProjectTitleById(estimate.projectId || ''));
+      setQuoteId(qd?.id || estimate.id.substring(0, 8).toUpperCase());
+      setQuoteVersion(estimate.version);
+      setQuoteObservations(qd?.observations || DEFAULT_OBSERVATIONS);
+      setQuoteConditions(qd?.conditions || DEFAULT_CONDITIONS);
+      if (qd?.enabledScenarios) setEnabledScenarios(qd.enabledScenarios as any);
+      setEditingEstimate(estimate);
+      setView('RESULTS');
+      setPrintMode('ECONOMIC');
   };
 
   const handleDelete = (e: any, id: string) => {
       e.preventDefault();
       e.stopPropagation();
-      if (onDeleteEstimate) onDeleteEstimate(id);
+      if (!confirm('¿Eliminar este legajo y todas sus versiones? Esta acción no se puede deshacer.')) return;
+      // Eliminar todas las versiones del grupo (mismo projectId o mismo id raíz)
+      const toDelete = savedEstimates?.filter(est => {
+          if (est.id === id) return true;
+          // versiones del mismo legajo comparten projectId y customProjectName
+          const target = savedEstimates.find(e => e.id === id);
+          if (!target) return false;
+          const sameProject = target.projectId && est.projectId === target.projectId;
+          const sameName    = target.customProjectName && est.customProjectName === target.customProjectName;
+          return sameProject || sameName;
+      }) || [];
+      if (toDelete.length > 1) {
+          if (!confirm(`Este legajo tiene ${toDelete.length} versiones. ¿Eliminar todas?`)) return;
+          toDelete.forEach(est => { if (onDeleteEstimate) onDeleteEstimate(est.id); });
+      } else {
+          if (onDeleteEstimate) onDeleteEstimate(id);
+      }
   };
 
   const handleAddModule = (e: React.FormEvent) => {
       e.preventDefault();
-      if (editingId) {
-          setPendingModules(prev => prev.map(m => m.id === editingId ? { ...moduleForm, id: editingId } as ExtendedCabinetModule : m));
-          setEditingId(null);
-      } else {
-          const newMod = { ...moduleForm, id: `m${Date.now()}` } as ExtendedCabinetModule;
+
+      if (moduleKind === 'SPECIAL' && specialTemplateId) {
+          const template = getTemplate(specialTemplateId);
+          if (!template) return;
+          const params: SpecialModuleParams = {
+              width:  moduleForm.width  || 600,
+              height: moduleForm.height || 720,
+              depth:  moduleForm.depth  || 580,
+          };
+          const result = template.calculate(params, specialOptions);
+          const newMod: ExtendedCabinetModule = {
+              ...moduleForm,
+              id:         `m${Date.now()}`,
+              name:       moduleForm.name || template.name,
+              moduleType: 'SPECIAL' as any,
+              // Piezas reales — el engine las procesa igual que un módulo estándar
+              extras:     [],  // sin extras de costo fijo
+              isSpecialModule:    true,
+              specialTemplateId,
+              specialParts:       result.parts,   // piezas para despiece
+              specialHardware:    result.hardware, // herrajes del template
+              specialLaborDays:   result.laborDays,
+          } as any;
           setPendingModules(prev => [...prev, newMod]);
+
+      } else if (moduleKind === 'MANUAL') {
+          if (!moduleForm.name) { alert('Ingresá un nombre para el módulo'); return; }
+          const totalManual = manualItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+          const newMod: ExtendedCabinetModule = {
+              ...moduleForm,
+              id:         `m${Date.now()}`,
+              moduleType: 'MANUAL' as any,
+              extras:     manualItems.map(i => ({ ...i, id: i.id || `mi_${Date.now()}` })),
+              isSpecialModule: true,
+              specialTemplateId: SPECIAL_MANUAL_ID,
+          } as any;
+          setPendingModules(prev => [...prev, newMod]);
+          setManualItems([]);
+
+      } else {
+          // Módulo estándar
+          if (editingId) {
+              setPendingModules(prev => prev.map(m => m.id === editingId ? { ...moduleForm, id: editingId } as ExtendedCabinetModule : m));
+              setEditingId(null);
+          } else {
+              const newMod = { ...moduleForm, id: `m${Date.now()}` } as ExtendedCabinetModule;
+              setPendingModules(prev => [...prev, newMod]);
+          }
       }
+
       setModuleForm(INITIAL_MODULE_FORM);
+      setModuleKind('STANDARD');
+      setSpecialTemplateId('');
+      setSpecialOptions({});
   };
 
   const handleInputChange = (field: keyof ExtendedCabinetModule, value: any) => {
       setModuleForm(prev => {
           const next = { ...prev, [field]: value };
           
-          // Lógica de Validación de Regla de Negocio: Laqueado/Enchapado -> MDF
+          // Auto-forzar frontsCore = MDF cuando el acabado lo requiere
           const isLacquer = next.moduleType?.includes('LACQUER');
-          const isVeneer = next.moduleType?.includes('VENEER');
-          
-          if ((isLacquer || isVeneer) && next.frontsCore !== 'MDF') {
-              setValidationWarning("Regla de Calidad: Los acabados Laqueados o Enchapados requieren obligatoriamente una base de MDF.");
-          } else {
-              setValidationWarning(null);
+          const isVeneer  = next.moduleType?.includes('VENEER');
+          if (isLacquer || isVeneer) {
+              next.frontsCore = 'MDF';
           }
+          setValidationWarning(null);
           
           return next;
       });
@@ -1591,20 +2016,45 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
     const handleConfirmVincular = () => {
         if (!vinculandoEstimateId || !onSaveEstimate) return;
         const estimateToUpdate = savedEstimates.find(e => e.id === vinculandoEstimateId);
-        if (estimateToUpdate) {
-            onSaveEstimate({
-                ...estimateToUpdate,
-                projectId: vinculandoProjectId || estimateToUpdate.projectId,
-                commercialStatus: CommercialStatus.IN_PRODUCTION,
-                auditLog: [...(estimateToUpdate.auditLog || []), {
-                    from: estimateToUpdate.commercialStatus || 'N/A',
-                    to: CommercialStatus.IN_PRODUCTION,
-                    timestamp: new Date().toISOString(),
-                    user: 'Usuario Actual'
-                }]
-            });
-            alert(`Estimación vinculada al proyecto y puesta En Producción.`);
+        if (!estimateToUpdate) return;
+
+        const projectId = vinculandoProjectId || estimateToUpdate.projectId;
+
+        // 1. Actualizar estimate — vincular al proyecto y pasar a En Producción
+        onSaveEstimate({
+            ...estimateToUpdate,
+            projectId,
+            commercialStatus: CommercialStatus.IN_PRODUCTION,
+            auditLog: [...(estimateToUpdate.auditLog || []), {
+                from: estimateToUpdate.commercialStatus || 'N/A',
+                to: CommercialStatus.IN_PRODUCTION,
+                timestamp: new Date().toISOString(),
+                user: 'Usuario Actual'
+            }]
+        });
+
+        // 2. Generar OP automáticamente y asociarla al proyecto
+        if (onAddProductionOrder && projectId) {
+            const projectTitle = getProjectTitleById(projectId);
+            const allModules = (estimateToUpdate.items || []).flatMap((item: any) => item.modules || []);
+            const newOrder: any = {
+                order_number: `OP-${Date.now().toString().slice(-6)}`,
+                project_id: projectId,
+                start_date: new Date().toISOString().split('T')[0],
+                delivery_date: '',
+                status: ProductionOrderStatus.PENDING,
+                items: allModules,
+                assigned_operators: [],
+                clientName: projectTitle,
+                itemDescription: estimateToUpdate.quoteData?.title || estimateToUpdate.customProjectName || projectTitle,
+                estimatedDeliveryDate: '',
+                budgetId: estimateToUpdate.id,
+                linkedProjectId: projectId,
+            };
+            onAddProductionOrder(newOrder);
         }
+
+        alert(`Estimación vinculada al proyecto y Orden de Producción generada.`);
         setVinculandoEstimateId(null);
         setVinculandoProjectId('');
     };
@@ -1696,67 +2146,221 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           alert("Debe seleccionar al menos un item.");
           return;
       }
-      setPendingPrintType('COSTS');
-      setIsPriceListModalOpen(true);
+      // Usar lista activa directamente — ir directo a la planilla
+      setIsCostSheetModalOpen(true);
   };
 
   const getRecalculatedItemPrices = (item: EstimatorItem, snapshot: CostSettings) => {
-      const laborCost = item.labor.workers * item.labor.days * snapshot.costLaborDay;
-      const margins = item.margins;
-      const costSnapshot: CostSnapshot = { ...snapshot, currency: 'ARS', timestamp: '' };
+      // Guard: item puede venir de Supabase con estructura incompleta
+      if (!item?.labor || !item?.margins || !item?.modules) {
+          return { whiteAglo: 0, whiteMDF: 0, colorAglo: 0, colorMDF: 0, whiteLacqAglo: 0, whiteLacqMDF: 0, colorLacqAglo: 0, colorLacqMDF: 0, whiteVenrAglo: 0, whiteVenrMDF: 0, colorVenrAglo: 0, colorVenrMDF: 0, baseConfig: 0, totalDirectCost: 0 };
+      }
 
-      const whiteAglo = calculateFinancialsForScenario(item.modules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: true, isMDFCore: false }, costSnapshot);
-      const whiteMDF = calculateFinancialsForScenario(item.modules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: true, isMDFCore: true }, costSnapshot);
-      const colorAglo = calculateFinancialsForScenario(item.modules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: false, isMDFCore: false }, costSnapshot);
-      const colorMDF = calculateFinancialsForScenario(item.modules, laborCost, margins, { moduleType: 'MELAMINE_FULL', isWhiteStructure: false, isMDFCore: true }, costSnapshot);
-      const lacquer = calculateFinancialsForScenario(item.modules, laborCost, margins, { moduleType: 'LACQUER_FULL', isWhiteStructure: false, isMDFCore: false }, costSnapshot);
-      const veneer = calculateFinancialsForScenario(item.modules, laborCost, margins, { moduleType: 'VENEER_FULL', isWhiteStructure: false, isMDFCore: false }, costSnapshot);
+      // Ítem manual: devolver precios originales sin recalcular con escenarios de materiales
+      const isManual = (item as any).isManualItem ||
+          item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
+      if (isManual) {
+          const p = item.scenarioPrices?.colorAglo || (item as any).details?.manualPrecioFinal || 0;
+          const taller = item.scenarioPrices?.baseConfig || (item as any).details?.manualPrecioTaller || 0;
+          const directCost = (item.details?.totalMaterialCostBase || 0) + (item.details?.totalHardwareCost || 0);
+          return { whiteAglo: p, whiteMDF: p, colorAglo: p, colorMDF: p,
+                   whiteLacqAglo: p, whiteLacqMDF: p, colorLacqAglo: p, colorLacqMDF: p,
+                   whiteVenrAglo: p, whiteVenrMDF: p, colorVenrAglo: p, colorVenrMDF: p,
+                   baseConfig: taller, totalDirectCost: directCost };
+      }
+
+      const S: any = snapshot;
+      const laborCost  = (item.labor.workers || 1) * (item.labor.days || 1) * snapshot.costLaborDay;
+      const margins    = item.margins;
+      const fixedCosts = (S.priceScrews || 0) + (S.priceGlueTin || 0);
+      // Extras del módulo: costo fijo independiente del escenario de material
+      const extrasCost = (item.modules as any[]).flatMap((m: any) => m.extras || [])
+          .reduce((a: number, e: any) => a + (e.unitPrice || 0) * (e.quantity || 0), 0);
+
+      // ── Mismo lookup de precios que usa la planilla de costos ──
+      const boardPrice = (name: string, count: number): number => {
+          const n = name.toLowerCase();
+          let p = S.priceBoard18WhiteAglo || 0;
+          if      (n.includes('trupan') || n.includes('5.5'))        p = S.priceBacking55Color       || 0;
+          else if (n.includes('fondo') && n.includes('3'))           p = S.priceBacking3White         || 0;
+          else if (n.includes('15mm'))                               p = S.priceBoard15WhiteAglo      || 0;
+          else if (n.includes('laquear') || n.includes('crudo'))     p = S.priceBoard18MDFCrudo1Face  || 0;
+          else if (n.includes('kiri') || n.includes('veneer'))       p = S.priceBoard18VeneerMDF      || 0;
+          else if (n.includes('color') && n.includes('mdf'))         p = S.priceBoard18ColorMDF       || 0;
+          else if (n.includes('color'))                              p = S.priceBoard18ColorAglo      || 0;
+          else if (n.includes('blanca') && n.includes('mdf'))        p = S.priceBoard18WhiteMDF       || 0;
+          return p * count;
+      };
+
+      const hwPrice = (name: string, qty: number): number => {
+          const n = name.toLowerCase();
+          let unitPrice = 0;
+          if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard || 0;
+          else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose || 0;
+          else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
+          else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
+          else if (n.includes('guías') || n.includes('guia')) {
+              const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
+              const isS = n.includes('suave'); const isP = n.includes('push');
+              if      (len <= 300) unitPrice = isS ? (S.priceSlide300Soft || 0) : isP ? (S.priceSlide300Push || 0) : (S.priceSlide300Std || 0);
+              else if (len <= 400) unitPrice = isS ? (S.priceSlide400Soft || 0) : isP ? (S.priceSlide400Push || 0) : (S.priceSlide400Std || 0);
+              else                 unitPrice = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
+          }
+          return unitPrice * qty;
+      };
+
+      // ── Engine unificado: mismo pipeline que planilla de costos ──
+      // calculateItemQuantities → precios por placa entera → margen
+      const calc = (override: Partial<CabinetModule>) => {
+          const q = calculateItemQuantities(item.modules, override);
+          const mType    = (override.moduleType as string) || 'MELAMINE_FULL';
+          const finArea  = mType.includes('LACQUER') ? q.lacquerAreaM2 : mType.includes('VENEER') ? q.veneerAreaM2 : 0;
+          const finPrice = mType.includes('LACQUER') ? (S.priceFinishLacquerSemi || 0) : mType.includes('VENEER') ? (S.priceFinishLustreSemi || 0) : 0;
+          const tPlacas  = Object.entries(q.detailedBoards).filter(([, v]) => (v as number) > 0).reduce((a, [n, c]) => a + boardPrice(n, c as number), 0);
+          const tTapac   = (q.linearWhite22 * (S.priceEdge22White045 || 0)) + (q.linearWhite45 * (S.priceEdge45White045 || 0))
+                         + (q.linearColor22 * (S.priceEdge22Color045 || 0)) + (q.linearColor45 * (S.priceEdge45Color045 || 0))
+                         + (q.linear2mm * (S.priceEdge2mm || 0));
+          const tHerrajes = Object.entries(q.detailedHardware).reduce((a, [n, qty]) => a + hwPrice(n, qty as number), 0) + extrasCost;
+          const d = tPlacas + tTapac + tHerrajes + fixedCosts + finArea * finPrice + laborCost;
+          const w = d * (1 + (margins.workshop ?? 35) / 100);
+          return { d, finalPrice: w * (1 + (margins.roden ?? 0) / 100) };
+      };
+
+      const whiteAglo     = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
+      const whiteMDF      = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
+      const colorAglo     = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
+      const colorMDF      = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
+      const whiteLacqAglo = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const whiteLacqMDF  = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const colorLacqAglo = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const colorLacqMDF  = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const whiteVenrAglo = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const whiteVenrMDF  = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const colorVenrAglo = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const colorVenrMDF  = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
 
       return {
-          whiteAglo: whiteAglo.finalPrice,
-          whiteMDF: whiteMDF.finalPrice,
-          colorAglo: colorAglo.finalPrice,
-          colorMDF: colorMDF.finalPrice,
-          lacquer: lacquer.finalPrice,
-          veneer: veneer.finalPrice,
-          totalDirectCost: colorAglo.totalDirectCost
+          whiteAglo:     whiteAglo.finalPrice,
+          whiteMDF:      whiteMDF.finalPrice,
+          colorAglo:     colorAglo.finalPrice,
+          colorMDF:      colorMDF.finalPrice,
+          whiteLacqAglo: whiteLacqAglo.finalPrice,
+          whiteLacqMDF:  whiteLacqMDF.finalPrice,
+          colorLacqAglo: colorLacqAglo.finalPrice,
+          colorLacqMDF:  colorLacqMDF.finalPrice,
+          whiteVenrAglo: whiteVenrAglo.finalPrice,
+          whiteVenrMDF:  whiteVenrMDF.finalPrice,
+          colorVenrAglo: colorVenrAglo.finalPrice,
+          colorVenrMDF:  colorVenrMDF.finalPrice,
+          baseConfig:    colorAglo.finalPrice,
+          totalDirectCost: colorAglo.d,
+          // Aliases para compatibilidad con render del presupuesto
+          lacquer: whiteLacqAglo.finalPrice,
+          veneer:  whiteVenrAglo.finalPrice,
       };
   };
 
-  if (printMode === 'SUPPLIES' || printMode === 'CUTTING' || printMode === 'COSTS' || printMode === 'PRODUCTION_ORDER') {
+  if (printMode === 'SUPPLIES' || printMode === 'CUTTING' || printMode === 'COSTS' || printMode === 'COSTS_CUTS' || printMode === 'PRODUCTION_ORDER') {
       const itemsToPrint = technicalItems.length > 0 ? technicalItems : items.filter(i => selectedItemIds.has(i.id));
       const summary = calculateGlobalSummary(itemsToPrint);
-      const cutList = printMode === 'CUTTING' ? getDecomposedCutList() : {};
+      const cutList = (printMode === 'CUTTING' || printMode === 'COSTS' || printMode === 'COSTS_CUTS') ? getDecomposedCutList() : {};
 
       return (
         <div className="animate-fade-in min-h-screen bg-gray-100/50 print:bg-white flex flex-col items-center font-sans">
              <style>{`
                 @media print {
-                    @page { margin: 10mm; size: A4; }
+                    @page { size: A4; margin: 0; }
+                    html, body, #root, .animate-fade-in, .min-h-screen { margin:0 !important; padding:0 !important; background:white !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
                     .no-print { display: none !important; }
+                    head, header[role="banner"] { display: none !important; }
+                    /* Cada hoja A4 es un div autónomo */
+                    .a4-page { width:210mm !important; height:297mm !important; overflow:hidden !important; break-after:page !important; page-break-after:always !important; display:flex !important; flex-direction:column !important; background:white !important; }
+                    .a4-page:last-child { break-after:avoid !important; page-break-after:avoid !important; }
+                    .a4-hdr { flex-shrink:0; height:16mm !important; }
+                    .a4-ftr { flex-shrink:0; height:12mm !important; }
+                    .a4-body { flex:1; overflow:hidden !important; padding:4mm 8mm !important; }
+                }
+                @media screen {
+                    .a4-page { width:210mm; min-height:297mm; display:flex; flex-direction:column; background:white; box-shadow:0 4px 24px rgba(0,0,0,0.15); margin-bottom:28px; }
+                    .a4-hdr { flex-shrink:0; }
+                    .a4-ftr { flex-shrink:0; margin-top:auto; }
+                    .a4-body { flex:1; padding:6mm 10mm; }
                 }
             `}</style>
              <div className="no-print w-full max-w-[210mm] flex flex-col gap-4 mb-6 pt-6">
                 <div className="flex justify-between items-center">
-                    <button onClick={() => setPrintMode('NONE')} className="text-gray-500 hover:text-black flex items-center gap-2 text-sm font-medium transition-colors bg-white px-4 py-2 rounded-lg border border-gray-200"><ArrowLeft size={16} /> Volver</button>
-                    <button onClick={() => window.print()} className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg"><Printer size={16} /> Imprimir Documento</button>
+                    <button onClick={() => { setPrintMode('NONE'); setShowQuoteModal(false); }} className="text-gray-500 hover:text-black flex items-center gap-2 text-sm font-medium transition-colors bg-white px-4 py-2 rounded-lg border border-gray-200"><ArrowLeft size={16} /> Volver</button>
+                    <div className="flex gap-2">
+                        {printMode === 'COSTS' && !editingEstimate && onSaveEstimate && (
+                            <button
+                                onClick={() => { setPendingPrintType('COSTS'); setShowQuoteModal(true); }}
+                                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 flex items-center gap-2"
+                            >
+                                <Archive size={16}/> Guardar en Historial
+                            </button>
+                        )}
+                        {printMode === 'COSTS' && editingEstimate && (
+                            <button
+                                onClick={() => { handleArchive(editingEstimate.id); alert('Planilla archivada en historial.'); }}
+                                className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 flex items-center gap-2"
+                            >
+                                <Archive size={16}/> Archivar
+                            </button>
+                        )}
+                        <button
+                        onClick={() => {
+                            const isChrome = navigator.userAgent.includes('Chrome');
+                            const isFirefox = navigator.userAgent.includes('Firefox');
+                            let instrucciones = 'Para imprimir sin encabezado ni pie de página del navegador:\n\n';
+                            if (isChrome) {
+                                instrucciones += 'Chrome:\n→ En el diálogo de impresión, hacé clic en "Más opciones"\n→ Desactivá "Encabezados y pies de página"';
+                            } else if (isFirefox) {
+                                instrucciones += 'Firefox:\n→ En el diálogo de impresión, ir a "Página"\n→ Desactivá encabezado y pie de página en ambos desplegables';
+                            } else {
+                                instrucciones += '→ En el diálogo de impresión, buscá "Encabezados y pies de página" y desactivalo\n→ Escala: 100%';
+                            }
+                            instrucciones += '\n\nEsta configuración se guarda para futuras impresiones.';
+                            alert(instrucciones);
+                            window.print();
+                        }}
+                        className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg"
+                    >
+                        <Printer size={16} /> Imprimir Documento
+                    </button>
+                    </div>
                 </div>
                 
-                {printMode !== 'COSTS' && (
+                {(printMode === 'COSTS' || printMode === 'COSTS_CUTS') && (
                     <div className="bg-white p-1 rounded-xl border border-gray-200 flex shadow-sm">
-                        <button 
+                        <button
+                            onClick={() => setPrintMode('COSTS')}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${printMode === 'COSTS' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <FileText size={16}/> Planilla Resumen
+                        </button>
+                        <button
+                            onClick={() => setPrintMode('COSTS_CUTS')}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${printMode === 'COSTS_CUTS' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <Grid size={16}/> Listado de Cortes
+                        </button>
+                    </div>
+                )}
+                {printMode !== 'COSTS' && printMode !== 'COSTS_CUTS' && (
+                    <div className="bg-white p-1 rounded-xl border border-gray-200 flex shadow-sm">
+                        <button
                             onClick={() => setPrintMode('SUPPLIES')}
                             className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${printMode === 'SUPPLIES' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                             <ShoppingCart size={16}/> Reporte Técnico (Materiales)
                         </button>
-                        <button 
+                        <button
                             onClick={() => setPrintMode('CUTTING')}
                             className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${printMode === 'CUTTING' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                             <Grid size={16}/> Listado de Corte
                         </button>
-                        <button 
+                        <button
                             onClick={() => setPrintMode('PRODUCTION_ORDER')}
                             className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${printMode === 'PRODUCTION_ORDER' ? 'bg-purple-50 text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
@@ -1766,146 +2370,284 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 )}
             </div>
 
-            <div className="print-container relative w-[210mm] min-h-[297mm] bg-white shadow-2xl print:shadow-none flex flex-col">
-                <header className="h-[14mm] bg-black text-white flex items-center justify-between px-10 relative">
-                    <div className="flex items-baseline gap-4"><h1 className="text-4xl font-bold tracking-tighter leading-none">rødën</h1><span className="text-3xl font-light text-gray-500 pb-0.5">|</span><span className="text-lg font-medium mb-1" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                        {printMode === 'SUPPLIES' ? 'Reporte Técnico' : printMode === 'CUTTING' ? 'Listado de Corte' : 'Costos de Producción'}
-                    </span></div>
-                    <div className="text-right">
-                        <div className="text-sm font-bold">{new Date().toLocaleDateString()}</div>
-                        <div className="text-xs font-light text-gray-300">1/1</div>
-                    </div>
-                </header>
-                
-                <div className="px-12 py-8 flex-1 flex flex-col font-mono text-sm">
-                    <div className="border-b border-gray-300 pb-4 mb-6">
-                        <h2 className="text-xl font-bold uppercase mb-1">
-                            {printMode === 'SUPPLIES' ? 'SECCIÓN 1 — REPORTE TÉCNICO' : 
-                             printMode === 'CUTTING' ? 'SECCIÓN 2 — LISTADO DE CORTE' : 
-                             printMode === 'PRODUCTION_ORDER' ? 'ORDEN DE PRODUCCIÓN' :
-                             'X — COSTOS'}
-                        </h2>
-                        <p>Proyecto: {getActiveProjectName()}</p>
+            {/* ══ DOCUMENTO A4 — hojas autónomas con header/footer ══ */}
+            <div className="flex flex-col items-center print:block">
+
+                {/* Componente header A4 reutilizable */}
+                {/* Componente footer A4 reutilizable */}
+
+                {(() => {
+                    const docTitle = printMode === 'COSTS' ? 'Planilla de Costos'
+                                   : printMode === 'COSTS_CUTS' ? 'Listado de Cortes'
+                                   : printMode === 'CUTTING' ? 'Listado de Corte'
+                                   : printMode === 'PRODUCTION_ORDER' ? 'Orden de Producción'
+                                   : 'Reporte Técnico';
+                    const projName = getActiveProjectName();
+                    const dateStr  = new Date().toLocaleDateString('es-AR');
+                    const listName = (editingEstimate?.settingsSnapshot as any)?.name || activeSettings.name || 'Lista Actual';
+
+                    const Hdr = ({ n, total }: { n: number, total: number }) => (
+                        <div className="a4-hdr bg-black text-white flex items-center justify-between"
+                             style={{ padding: '0 10mm' }}>
+                            <div style={{ display:'flex', alignItems:'baseline', gap:'8px' }}>
+                                <span style={{ fontSize:'22px', fontWeight:700, letterSpacing:'-0.5px', lineHeight:'1' }}>rødën</span>
+                                <span style={{ fontSize:'16px', fontWeight:300, color:'#666' }}>|</span>
+                                <span style={{ fontSize:'12px', fontWeight:500 }}>{docTitle}</span>
+                            </div>
+                            <div style={{ textAlign:'right' }}>
+                                <div style={{ fontSize:'11px', fontWeight:700 }}>{projName}</div>
+                                <div style={{ fontSize:'9px', color:'#aaa' }}>{dateStr} · {listName}</div>
+                                <div style={{ fontSize:'9px', color:'#777' }}>Hoja {n} de {total}</div>
+                            </div>
+                        </div>
+                    );
+
+                    const Ftr = () => (
+                        <div className="a4-ftr bg-gray-900 text-white flex items-center justify-between"
+                             style={{ padding: '0 10mm', borderTop: '1px solid #333' }}>
+                            <span style={{ fontSize:'9px', color:'#888', letterSpacing:'0.5px' }}>Devoto | Buenos Aires | Argentina</span>
+                            <span style={{ fontSize:'11px', fontWeight:700 }}>www.rodenmobel.com</span>
+                            <span style={{ fontSize:'9px', color:'#888' }}>rødën {new Date().getFullYear()}</span>
+                        </div>
+                    );
+
+                    // ── CALCULAR TOTAL DE HOJAS ──
+                    // Hoja 1: siempre (contenido principal)
+                    // Hoja 2+: planilla de cortes (solo si printMode === 'COSTS')
+                    const cutEntries = (printMode === 'COSTS' || printMode === 'COSTS_CUTS') ? Object.entries(cutList) : [];
+                    const totalPages = printMode === 'COSTS' ? 2 : printMode === 'COSTS_CUTS' ? 1 : 1;
+
+                    return (
+                        <>
+                            {printMode !== 'COSTS' && printMode !== 'COSTS_CUTS' && (
+                            <>
+                            <div className="a4-page">
+                                <Hdr n={1} total={totalPages} />
+                                <div className="a4-body">
+
+                    <div className="border-b border-gray-300 pb-4 mb-6 flex justify-between items-start">
+                        <div>
+                            <h2 className="text-2xl font-bold uppercase mb-0.5">{getActiveProjectName()}</h2>
+                            <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">
+                                {printMode === 'SUPPLIES' ? 'Reporte Técnico de Materiales' : 
+                                 printMode === 'CUTTING' ? 'Listado de Corte' : 
+                                 printMode === 'PRODUCTION_ORDER' ? 'Orden de Producción' :
+                                 'Planilla de Costos de Producción'}
+                            </p>
+                        </div>
+                        {printMode === 'COSTS' && (
+                            <div className="text-right">
+                                <span className="text-[10px] font-bold uppercase text-gray-400 block">Lista de precios</span>
+                                <span className="text-sm font-bold text-gray-700">{activeSettings.name || 'Lista Actual'}</span>
+                            </div>
+                        )}
                         {printMode === 'PRODUCTION_ORDER' && (
-                            <div className="mt-2 grid grid-cols-2 gap-4 text-xs">
+                            <div className="mt-2 grid grid-cols-3 gap-4 text-xs">
                                 <div><strong>Orden N°:</strong> {productionOrderInfo.orderNumber}</div>
-                                <div><strong>Fecha Emisión:</strong> {new Date().toLocaleDateString()}</div>
-                                <div><strong>Inicio Est.:</strong> {new Date(productionOrderInfo.startDate).toLocaleDateString()}</div>
-                                <div><strong>Entrega Est.:</strong> {new Date(productionOrderInfo.deliveryDate).toLocaleDateString()}</div>
+                                <div><strong>Inicio:</strong>
+                                    <input type="date" className="ml-1 border rounded px-1 py-0.5 text-xs no-print" value={productionOrderInfo.startDate} onChange={e => setProductionOrderInfo({...productionOrderInfo, startDate: e.target.value})}/>
+                                    <span className="hidden print:inline ml-1">{productionOrderInfo.startDate ? new Date(productionOrderInfo.startDate).toLocaleDateString() : '—'}</span>
+                                </div>
+                                <div><strong>Entrega:</strong>
+                                    <input type="date" className="ml-1 border rounded px-1 py-0.5 text-xs no-print" value={productionOrderInfo.deliveryDate} onChange={e => setProductionOrderInfo({...productionOrderInfo, deliveryDate: e.target.value})}/>
+                                    <span className="hidden print:inline ml-1">{productionOrderInfo.deliveryDate ? new Date(productionOrderInfo.deliveryDate).toLocaleDateString() : '—'}</span>
+                                </div>
                             </div>
                         )}
                     </div>
 
                     {printMode === 'PRODUCTION_ORDER' && (
-                        <div className="space-y-8">
-                            <div className="bg-gray-50 p-4 rounded border border-gray-200">
-                                <h3 className="font-bold uppercase text-sm mb-3 border-b border-gray-300 pb-1">Datos de Producción</h3>
-                                <div className="grid grid-cols-3 gap-4 text-xs">
-                                    <div>
-                                        <label className="block text-gray-400 uppercase font-bold mb-1">Operarios</label>
-                                        <input type="number" className="w-full border p-1 rounded no-print" value={productionOrderInfo.workers} onChange={e => setProductionOrderInfo({...productionOrderInfo, workers: Number(e.target.value)})}/>
-                                        <span className="hidden print:block">{productionOrderInfo.workers} personas</span>
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-400 uppercase font-bold mb-1">Fecha Inicio</label>
-                                        <input type="date" className="w-full border p-1 rounded no-print" value={productionOrderInfo.startDate} onChange={e => setProductionOrderInfo({...productionOrderInfo, startDate: e.target.value})}/>
-                                        <span className="hidden print:block">{new Date(productionOrderInfo.startDate).toLocaleDateString()}</span>
-                                    </div>
-                                    <div>
-                                        <label className="block text-gray-400 uppercase font-bold mb-1">Fecha Entrega</label>
-                                        <input type="date" className="w-full border p-1 rounded no-print" value={productionOrderInfo.deliveryDate} onChange={e => setProductionOrderInfo({...productionOrderInfo, deliveryDate: e.target.value})}/>
-                                        <span className="hidden print:block">{new Date(productionOrderInfo.deliveryDate).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="space-y-0">
 
-                            <div>
-                                <h3 className="font-bold border-b border-black mb-3 uppercase text-lg">1. Definición Técnica por Ítem</h3>
-                                <div className="space-y-4">
-                                    {itemsToPrint.map((item, idx) => (
-                                        <div key={item.id} className="border border-gray-200 p-3 rounded bg-white">
-                                            <div className="font-bold text-sm mb-2">{idx + 1}. {item.name}</div>
-                                            <div className="grid grid-cols-3 gap-4 text-[10px] text-gray-600">
-                                                <div><strong>Estructura:</strong> {item.modules[0]?.materialColorName || 'A definir'} ({item.modules[0]?.structureCore || 'AGLO'})</div>
-                                                <div><strong>Frentes:</strong> {item.modules[0]?.materialFrontName || 'A definir'} ({item.modules[0]?.frontsCore || 'AGLO'})</div>
-                                                <div><strong>Herrajes:</strong> {SLIDE_LABELS[item.modules[0]?.slideType as keyof typeof SLIDE_LABELS] || 'Estándar'}</div>
+                            {/* ── SECCIÓN 1: Ítems y configuración ── */}
+                            <div className="border-b border-gray-200 px-0 py-4">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3">1 — Ítems y configuración</p>
+                                <div className="space-y-2">
+                                    {itemsToPrint.map((item, idx) => {
+                                        const isManualItem = (item as any).isManualItem ||
+                                            item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
+
+                                        if (isManualItem) {
+                                            return (
+                                                <div key={item.id} className="bg-gray-50 rounded px-3 py-2 text-[10px]">
+                                                    <div className="font-bold text-sm text-gray-900">{idx + 1}. {item.name}</div>
+                                                </div>
+                                            );
+                                        }
+
+                                        const q = calculateItemQuantities(item.modules);
+                                        const hasLacquer = q.lacquerAreaM2 > 0;
+                                        const hasVeneer  = q.veneerAreaM2  > 0;
+                                        const structDesc = item.modules[0]?.isWhiteStructure ? 'Mel. Blanca' : 'Mel. Color';
+                                        const coreDesc   = item.modules[0]?.structureCore === 'MDF' ? 'MDF' : 'Aglo';
+                                        const frontDesc  = hasLacquer ? 'Frentes Laca Semi Mate'
+                                                         : hasVeneer  ? 'Frentes Enchapado Kiri'
+                                                         : (item.modules[0]?.materialFrontName || 'Melamina');
+                                        const slideDesc  = SLIDE_LABELS[item.modules[0]?.slideType as keyof typeof SLIDE_LABELS] || 'Telescópicas estándar';
+                                        return (
+                                            <div key={item.id} className="bg-gray-50 rounded px-3 py-2 grid grid-cols-4 gap-3 text-[10px]">
+                                                <div className="font-bold text-sm text-gray-900 col-span-1">{idx + 1}. {item.name}</div>
+                                                <div className="text-gray-600"><span className="text-gray-400 block text-[9px] uppercase">Estructura</span>{structDesc} {coreDesc}</div>
+                                                <div className="text-gray-600"><span className="text-gray-400 block text-[9px] uppercase">Terminación</span>{frontDesc}</div>
+                                                <div className="text-gray-600"><span className="text-gray-400 block text-[9px] uppercase">MO estimada</span>{item.labor?.workers || 1} op. · {item.labor?.days || 1} días</div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            <div className="break-before-page pt-8">
-                                <h3 className="font-bold border-b border-black mb-4 uppercase text-lg">2. Reporte de Insumos</h3>
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div>
-                                        <h4 className="font-bold text-xs uppercase mb-2 text-gray-500">Placas y Tableros</h4>
-                                        <ul className="text-xs space-y-1">
+                            {/* ── SECCIÓN 2: Placas + Herrajes (en columnas) — solo si hay ítems no manuales ── */}
+                            {itemsToPrint.some(item => !((item as any).isManualItem || item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID))) && (
+                            <div className="border-b border-gray-200 py-4 grid grid-cols-2 gap-8">
+                                <div>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3">2 — Placas y tableros</p>
+                                    <table className="w-full text-[10px]">
+                                        <tbody>
                                             {Object.entries(summary.globalBoards).map(([name, count]) => (
-                                                <li key={name} className="flex justify-between border-b border-gray-100 py-1">
-                                                    <span>{name}</span>
-                                                    <span className="font-bold">{count} un.</span>
-                                                </li>
+                                                <tr key={name} className="border-b border-gray-100">
+                                                    <td className="py-1 text-gray-800">{name}</td>
+                                                    <td className="py-1 text-right font-bold">{count} ud.</td>
+                                                </tr>
                                             ))}
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-xs uppercase mb-2 text-gray-500">Herrajes y Accesorios</h4>
-                                        <ul className="text-xs space-y-1">
+                                            {/* Terminaciones especiales */}
+                                            {itemsToPrint.some(item => calculateItemQuantities(item.modules).lacquerAreaM2 > 0) && (
+                                                <tr className="border-b border-gray-100 bg-amber-50">
+                                                    <td className="py-1 text-amber-800">Aplicación laca semi mate</td>
+                                                    <td className="py-1 text-right font-bold text-amber-800">
+                                                        {itemsToPrint.reduce((acc, item) => acc + calculateItemQuantities(item.modules).lacquerAreaM2, 0).toFixed(1)} m²
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {itemsToPrint.some(item => calculateItemQuantities(item.modules).veneerAreaM2 > 0) && (
+                                                <tr className="border-b border-gray-100 bg-amber-50">
+                                                    <td className="py-1 text-amber-800">Aplicación enchapado</td>
+                                                    <td className="py-1 text-right font-bold text-amber-800">
+                                                        {itemsToPrint.reduce((acc, item) => acc + calculateItemQuantities(item.modules).veneerAreaM2, 0).toFixed(1)} m²
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3">3 — Herrajes y accesorios</p>
+                                    <table className="w-full text-[10px]">
+                                        <tbody>
                                             {Object.entries(summary.globalHardware).map(([name, count]) => (
-                                                <li key={name} className="flex justify-between border-b border-gray-100 py-1">
-                                                    <span>{name}</span>
-                                                    <span className="font-bold">{count}</span>
-                                                </li>
+                                                <tr key={name} className="border-b border-gray-100">
+                                                    <td className="py-1 text-gray-800">{name}</td>
+                                                    <td className="py-1 text-right font-bold">{count}</td>
+                                                </tr>
                                             ))}
-                                        </ul>
-                                    </div>
+                                            {/* Tapacantos */}
+                                            {(() => {
+                                                const totQ = calculateItemQuantities(itemsToPrint.flatMap(i => i.modules));
+                                                return (<>
+                                                    {totQ.linearColor45 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-800">Tapacanto Color 29mm</td><td className="py-1 text-right font-bold">{totQ.linearColor45} m</td></tr>}
+                                                    {totQ.linearWhite45 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-800">Tapacanto Blanco 29mm</td><td className="py-1 text-right font-bold">{totQ.linearWhite45} m</td></tr>}
+                                                    {totQ.linearColor22 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-800">Tapacanto Color 22mm</td><td className="py-1 text-right font-bold">{totQ.linearColor22} m</td></tr>}
+                                                    {totQ.linear2mm > 0    && <tr className="border-b border-gray-100"><td className="py-1 text-gray-800">Tapacanto PVC 2mm</td><td className="py-1 text-right font-bold">{totQ.linear2mm} m</td></tr>}
+                                                </>);
+                                            })()}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
+                            )}
 
-                            <div className="break-before-page pt-8">
-                                <h3 className="font-bold border-b border-black mb-4 uppercase text-lg">3. Planilla de Cortes</h3>
+                            {/* ── SECCIÓN: Ítems Especiales Manuales ── */}
+                            {(() => {
+                                const manualMods = itemsToPrint.flatMap(item =>
+                                    item.modules?.filter((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID) || []
+                                );
+                                if (manualMods.length === 0) return null;
+                                const allExtras = manualMods.flatMap((m: any) => m.extras || []);
+                                if (allExtras.length === 0) return null;
+                                return (
+                                <div className="py-4">
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3">Ítems Especiales</p>
+                                    <table className="w-full text-[9px] border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-gray-300">
+                                                <th className="py-0.5 text-left font-medium text-gray-500">Descripción</th>
+                                                <th className="py-0.5 text-center font-medium text-gray-500 w-12">Cant.</th>
+                                                <th className="py-0.5 text-center font-medium text-gray-500 w-10">Un.</th>
+                                                <th className="py-0.5 text-right font-medium text-gray-500 w-20">P. Unit.</th>
+                                                <th className="py-0.5 text-right font-medium text-gray-500 w-20">Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {allExtras.map((ex: any, i: number) => (
+                                                <tr key={i} className="border-b border-gray-100">
+                                                    <td className="py-1 text-gray-800">{ex.description}</td>
+                                                    <td className="py-1 text-center">{ex.quantity}</td>
+                                                    <td className="py-1 text-center text-gray-500">{ex.unit}</td>
+                                                    <td className="py-1 text-right">{formatCurrency(ex.unitPrice)}</td>
+                                                    <td className="py-1 text-right font-bold">{formatCurrency(ex.unitPrice * ex.quantity)}</td>
+                                                </tr>
+                                            ))}
+                                            <tr className="border-t border-gray-300 bg-gray-50">
+                                                <td className="py-1 font-bold text-gray-800" colSpan={4}>Total Ítems Especiales</td>
+                                                <td className="py-1 text-right font-bold">{formatCurrency(allExtras.reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0))}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                );
+                            })()}
+
+                            {/* ── SECCIÓN 3: Planilla de cortes — solo si hay ítems no manuales ── */}
+                            {itemsToPrint.some(item => !((item as any).isManualItem || item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID))) && (
+                            <div className="py-4">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3">4 — Planilla de cortes</p>
                                 {Object.entries(cutList).map(([material, thicknesses]) => (
-                                    <div key={material} className="mb-6">
-                                        <h4 className="font-bold bg-gray-100 p-1 uppercase text-[10px] mb-2">{material}</h4>
+                                    <div key={material} className="mb-4">
+                                        <p className="text-[9px] font-bold uppercase text-gray-500 bg-gray-100 px-2 py-1 rounded mb-1">{material}</p>
                                         {Object.entries(thicknesses).map(([thick, pieces]) => (
-                                            <div key={thick} className="mb-4">
-                                                <table className="w-full text-left text-[9px] border-collapse border border-gray-200">
-                                                    <thead>
-                                                        <tr className="bg-gray-50">
-                                                            <th className="border px-1 py-0.5">Ref.</th>
-                                                            <th className="border px-1 py-0.5 text-center">Cant.</th>
-                                                            <th className="border px-1 py-0.5 text-center">Ancho</th>
-                                                            <th className="border px-1 py-0.5 text-center">Largo</th>
-                                                            <th className="border px-1 py-0.5 text-center">Veta</th>
+                                            <table key={thick} className="w-full text-[9px] border-collapse mb-2">
+                                                <thead>
+                                                    <tr className="border-b border-gray-300">
+                                                        <th className="py-0.5 text-left font-medium text-gray-500">Pieza</th>
+                                                        <th className="py-0.5 text-center font-medium text-gray-500">Cant.</th>
+                                                        <th className="py-0.5 text-center font-medium text-gray-500">Ancho</th>
+                                                        <th className="py-0.5 text-center font-medium text-gray-500">Largo</th>
+                                                        <th className="py-0.5 text-center font-medium text-gray-500">Veta</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(pieces as any[]).map((p, pidx) => (
+                                                        <tr key={pidx} className="border-b border-gray-100">
+                                                            <td className="py-0.5 text-gray-800">{p.moduleRef.substring(0, 20)}</td>
+                                                            <td className="py-0.5 text-center font-bold">{p.quantity}</td>
+                                                            <td className="py-0.5 text-center">{p.width}</td>
+                                                            <td className="py-0.5 text-center">{p.height}</td>
+                                                            <td className="py-0.5 text-center font-bold">{p.grain === 'horizontal' ? 'H' : p.grain === 'vertical' ? 'V' : '—'}</td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {(pieces as any[]).map((p, idx) => (
-                                                            <tr key={idx}>
-                                                                <td className="border px-1 py-0.5">{p.moduleRef.substring(0,15)}</td>
-                                                                <td className="border px-1 py-0.5 text-center font-bold">{p.quantity}</td>
-                                                                <td className="border px-1 py-0.5 text-center">{p.width}</td>
-                                                                <td className="border px-1 py-0.5 text-center">{p.height}</td>
-                                                                <td className="border px-1 py-0.5 text-center uppercase">{p.grain === 'horizontal' ? 'H' : p.grain === 'vertical' ? 'V' : '-'}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         ))}
                                     </div>
                                 ))}
                             </div>
+                            )}
 
-                            <div className="mt-8 border-t-2 border-black pt-4 text-[10px] flex justify-between items-end">
-                                <div>
-                                    <div className="font-bold uppercase mb-1">Observaciones Generales:</div>
-                                    <div className="max-w-md italic">{technicalObservations || "Sin observaciones adicionales."}</div>
+                            {/* ── OBSERVACIONES ── */}
+                            <div className="border-t-2 border-black pt-4 flex justify-between items-end text-[10px] mt-4">
+                                <div className="flex-1 mr-8">
+                                    <p className="font-bold uppercase mb-1 text-gray-700">Observaciones</p>
+                                    <textarea
+                                        className="w-full border rounded p-1 text-[10px] resize-none no-print"
+                                        rows={2}
+                                        placeholder="Notas para el taller..."
+                                        value={technicalObservations}
+                                        onChange={e => setTechnicalObservations(e.target.value)}
+                                    />
+                                    <p className="hidden print:block italic text-gray-500">{technicalObservations || 'Sin observaciones.'}</p>
                                 </div>
-                                <div className="text-right">
-                                    <div className="font-bold">ORDEN DE PRODUCCIÓN: {productionOrderInfo.orderNumber}</div>
-                                    <div className="text-gray-400">Generado el {new Date().toLocaleDateString()}</div>
+                                <div className="text-right shrink-0">
+                                    <p className="font-bold text-gray-800">{productionOrderInfo.orderNumber}</p>
+                                    <p className="text-gray-400">rødën taller · {new Date().toLocaleDateString('es-AR')}</p>
                                 </div>
                             </div>
                         </div>
@@ -2002,203 +2744,552 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                         </div>
                     )}
 
-                    {printMode === 'COSTS' && (
-                        <div className="space-y-6">
-                        <div className="bg-amber-50 border border-amber-200 p-4 rounded text-sm text-amber-800 mb-6 break-inside-avoid">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <strong className="block mb-1">Nota Confidencial:</strong>
-                                        Esta planilla detalla los costos directos de fabricación y el precio final de taller. 
-                                        <strong> No incluye el beneficio comercial de Roden.</strong>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="text-[10px] font-bold uppercase text-amber-600 block">Lista de Precios Utilizada:</span>
-                                        <span className="font-bold">{activeSettings.name || 'Lista Actual'}</span>
-                                    </div>
-                                </div>
-                                <div className="mt-4 flex justify-end">
-                                    <button 
-                                       onClick={() => {
-                                           if (editingEstimate) {
-                                               handleArchive(editingEstimate.id);
-                                               alert('Planilla archivada en historial.');
-                                           }
-                                       }}
-                                       className="bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-700 flex items-center gap-2"
-                                    >
-                                        <Archive size={14}/> Archivar en Historial
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* RESUMEN GENERAL */}
-                             <table className="w-full text-left text-xs border-collapse border border-gray-300 mb-6">
-                                <thead>
-                                    <tr className="bg-gray-100">
-                                        <th className="border border-gray-300 p-2">Ítem</th>
-                                        <th className="border border-gray-300 p-2 text-right">Materiales</th>
-                                        <th className="border border-gray-300 p-2 text-right">Herrajes</th>
-                                        <th className="border border-gray-300 p-2 text-right">M. Obra</th>
-                                        <th className="border border-gray-300 p-2 text-right">Terminación</th>
-                                        <th className="border border-gray-300 p-2 text-right bg-gray-200 font-bold">Costo Directo</th>
-                                        <th className="border border-gray-300 p-2 text-right">Margen Taller</th>
-                                        <th className="border border-gray-300 p-2 text-right bg-black text-white font-bold">Precio Taller</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {itemsToPrint.map((item) => {
-                                        const q = calculateItemQuantities(item.modules);
-                                        const laborCost = item.labor.workers * item.labor.days * activeSettings.costLaborDay * q.avgComplexity;
-                                        
-                                        const matCost = 
-                                            (q.boards18Color * activeSettings.priceBoard18ColorAglo) +
-                                            (q.boards18White * activeSettings.priceBoard18WhiteAglo) +
-                                            (q.boards18MDFMelamine * activeSettings.priceBoard18ColorMDF) + 
-                                            (q.boards18MDF * activeSettings.priceBoard18MDFCrudo1Face) +
-                                            (q.boards15 * activeSettings.priceBoard15WhiteAglo) +
-                                            (q.backing55 * activeSettings.priceBacking55Color) +
-                                            (q.backing3 * activeSettings.priceBacking3White) +
-                                            (q.linearWhite22 * activeSettings.priceEdge22White045) +
-                                            (q.linearWhite45 * activeSettings.priceEdge45White045) +
-                                            (q.linearColor22 * activeSettings.priceEdge22Color045) +
-                                            (q.linearColor45 * activeSettings.priceEdge45Color045) +
-                                            (q.linear2mm * activeSettings.priceEdge2mm);
+                                </div>{/* fin a4-body hoja 1 */}
+                                <Ftr />
+                            </div>{/* fin a4-page hoja 1 */}
+                            </>
+                            )}
 
-                                        const hwCost = (q.totalHinges * activeSettings.priceHingeStandard) + 
-                                                       (q.totalPistons * activeSettings.priceGasPiston) +
-                                                       (q.totalSlides * activeSettings.priceSlide500Std) +
-                                                       q.totalExtrasCost + activeSettings.priceGlueTin;
-                                        
-                                        const finishCost = (q.lacquerAreaM2 * activeSettings.priceFinishLacquerSemi) + (q.veneerAreaM2 * activeSettings.priceFinishLustreSemi);
-                                        const screwsCost = activeSettings.priceScrews;
+                    {printMode === 'COSTS' && itemsToPrint.map((item, itemIndex) => {
 
-                                        const totalDirect = matCost + hwCost + screwsCost + laborCost + finishCost;
-                                        const workshopProfit = totalDirect * (costSheetMargin / 100);
-                                        const workshopPrice = totalDirect + workshopProfit;
+                        const S = (editingEstimate?.settingsSnapshot || activeSettings) as typeof activeSettings;
+                        const costSnapshot: CostSnapshot = { ...S, currency: 'ARS', timestamp: '' } as CostSnapshot;
+                        const q = calculateItemQuantities(item.modules);
+                        const margins = item.margins || { workshop: 35, roden: 0 };
+                        const laborCost = (item.labor?.workers || 1) * (item.labor?.days || 1) * S.costLaborDay;
+                        const fixedCosts = S.priceScrews + S.priceGlueTin;
 
-                                        return (
-                                            <tr key={item.id} className="odd:bg-white even:bg-gray-50">
-                                                <td className="border border-gray-300 p-2 font-bold">{item.name}</td>
-                                                <td className="border border-gray-300 p-2 text-right">{formatCurrency(matCost)}</td>
-                                                <td className="border border-gray-300 p-2 text-right">{formatCurrency(hwCost)}</td>
-                                                <td className="border border-gray-300 p-2 text-right">{formatCurrency(laborCost)}</td>
-                                                <td className="border border-gray-300 p-2 text-right">{formatCurrency(finishCost)}</td>
-                                                <td className="border border-gray-300 p-2 text-right font-bold bg-gray-100">{formatCurrency(totalDirect)}</td>
-                                                <td className="border border-gray-300 p-2 text-right text-gray-500">{costSheetMargin}%</td>
-                                                <td className="border border-gray-300 p-2 text-right font-bold text-lg">{formatCurrency(workshopPrice)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                                <tfoot>
-                                    <tr className="bg-gray-200 border-t-2 border-black">
-                                        <td colSpan={5} className="p-3 text-right font-bold uppercase">Totales Generales</td>
-                                        <td className="p-3 text-right font-bold">
-                                            {formatCurrency(itemsToPrint.reduce((acc, item) => {
-                                                const q = calculateItemQuantities(item.modules);
-                                                const laborCost = item.labor.workers * item.labor.days * settings.costLaborDay;
-                                                const matCost = (q.boards18Color * settings.priceBoard18ColorAglo) + (q.boards18White * settings.priceBoard18WhiteAglo) + (q.boards18MDFMelamine * settings.priceBoard18ColorMDF) + (q.boards18MDF * settings.priceBoard18MDFCrudo1Face) + (q.boards15 * settings.priceBoard15WhiteAglo) + (q.backing55 * settings.priceBacking55Color) + (q.backing3 * settings.priceBacking3White) + (q.linearWhite22 * settings.priceEdge22White045) + (q.linearWhite45 * settings.priceEdge45White045) + (q.linearColor22 * settings.priceEdge22Color045) + (q.linearColor45 * settings.priceEdge45Color045) + (q.linear2mm * settings.priceEdge2mm);
-                                                const hwCost = (q.totalHinges * settings.priceHingeStandard) + (q.totalPistons * settings.priceGasPiston) + (q.totalSlides * settings.priceSlide500Std) + q.totalExtrasCost + settings.priceGlueTin;
-                                                const finishCost = (q.lacquerAreaM2 * settings.priceFinishLacquerSemi) + (q.veneerAreaM2 * settings.priceFinishLustreSemi);
-                                                const screwsCost = settings.priceScrews;
-                                                const totalDirect = matCost + hwCost + screwsCost + laborCost + finishCost;
-                                                return acc + totalDirect;
-                                            }, 0))}
-                                        </td>
-                                        <td></td>
-                                        <td className="p-3 text-right font-bold text-xl bg-black text-white">
-                                            {formatCurrency(itemsToPrint.reduce((acc, item) => {
-                                                const q = calculateItemQuantities(item.modules);
-                                                const laborCost = item.labor.workers * item.labor.days * activeSettings.costLaborDay;
-                                                const matCost = (q.boards18Color * activeSettings.priceBoard18ColorAglo) + (q.boards18White * activeSettings.priceBoard18WhiteAglo) + (q.boards18MDFMelamine * activeSettings.priceBoard18ColorMDF) + (q.boards18MDF * activeSettings.priceBoard18MDFCrudo1Face) + (q.boards15 * activeSettings.priceBoard15WhiteAglo) + (q.backing55 * activeSettings.priceBacking55Color) + (q.backing3 * activeSettings.priceBacking3White) + (q.linearWhite22 * activeSettings.priceEdge22White045) + (q.linearWhite45 * activeSettings.priceEdge45White045) + (q.linearColor22 * activeSettings.priceEdge22Color045) + (q.linearColor45 * activeSettings.priceEdge45Color045) + (q.linear2mm * activeSettings.priceEdge2mm);
-                                                const hwCost = (q.totalHinges * activeSettings.priceHingeStandard) + (q.totalPistons * activeSettings.priceGasPiston) + (q.totalSlides * activeSettings.priceSlide500Std) + q.totalExtrasCost + activeSettings.priceGlueTin;
-                                                const finishCost = (q.lacquerAreaM2 * activeSettings.priceFinishLacquerSemi) + (q.veneerAreaM2 * activeSettings.priceFinishLustreSemi);
-                                                const screwsCost = activeSettings.priceScrews;
-                                                const totalDirect = matCost + hwCost + screwsCost + laborCost + finishCost;
-                                                const workshopProfit = totalDirect * (costSheetMargin / 100);
-                                                return acc + (totalDirect + workshopProfit);
-                                            }, 0))}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                        // ── Ítem manual: planilla simplificada (solo MO + beneficios, sin materiales ni terminaciones) ──
+                        const isManualItem = (item as any).isManualItem ||
+                            item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
 
-                            {/* DETALLE POR ÍTEM */}
-                            {itemsToPrint.map((item) => {
-                                const q = calculateItemQuantities(item.modules);
-                                const laborCost = item.labor.workers * item.labor.days * activeSettings.costLaborDay * q.avgComplexity;
-                                return (
-                                    <div key={item.id} className="break-inside-avoid mb-8 border border-gray-200 rounded-lg overflow-hidden">
-                                        <div className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center">
-                                            <span className="font-bold text-sm uppercase">{item.name} — Detalle</span>
-                                            <span className="text-xs text-gray-300">{item.modules.length} módulos · {item.labor.workers} operario(s) · {item.labor.days} días</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200">
-                                            {/* Materiales */}
-                                            <div className="p-4">
-                                                <h6 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1">
-                                                    <span className="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Materiales
-                                                </h6>
-                                                <table className="w-full text-[10px]">
-                                                    <tbody>
-                                                        {Object.entries(q.detailedBoards).map(([mat, qty]) => (
-                                                            <tr key={mat} className="border-b border-gray-100">
-                                                                <td className="py-1 text-gray-700">{mat}</td>
-                                                                <td className="py-1 text-right font-bold text-gray-900">{qty} plancha(s)</td>
-                                                            </tr>
-                                                        ))}
-                                                        {q.linearColor22 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Canto Color 22mm</td><td className="py-1 text-right font-bold">{q.linearColor22} m</td></tr>}
-                                                        {q.linearWhite22 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Canto Blanco 22mm</td><td className="py-1 text-right font-bold">{q.linearWhite22} m</td></tr>}
-                                                        {q.linearColor45 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Canto Color 45mm</td><td className="py-1 text-right font-bold">{q.linearColor45} m</td></tr>}
-                                                        {q.linearWhite45 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Canto Blanco 45mm</td><td className="py-1 text-right font-bold">{q.linearWhite45} m</td></tr>}
-                                                        {q.linear2mm > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Canto PVC 2mm</td><td className="py-1 text-right font-bold">{q.linear2mm} m</td></tr>}
-                                                        {q.lacquerAreaM2 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Laqueado</td><td className="py-1 text-right font-bold">{q.lacquerAreaM2} m²</td></tr>}
-                                                        {q.veneerAreaM2 > 0 && <tr className="border-b border-gray-100"><td className="py-1 text-gray-700">Enchapado</td><td className="py-1 text-right font-bold">{q.veneerAreaM2} m²</td></tr>}
-                                                    </tbody>
-                                                </table>
+                        if (isManualItem) {
+                            const totalExtras = item.modules.reduce((sum: number, m: any) =>
+                                sum + (m.extras || []).reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0), 0);
+                            const costoDirecto = totalExtras + laborCost;
+                            const wm = 1 + (margins.workshop / 100);
+                            const wr = 1 + ((margins.roden ?? 0) / 100);
+                            const precioTaller = costoDirecto * wm;
+                            const precioFinal  = precioTaller * wr;
+                            return (
+                                <React.Fragment key={item.id}>
+                                    <div className="a4-page" style={{ fontSize:'12px' }}>
+                                        <Hdr n={itemIndex + 1} total={itemsToPrint.length} />
+                                        <div className="a4-body" style={{ padding:'4mm 9mm 0 9mm' }}>
+                                            {/* TÍTULO */}
+                                            <div style={{ background:'#111', color:'#fff', padding:'2.5mm 4mm', marginBottom:'4mm', borderRadius:'2px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                                <span style={{ fontWeight:700, fontSize:'12px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{item.name}</span>
+                                                <span style={{ fontSize:'9px', color:'#bbb' }}>Ítem Manual · {item.labor?.workers||1} op. × {item.labor?.days||1} días</span>
                                             </div>
-                                            {/* Herrajes y Mano de Obra */}
-                                            <div className="p-4">
-                                                <h6 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1">
-                                                    <span className="w-2 h-2 bg-amber-500 rounded-full inline-block"></span> Herrajes y Mano de Obra
-                                                </h6>
-                                                <table className="w-full text-[10px]">
-                                                    <tbody>
-                                                        {Object.entries(q.detailedHardware).map(([hw, qty]) => (
-                                                            <tr key={hw} className="border-b border-gray-100">
-                                                                <td className="py-1 text-gray-700">{hw}</td>
-                                                                <td className="py-1 text-right font-bold text-gray-900">{qty} un.</td>
+
+                                            {/* MATERIALES — ítems del módulo manual */}
+                                            {totalExtras > 0 && (
+                                                <>
+                                                    <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Materiales y trabajos</p>
+                                                    <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'4mm' }}>
+                                                        <tbody>
+                                                            {item.modules?.flatMap((m: any) => m.extras || []).map((ex: any, i: number) => (
+                                                                <tr key={i} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                                    <td style={{ padding:'2px 0', color:'#374151' }}>{ex.description}</td>
+                                                                    <td style={{ padding:'2px 0', textAlign:'right', color:'#9ca3af', width:'40px' }}>{ex.quantity} {ex.unit}</td>
+                                                                    <td style={{ padding:'2px 0', textAlign:'right', fontWeight:500, width:'80px' }}>{formatCurrency(ex.unitPrice * ex.quantity)}</td>
+                                                                </tr>
+                                                            ))}
+                                                            <tr style={{ borderTop:'1px solid #d1d5db', background:'#f9fafb' }}>
+                                                                <td style={{ padding:'2px 0', fontWeight:700, color:'#111' }} colSpan={2}>Subtotal materiales</td>
+                                                                <td style={{ padding:'2px 0', textAlign:'right', fontWeight:700, width:'80px' }}>{formatCurrency(totalExtras)}</td>
                                                             </tr>
-                                                        ))}
-                                                        {/* Extras */}
-                                                        {item.modules.flatMap(m => m.extras || []).map((ex, i) => (
-                                                            <tr key={`ex${i}`} className="border-b border-gray-100">
-                                                                <td className="py-1 text-gray-700">{ex.description}</td>
-                                                                <td className="py-1 text-right font-bold">{ex.quantity} {ex.unit}</td>
-                                                            </tr>
-                                                        ))}
-                                                        <tr className="border-t border-gray-300 bg-gray-50">
-                                                            <td className="py-1.5 font-bold text-gray-800">Mano de Obra</td>
-                                                            <td className="py-1.5 text-right font-bold">{item.labor.workers} op. × {item.labor.days} días</td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td className="py-1 text-gray-500 text-[9px]">Costo M.O. computado</td>
-                                                            <td className="py-1 text-right font-bold text-gray-800">{formatCurrency(laborCost)}</td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
+                                                        </tbody>
+                                                    </table>
+                                                </>
+                                            )}
+
+                                            {/* MANO DE OBRA */}
+                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Mano de obra</p>
+                                            <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'4mm' }}>
+                                                <tbody>
+                                                    <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                        <td style={{ padding:'2px 0', color:'#374151' }}>{item.labor?.workers||1} op. × {item.labor?.days||1} días × {formatCurrency(S.costLaborDay)}/día</td>
+                                                        <td style={{ padding:'2px 0', textAlign:'right', fontWeight:600, width:'80px' }}>{formatCurrency(laborCost)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+
+                                            {/* RESUMEN */}
+                                            <div style={{ background:'#111', color:'#fff', borderRadius:'2px', padding:'3mm 4mm', maxWidth:'240px', marginLeft:'auto' }}>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Materiales</span>
+                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(totalExtras)}</span>
+                                                </div>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Mano de obra</span>
+                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(laborCost)}</span>
+                                                </div>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'3px', borderTop:'1px solid #333', paddingTop:'2px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Costo directo</span>
+                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(costoDirecto)}</span>
+                                                </div>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Beneficio taller ({margins.workshop}%)</span>
+                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(precioTaller - costoDirecto)}</span>
+                                                </div>
+                                                {(margins.roden ?? 0) > 0 && (
+                                                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
+                                                        <span style={{ fontSize:'9px', color:'#aaa' }}>Beneficio Roden ({margins.roden}%)</span>
+                                                        <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(precioFinal - precioTaller)}</span>
+                                                    </div>
+                                                )}
+                                                <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #444', paddingTop:'2px', marginTop:'2px' }}>
+                                                    <span style={{ fontSize:'12px', fontWeight:700 }}>PRECIO FINAL</span>
+                                                    <span style={{ fontSize:'14px', fontWeight:700 }}>{formatCurrency(precioFinal)}</span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <Ftr />
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                </React.Fragment>
+                            );
+                        }
 
-                </div>
-                <footer className="h-[10mm] bg-gray-300 flex items-center justify-between px-10 border-t border-gray-300 leading-none text-gray-800">
-                    <span className="text-xs tracking-wider">Devoto | Buenos Aires | Argentina</span><span className="text-xl font-bold">www.rodenmobel.com</span>
-                </footer>
+                        // ── Configuración real del ítem (primer módulo como referencia) ──
+                        const m0 = item.modules[0] || {} as any;
+                        const realMT   = m0.moduleType || 'MELAMINE_FULL';
+                        const realWhite = !!m0.isWhiteStructure;
+                        const realMDF   = (m0.structureCore || 'AGLO') === 'MDF';
+
+                        const descRealConfig = (() => {
+                            const core  = realMDF ? 'MDF' : 'MDP';
+                            const color = realWhite ? 'Blanca' : 'Color';
+                            if (realMT === 'LACQUER_FULL')           return `Todo Laqueado`;
+                            if (realMT === 'VENEER_FULL')            return `Todo Enchapado Kiri`;
+                            if (realMT === 'MELAMINE_STRUCT_LACQUER') return `Mel. ${color} ${core} + Frentes Laqueados`;
+                            if (realMT === 'MELAMINE_STRUCT_VENEER')  return `Mel. ${color} ${core} + Frentes Enchapados`;
+                            return `Melamina ${color} ${core}`;
+                        })();
+
+                        // ── Terminación del ítem real ──
+                        const hasLacquer = q.lacquerAreaM2 > 0;
+                        const hasVeneer  = q.veneerAreaM2  > 0;
+                        const finishAreaM2  = hasLacquer ? q.lacquerAreaM2 : hasVeneer ? q.veneerAreaM2 : 0;
+                        const finishPriceM2 = hasLacquer ? (S.priceFinishLacquerSemi || 0) : hasVeneer ? (S.priceFinishLustreSemi || 0) : 0;
+                        const finishLabel   = hasLacquer
+                            ? (realMT === 'LACQUER_FULL' ? 'Laca Semi Mate — todo el mueble' : 'Laca Semi Mate — frentes')
+                            : hasVeneer
+                            ? (realMT === 'VENEER_FULL'  ? 'Enchapado Kiri — todo el mueble' : 'Enchapado Kiri — frentes')
+                            : null;
+
+                        // ── Precio de herrajes: lookup según nombre ──
+                        const hwPrice = (name: string, qty: number): number => {
+                            const n = name.toLowerCase();
+                            let unitPrice = 0;
+                            if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard;
+                            else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose;
+                            else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush;
+                            else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston;
+                            else if (n.includes('guías') || n.includes('guia')) {
+                                const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
+                                const isS = n.includes('suave'); const isP = n.includes('push');
+                                if      (len <= 300) unitPrice = isS ? S.priceSlide300Soft : isP ? S.priceSlide300Push : S.priceSlide300Std;
+                                else if (len <= 400) unitPrice = isS ? S.priceSlide400Soft : isP ? S.priceSlide400Push : S.priceSlide400Std;
+                                else                 unitPrice = isS ? S.priceSlide500Soft : isP ? S.priceSlide500Push : S.priceSlide500Std;
+                            }
+                            return unitPrice * qty;
+                        };
+
+                        // ── Precio de placas por nombre ──
+                        const boardPrice = (name: string, count: number): number => {
+                            const n = name.toLowerCase();
+                            let p = S.priceBoard18WhiteAglo;
+                            if      (n.includes('trupan') || n.includes('5.5'))            p = S.priceBacking55Color;
+                            else if (n.includes('fondo') && n.includes('3'))               p = S.priceBacking3White;
+                            else if (n.includes('15mm'))                                    p = S.priceBoard15WhiteAglo;
+                            else if (n.includes('laquear') || n.includes('crudo'))         p = S.priceBoard18MDFCrudo1Face;
+                            else if (n.includes('kiri') || n.includes('veneer'))           p = S.priceBoard18VeneerMDF;
+                            else if (n.includes('color') && n.includes('mdf'))             p = S.priceBoard18ColorMDF;
+                            else if (n.includes('color'))                                  p = S.priceBoard18ColorAglo;
+                            else if (n.includes('blanca') && n.includes('mdf'))            p = S.priceBoard18WhiteMDF;
+                            return p * count;
+                        };
+
+                        // ── Subtotales de la configuración real ──
+                        const totalPlacas   = Object.entries(q.detailedBoards).filter(([,v])=>v>0).reduce((a,[n,c])=>a+boardPrice(n,c),0);
+                        const totalTapac    = (q.linearWhite22*S.priceEdge22White045)+(q.linearWhite45*S.priceEdge45White045)+(q.linearColor22*S.priceEdge22Color045)+(q.linearColor45*S.priceEdge45Color045)+(q.linear2mm*S.priceEdge2mm);
+                        const totalHerrajes = Object.entries(q.detailedHardware).reduce((a,[n,qty])=>a+hwPrice(n,qty),0) + (item.modules?.flatMap((m:any)=>m.extras||[]).reduce((a:number,e:any)=>a+e.unitPrice*e.quantity,0));
+                        const totalFijos    = fixedCosts;
+                        const totalFinish   = finishAreaM2 * finishPriceM2;
+                        const totalMaterials = totalPlacas + totalTapac + totalHerrajes + totalFijos + totalFinish;
+                        const totalDirectCost = totalMaterials + laborCost;
+                        const totalWorkshop   = totalDirectCost * (1 + (margins.workshop ?? 35) / 100);
+
+                        // ── 14 terminaciones — mismo engine que la planilla (placas enteras) ──
+                        const calc = (override: any) => {
+                            if (!item?.modules?.length) return { d: 0, w: 0 };
+                            const qOver = calculateItemQuantities(item.modules, override);
+
+                            // Calcular acabado según override
+                            const mType = override.moduleType || realMT;
+                            const finArea = mType.includes('LACQUER') ? qOver.lacquerAreaM2
+                                          : mType.includes('VENEER')  ? qOver.veneerAreaM2 : 0;
+                            const finPrice = mType.includes('LACQUER') ? (S.priceFinishLacquerSemi || 0)
+                                           : mType.includes('VENEER')  ? (S.priceFinishLustreSemi || 0) : 0;
+                            const tPlacas  = Object.entries(qOver.detailedBoards).filter(([,v])=>v>0).reduce((a,[n,c])=>a+boardPrice(n,c as number),0);
+                            const tTapac   = (qOver.linearWhite22*S.priceEdge22White045)+(qOver.linearWhite45*S.priceEdge45White045)+(qOver.linearColor22*S.priceEdge22Color045)+(qOver.linearColor45*S.priceEdge45Color045)+(qOver.linear2mm*S.priceEdge2mm);
+                            const tHerrajes= Object.entries(qOver.detailedHardware).reduce((a,[n,qty])=>a+hwPrice(n,qty as number),0);
+                            const tFinish  = finArea * finPrice;
+                            const d = tPlacas + tTapac + tHerrajes + fixedCosts + tFinish + laborCost;
+                            return { d, w: d * (1 + (margins.workshop ?? 35) / 100) };
+                        };
+                                        const terminaciones = [
+                                            { k:'wa',  label:'Melamina Blanca MDP',           isReal: realMT==='MELAMINE_FULL' && realWhite && !realMDF,  r: calc({ moduleType:'MELAMINE_FULL',          isWhiteStructure:true,  isMDFCore:false, structureCore:'AGLO', frontsCore:'AGLO' }) },
+                                            { k:'wm',  label:'Melamina Blanca MDF',           isReal: realMT==='MELAMINE_FULL' && realWhite && realMDF,   r: calc({ moduleType:'MELAMINE_FULL',          isWhiteStructure:true,  isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF'  }) },
+                                            { k:'ca',  label:'Melamina Color MDP',            isReal: realMT==='MELAMINE_FULL' && !realWhite && !realMDF, r: calc({ moduleType:'MELAMINE_FULL',          isWhiteStructure:false, isMDFCore:false, structureCore:'AGLO', frontsCore:'AGLO' }) },
+                                            { k:'cm',  label:'Melamina Color MDF',            isReal: realMT==='MELAMINE_FULL' && !realWhite && realMDF,  r: calc({ moduleType:'MELAMINE_FULL',          isWhiteStructure:false, isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF'  }) },
+                                            { k:'wla', label:'Bl. MDP + Frentes Laqueados',   isReal: realMT==='MELAMINE_STRUCT_LACQUER' && realWhite && !realMDF, r: calc({ moduleType:'MELAMINE_STRUCT_LACQUER', isWhiteStructure:true,  isMDFCore:false, structureCore:'AGLO', frontsCore:'MDF' }) },
+                                            { k:'wlm', label:'Bl. MDF + Frentes Laqueados',   isReal: realMT==='MELAMINE_STRUCT_LACQUER' && realWhite && realMDF,  r: calc({ moduleType:'MELAMINE_STRUCT_LACQUER', isWhiteStructure:true,  isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
+                                            { k:'cla', label:'Col. MDP + Frentes Laqueados',  isReal: realMT==='MELAMINE_STRUCT_LACQUER' && !realWhite && !realMDF, r: calc({ moduleType:'MELAMINE_STRUCT_LACQUER', isWhiteStructure:false, isMDFCore:false, structureCore:'AGLO', frontsCore:'MDF' }) },
+                                            { k:'clm', label:'Col. MDF + Frentes Laqueados',  isReal: realMT==='MELAMINE_STRUCT_LACQUER' && !realWhite && realMDF,  r: calc({ moduleType:'MELAMINE_STRUCT_LACQUER', isWhiteStructure:false, isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
+                                            { k:'wva', label:'Bl. MDP + Frentes Enchapados',  isReal: realMT==='MELAMINE_STRUCT_VENEER'  && realWhite && !realMDF, r: calc({ moduleType:'MELAMINE_STRUCT_VENEER',  isWhiteStructure:true,  isMDFCore:false, structureCore:'AGLO', frontsCore:'MDF' }) },
+                                            { k:'wvm', label:'Bl. MDF + Frentes Enchapados',  isReal: realMT==='MELAMINE_STRUCT_VENEER'  && realWhite && realMDF,  r: calc({ moduleType:'MELAMINE_STRUCT_VENEER',  isWhiteStructure:true,  isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
+                                            { k:'cva', label:'Col. MDP + Frentes Enchapados', isReal: realMT==='MELAMINE_STRUCT_VENEER'  && !realWhite && !realMDF, r: calc({ moduleType:'MELAMINE_STRUCT_VENEER',  isWhiteStructure:false, isMDFCore:false, structureCore:'AGLO', frontsCore:'MDF' }) },
+                                            { k:'cvm', label:'Col. MDF + Frentes Enchapados', isReal: realMT==='MELAMINE_STRUCT_VENEER'  && !realWhite && realMDF,  r: calc({ moduleType:'MELAMINE_STRUCT_VENEER',  isWhiteStructure:false, isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
+                                            { k:'lf',  label:'Todo Laqueado',                  isReal: realMT==='LACQUER_FULL',  r: calc({ moduleType:'LACQUER_FULL',  isWhiteStructure:false, isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
+                                            { k:'vf',  label:'Todo Enchapado Kiri',            isReal: realMT==='VENEER_FULL',   r: calc({ moduleType:'VENEER_FULL',   isWhiteStructure:false, isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
+                                        ];
+                        const realTerm = terminaciones.find(t => t.isReal);
+
+                        // Planilla de cortes de este ítem
+                        const itemCutList = (() => {
+                            const grouped: Record<string, Record<string, any[]>> = {};
+                            item.modules.forEach((mod: any) => {
+                                const parts = calculateModuleParts(mod);
+                                const qty = mod.quantity || 1;
+                                parts.forEach((part: any) => {
+                                    const n = part.material?.toLowerCase() || '';
+                                    let matLabel = 'Otros';
+                                    let espesor = '18mm';
+                                    if      (n.includes('5.5mm'))  { matLabel = 'Fondo Trupan 5.5mm Color';    espesor = '5.5mm'; }
+                                    else if (n.includes('3mm'))    { matLabel = 'Fondo MDF 3mm Blanco';         espesor = '3mm';   }
+                                    else if (n.includes('15mm'))   { matLabel = 'Mel. Blanca 15mm MDP (Cajón)'; espesor = '15mm';  }
+                                    else if (n.includes('color') && n.includes('mdf'))  matLabel = 'Mel. Color 18mm MDF';
+                                    else if (n.includes('color'))                        matLabel = 'Mel. Color 18mm MDP';
+                                    else if (n.includes('white') || n.includes('blanca')) {
+                                        matLabel = realMDF ? 'Mel. Blanca 18mm MDF' : 'Mel. Blanca 18mm MDP';
+                                    }
+                                    else if (n.includes('crudo') || n.includes('laqu')) matLabel = 'MDF Crudo 18mm 1 Cara (Frentes Laca)';
+                                    else if (n.includes('kiri')  || n.includes('vene')) matLabel = 'MDF Enchapado Kiri 18mm';
+                                    if (!grouped[matLabel]) grouped[matLabel] = {};
+                                    if (!grouped[matLabel][espesor]) grouped[matLabel][espesor] = [];
+                                    const w = Math.floor(part.width || 0);
+                                    const h = Math.floor(part.height || 0);
+                                    grouped[matLabel][espesor].push({
+                                        pieza:    part.name,
+                                        destino:  mod.name,
+                                        mayor:    Math.max(w, h),
+                                        menor:    Math.min(w, h),
+                                        cantidad: part.quantity * qty,
+                                        veta:     part.grain === 'horizontal' ? 'H' : part.grain === 'vertical' ? 'V' : '—',
+                                    });
+                                });
+                            });
+                            return grouped;
+                        })();
+
+                        const totalItemPages = 2; // 1 costos + 1 cortes
+                        const pageBase = itemIndex * totalItemPages;
+
+                        return (
+                            <React.Fragment key={item.id}>
+
+                            {/* ════════════════════════════════════
+                                HOJA A: PLANILLA DE COSTOS DEL ÍTEM
+                            ════════════════════════════════════ */}
+                            <div className="a4-page" style={{ fontSize:'12px' }}>
+                                <Hdr n={pageBase+1} total={itemsToPrint.length * totalItemPages} />
+                                <div className="a4-body" style={{ padding:'4mm 9mm 0 9mm' }}>
+
+                                    {/* ── TÍTULO DEL ÍTEM ── */}
+                                    <div style={{ background:'#111', color:'#fff', padding:'2.5mm 4mm', marginBottom:'3mm', display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:'2px' }}>
+                                        <span style={{ fontWeight:700, fontSize:'12px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{item.name}</span>
+                                        <span style={{ fontSize:'9px', color:'#bbb' }}>
+                                            Config: {descRealConfig} · {item.modules.length} mód. · {item.labor?.workers||1} op. × {item.labor?.days||1} días
+                                        </span>
+                                    </div>
+
+                                    {/* ── CUERPO: 2 COLUMNAS ── */}
+                                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4mm', marginBottom:'3mm' }}>
+
+                                        {/* COLUMNA IZQ: Placas + Tapacantos + Herrajes */}
+                                        <div>
+                                            {/* PLACAS */}
+                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Placas y tableros</p>
+                                            <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'3mm' }}>
+                                                <tbody>
+                                                    {Object.entries(q.detailedBoards).filter(([,v])=>(v as number)>0).map(([name, count]) => {
+                                                        const bp = boardPrice(name, count as number);
+                                                        return (
+                                                            <tr key={name} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                                <td style={{ padding:'1.5px 0', color:'#374151', lineHeight:'1.3' }}>{name}</td>
+                                                                <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px', whiteSpace:'nowrap' }}>{count as number} ud</td>
+                                                                <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px', whiteSpace:'nowrap' }}>{formatCurrency(bp)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {/* Tapacantos */}
+                                                    {q.linearWhite22>0 && <tr style={{borderBottom:'1px solid #f3f4f6'}}><td style={{padding:'1.5px 0',color:'#374151'}}>Tapacanto Blanco 22mm ABS 0.45</td><td style={{padding:'1.5px 0',textAlign:'right',color:'#9ca3af',width:'32px'}}>{q.linearWhite22}m</td><td style={{padding:'1.5px 0',textAlign:'right',fontWeight:500,width:'72px'}}>{formatCurrency(q.linearWhite22*S.priceEdge22White045)}</td></tr>}
+                                                    {q.linearWhite45>0 && <tr style={{borderBottom:'1px solid #f3f4f6'}}><td style={{padding:'1.5px 0',color:'#374151'}}>Tapacanto Blanco 29mm ABS 0.45</td><td style={{padding:'1.5px 0',textAlign:'right',color:'#9ca3af',width:'32px'}}>{q.linearWhite45}m</td><td style={{padding:'1.5px 0',textAlign:'right',fontWeight:500,width:'72px'}}>{formatCurrency(q.linearWhite45*S.priceEdge45White045)}</td></tr>}
+                                                    {q.linearColor22>0 && <tr style={{borderBottom:'1px solid #f3f4f6'}}><td style={{padding:'1.5px 0',color:'#374151'}}>Tapacanto Color 22mm ABS 0.45</td><td style={{padding:'1.5px 0',textAlign:'right',color:'#9ca3af',width:'32px'}}>{q.linearColor22}m</td><td style={{padding:'1.5px 0',textAlign:'right',fontWeight:500,width:'72px'}}>{formatCurrency(q.linearColor22*S.priceEdge22Color045)}</td></tr>}
+                                                    {q.linearColor45>0 && <tr style={{borderBottom:'1px solid #f3f4f6'}}><td style={{padding:'1.5px 0',color:'#374151'}}>Tapacanto Color 29mm ABS 0.45</td><td style={{padding:'1.5px 0',textAlign:'right',color:'#9ca3af',width:'32px'}}>{q.linearColor45}m</td><td style={{padding:'1.5px 0',textAlign:'right',fontWeight:500,width:'72px'}}>{formatCurrency(q.linearColor45*S.priceEdge45Color045)}</td></tr>}
+                                                    {q.linear2mm>0     && <tr style={{borderBottom:'1px solid #f3f4f6'}}><td style={{padding:'1.5px 0',color:'#374151'}}>Tapacanto PVC 2mm</td><td style={{padding:'1.5px 0',textAlign:'right',color:'#9ca3af',width:'32px'}}>{q.linear2mm}m</td><td style={{padding:'1.5px 0',textAlign:'right',fontWeight:500,width:'72px'}}>{formatCurrency(q.linear2mm*S.priceEdge2mm)}</td></tr>}
+                                                    <tr style={{ borderTop:'1px solid #d1d5db', background:'#f9fafb' }}>
+                                                        <td style={{ padding:'2px 0', fontWeight:700, color:'#111' }} colSpan={2}>Subtotal placas + tapac.</td>
+                                                        <td style={{ padding:'2px 0', textAlign:'right', fontWeight:700, width:'72px' }}>{formatCurrency(totalPlacas + totalTapac)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+
+                                            {/* HERRAJES */}
+                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Herrajes y fijos</p>
+                                            <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'2mm' }}>
+                                                <tbody>
+                                                    {Object.entries(q.detailedHardware).map(([hw, qty]) => (
+                                                        <tr key={hw} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}</td>
+                                                            <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{qty as number} un</td>
+                                                            <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(hwPrice(hw, qty as number))}</td>
+                                                        </tr>
+                                                    ))}
+                                                    {item.modules?.flatMap((m:any)=>m.extras||[]).map((ex:any, ei:number) => (
+                                                        <tr key={ei} style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{ex.description}</td>
+                                                            <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{ex.quantity} {ex.unit}</td>
+                                                            <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(ex.unitPrice * ex.quantity)}</td>
+                                                        </tr>
+                                                    ))}
+                                                    <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                        <td style={{ padding:'1.5px 0', color:'#374151' }}>Tornillería y bulones (kit fijo)</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>1 kit</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(S.priceScrews)}</td>
+                                                    </tr>
+                                                    <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                        <td style={{ padding:'1.5px 0', color:'#374151' }}>Adhesivo PVA / Cemento (kit fijo)</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>1 kit</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(S.priceGlueTin)}</td>
+                                                    </tr>
+                                                    <tr style={{ borderTop:'1px solid #d1d5db', background:'#f9fafb' }}>
+                                                        <td style={{ padding:'2px 0', fontWeight:700, color:'#111' }} colSpan={2}>Subtotal herrajes + fijos</td>
+                                                        <td style={{ padding:'2px 0', textAlign:'right', fontWeight:700, width:'72px' }}>{formatCurrency(totalHerrajes + totalFijos)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* COLUMNA DER: Terminación + MO + Cuadro */}
+                                        <div>
+                                            {/* TERMINACIÓN APLICADA */}
+                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Terminación aplicada</p>
+                                            <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'3mm' }}>
+                                                <tbody>
+                                                    <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                        <td style={{ padding:'1.5px 0', color:'#374151' }}>Sup. frentes (×1.15)</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', color:'#6b7280' }}>
+                                                            {(item.modules.reduce((a:number,m:any)=>a+(m.width||0)*(m.height||0)/1e6*(m.quantity||1),0)*1.15).toFixed(2)} m²
+                                                        </td>
+                                                    </tr>
+                                                    <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                        <td style={{ padding:'1.5px 0', color:'#374151' }}>Sup. exterior total (×1.15)</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', color:'#6b7280' }}>
+                                                            {(item.modules.reduce((a:number,m:any)=>{const W=m.width||0,H=m.height||0,D=m.depth||0;return a+(W*H+2*H*D+2*W*D)/1e6*(m.quantity||1);},0)*1.15).toFixed(2)} m²
+                                                        </td>
+                                                    </tr>
+                                                    {finishLabel && (
+                                                        <tr style={{ background:'#fffbeb', borderBottom:'1px solid #fde68a' }}>
+                                                            <td style={{ padding:'1.5px 0', color:'#92400e', fontWeight:600 }}>{finishLabel}</td>
+                                                            <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:700, color:'#92400e' }}>
+                                                                {finishAreaM2.toFixed(1)} m² × {formatCurrency(finishPriceM2)}/m² = {formatCurrency(totalFinish)}
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                    {!finishLabel && (
+                                                        <tr><td colSpan={2} style={{ padding:'1.5px 0', color:'#9ca3af', fontStyle:'italic' }}>Sin terminación especial (melamina estándar)</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+
+                                            {/* MANO DE OBRA */}
+                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Mano de obra</p>
+                                            <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'3mm' }}>
+                                                <tbody>
+                                                    <tr style={{ borderBottom:'1px solid #f3f4f6' }}>
+                                                        <td style={{ padding:'1.5px 0', color:'#374151' }}>{item.labor?.workers||1} op. × {item.labor?.days||1} días × {formatCurrency(S.costLaborDay)}/día</td>
+                                                        <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:600, width:'72px' }}>{formatCurrency(laborCost)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+
+                                            {/* RESUMEN COSTO REAL */}
+                                            <div style={{ background:'#111', color:'#fff', borderRadius:'2px', padding:'2.5mm 3mm', marginBottom:'3mm' }}>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1.5px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Costo directo ({descRealConfig})</span>
+                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(totalDirectCost)}</span>
+                                                </div>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1.5px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Beneficio taller ({margins.workshop}%)</span>
+                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(totalWorkshop - totalDirectCost)}</span>
+                                                </div>
+                                                <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #444', paddingTop:'2px', marginTop:'2px' }}>
+                                                    <span style={{ fontSize:'12px', fontWeight:700 }}>PRECIO TALLER</span>
+                                                    <span style={{ fontSize:'14px', fontWeight:700, color:'#fff' }}>{formatCurrency(totalWorkshop)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* 14 TERMINACIONES — configuración real destacada */}
+                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>
+                                                Comparativa 14 terminaciones · Benef. {margins.workshop}%
+                                            </p>
+                                            <table style={{ width:'100%', fontSize:'9.5px', borderCollapse:'collapse' }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom:'1.5px solid #374151', background:'#f9fafb' }}>
+                                                        <th style={{ padding:'2px 0', textAlign:'left', fontWeight:600, color:'#4b5563' }}>Terminación</th>
+                                                        <th style={{ padding:'2px 3px', textAlign:'right', fontWeight:600, color:'#4b5563', width:'64px' }}>Costo dir.</th>
+                                                        <th style={{ padding:'2px 3px', textAlign:'right', fontWeight:600, color:'#b45309', width:'60px' }}>Benef.</th>
+                                                        <th style={{ padding:'2px 0', textAlign:'right', fontWeight:700, color:'#111', width:'72px' }}>P. Taller</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {terminaciones.map((t) => (
+                                                        <tr key={t.k} style={{
+                                                            borderBottom: '1px solid #f3f4f6',
+                                                            background: t.isReal ? '#f0fdf4' : 'transparent',
+                                                            fontWeight: t.isReal ? 700 : 400,
+                                                        }}>
+                                                            <td style={{ padding:'1.5px 0', color: t.isReal ? '#166534' : '#374151', display:'flex', alignItems:'center', gap:'3px' }}>
+                                                                {t.isReal && <span style={{ fontSize:'8px', background:'#16a34a', color:'#fff', borderRadius:'2px', padding:'0 2px', fontWeight:700, whiteSpace:'nowrap' }}>✓</span>}
+                                                                {t.label}
+                                                            </td>
+                                                            <td style={{ padding:'1.5px 3px', textAlign:'right', color: t.isReal ? '#166534' : '#6b7280', width:'64px' }}>{formatCurrency(t.r.d)}</td>
+                                                            <td style={{ padding:'1.5px 3px', textAlign:'right', color:'#b45309', width:'60px' }}>{formatCurrency(t.r.w - t.r.d)}</td>
+                                                            <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight: t.isReal ? 800 : 600, color: t.isReal ? '#166534' : '#111', width:'72px' }}>{formatCurrency(t.r.w)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>{/* fin grid 2 col */}
+
+                                </div>{/* fin a4-body costos */}
+                                <Ftr />
+                            </div>{/* fin a4-page costos */}
+
+                            {/* ════════════════════════════════════
+                                HOJA B: PLANILLA DE CORTES DEL ÍTEM
+                            ════════════════════════════════════ */}
+                            <div className="a4-page" style={{ fontSize:'12px' }}>
+                                <Hdr n={pageBase+2} total={itemsToPrint.length * totalItemPages} />
+                                <div className="a4-body" style={{ padding:'4mm 9mm' }}>
+
+                                    <div style={{ borderBottom:'2px solid #111', paddingBottom:'2px', marginBottom:'4mm', display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                                        <span style={{ fontWeight:700, fontSize:'12px', textTransform:'uppercase' }}>Planilla de Cortes — {item.name}</span>
+                                        <span style={{ fontSize:'9px', color:'#6b7280' }}>{descRealConfig} · {item.modules.length} módulos</span>
+                                    </div>
+
+                                    {Object.entries(itemCutList).map(([matLabel, thicknesses]) => (
+                                        <div key={matLabel} style={{ marginBottom:'4mm' }}>
+                                            <p style={{ fontSize:'11px', fontWeight:700, textTransform:'uppercase', color:'#fff', background:'#374151', padding:'2px 4px', marginBottom:'2px', letterSpacing:'0.5px' }}>
+                                                {matLabel}
+                                            </p>
+                                            {Object.entries(thicknesses).map(([, pieces]) => (
+                                                <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'3mm' }}>
+                                                    <thead>
+                                                        <tr style={{ borderBottom:'1.5px solid #374151', background:'#f9fafb' }}>
+                                                            <th style={{ padding:'2px 3px', textAlign:'left', fontWeight:600, color:'#4b5563' }}>Pieza</th>
+                                                            <th style={{ padding:'2px 3px', textAlign:'left', fontWeight:600, color:'#4b5563' }}>Destino</th>
+                                                            <th style={{ padding:'2px 3px', textAlign:'center', fontWeight:600, color:'#4b5563', width:'52px' }}>Mayor (mm)</th>
+                                                            <th style={{ padding:'2px 3px', textAlign:'center', fontWeight:600, color:'#4b5563', width:'52px' }}>Menor (mm)</th>
+                                                            <th style={{ padding:'2px 3px', textAlign:'center', fontWeight:600, color:'#4b5563', width:'40px' }}>Cant.</th>
+                                                            <th style={{ padding:'2px 3px', textAlign:'center', fontWeight:600, color:'#4b5563', width:'36px' }}>Veta</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(pieces as any[]).map((p, pi) => (
+                                                            <tr key={pi} style={{ borderBottom:'1px solid #f3f4f6', background: pi%2===0?'#fff':'#fafafa' }}>
+                                                                <td style={{ padding:'1.5px 3px', color:'#374151' }}>{p.pieza}</td>
+                                                                <td style={{ padding:'1.5px 3px', color:'#6b7280' }}>{p.destino}</td>
+                                                                <td style={{ padding:'1.5px 3px', textAlign:'center', fontWeight:600 }}>{p.mayor}</td>
+                                                                <td style={{ padding:'1.5px 3px', textAlign:'center', fontWeight:600 }}>{p.menor}</td>
+                                                                <td style={{ padding:'1.5px 3px', textAlign:'center', fontWeight:700 }}>{p.cantidad}</td>
+                                                                <td style={{ padding:'1.5px 3px', textAlign:'center', color: p.veta==='H'?'#1d4ed8':p.veta==='V'?'#7c3aed':'#9ca3af', fontWeight:700 }}>{p.veta}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            ))}
+                                        </div>
+                                    ))}
+                                    {Object.keys(itemCutList).length === 0 && (
+                                        <p style={{ color:'#9ca3af', fontStyle:'italic' }}>Sin piezas calculadas para este ítem.</p>
+                                    )}
+
+                                </div>{/* fin a4-body cortes */}
+                                <Ftr />
+                            </div>{/* fin a4-page cortes */}
+
+                            </React.Fragment>
+                        );
+                    })}
+
+                            {/* ═══ HOJA 2: PLANILLA DE CORTES ═══ */}
+                            {(printMode === 'COSTS' || printMode === 'COSTS_CUTS') && (
+                                <div className="a4-page">
+                                    <Hdr n={printMode === 'COSTS_CUTS' ? 1 : 2} total={totalPages} />
+                                    <div className="a4-body">
+                                        <div style={{ borderBottom:'2px solid #111', paddingBottom:'4px', marginBottom:'8px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                            <span style={{ fontWeight:700, fontSize:'12px', textTransform:'uppercase', letterSpacing:'0.5px' }}>Planilla de Cortes</span>
+                                            <span style={{ fontSize:'10px', color:'#6b7280' }}>{itemsToPrint.length} ítem(s) · {itemsToPrint.reduce((a,i) => a + i.modules.length, 0)} módulos</span>
+                                        </div>
+                                        {Object.entries(cutList).map(([material, thicknesses]) => (
+                                            <div key={material} style={{ marginBottom:'8px' }}>
+                                                <p style={{ fontSize:'11px', fontWeight:700, textTransform:'uppercase', color:'#6b7280', background:'#f3f4f6', padding:'2px 4px', marginBottom:'3px' }}>{material}</p>
+                                                {Object.entries(thicknesses as any).map(([thick, pieces]) => (
+                                                    <table key={thick} style={{ width:'100%', fontSize:'11px', borderCollapse:'collapse', marginBottom:'4px' }}>
+                                                        <thead>
+                                                            <tr style={{ borderBottom:'1px solid #d1d5db', background:'#f9fafb' }}>
+                                                                <th style={{ padding:'2px 2px', textAlign:'left', fontWeight:600, color:'#6b7280' }}>Pieza</th>
+                                                                <th style={{ padding:'2px 2px', textAlign:'center', fontWeight:600, color:'#6b7280', width:'32px' }}>Cant.</th>
+                                                                <th style={{ padding:'2px 2px', textAlign:'center', fontWeight:600, color:'#6b7280', width:'44px' }}>Ancho</th>
+                                                                <th style={{ padding:'2px 2px', textAlign:'center', fontWeight:600, color:'#6b7280', width:'44px' }}>Largo</th>
+                                                                <th style={{ padding:'2px 2px', textAlign:'center', fontWeight:600, color:'#6b7280', width:'32px' }}>Veta</th>
+                                                                <th style={{ padding:'2px 2px', textAlign:'left', fontWeight:600, color:'#6b7280' }}>Ítem</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {(pieces as any[]).map((p, pidx) => (
+                                                                <tr key={pidx} style={{ borderBottom:'1px solid #f3f4f6', background: pidx%2===0 ? '#fff' : '#fafafa' }}>
+                                                                    <td style={{ padding:'1.5px 2px', color:'#374151' }}>{p.moduleRef?.substring(0, 22)}</td>
+                                                                    <td style={{ padding:'1.5px 2px', textAlign:'center', fontWeight:700 }}>{p.quantity}</td>
+                                                                    <td style={{ padding:'1.5px 2px', textAlign:'center' }}>{p.width}</td>
+                                                                    <td style={{ padding:'1.5px 2px', textAlign:'center' }}>{p.height}</td>
+                                                                    <td style={{ padding:'1.5px 2px', textAlign:'center', fontWeight:700 }}>{p.grain === 'horizontal' ? 'H' : p.grain === 'vertical' ? 'V' : '—'}</td>
+                                                                    <td style={{ padding:'1.5px 2px', color:'#9ca3af' }}>{(p as any).itemName || ''}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                ))}
+                                            </div>
+                                        ))}
+                                        {Object.keys(cutList).length === 0 && (
+                                            <p style={{ fontSize:'12px', color:'#9ca3af', fontStyle:'italic' }}>Sin piezas calculadas.</p>
+                                        )}
+                                    </div>
+                                    <Ftr />
+                                </div>
+                            )}
+
+                        </>
+                    );
+                })()}
+
             </div>
 
             {/* OPTIMIZATION VISUALIZER MODAL */}
@@ -2282,13 +3373,38 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             <style>{`
                 @media print {
                     @page { margin: 10mm; size: A4; }
+                    html, body, #root, .animate-fade-in, .min-h-screen { margin:0 !important; padding:0 !important; background:white !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
                     .no-print { display: none !important; }
                 }
             `}</style>
             <div className="no-print w-full max-w-[210mm] flex justify-between items-center mb-6 pt-6">
                 <button onClick={() => setPrintMode('NONE')} className="text-gray-500 hover:text-black flex items-center gap-2 text-sm font-medium transition-colors bg-white px-4 py-2 rounded-lg border border-gray-200"><ArrowLeft size={16} /> Volver</button>
                 <div className="flex gap-2">
-                    <button onClick={() => window.print()} className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg"><Printer size={16} /> Imprimir</button>
+                    {!editingEstimate && onSaveEstimate && (
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm font-medium">
+                            <Archive size={14}/> Guardado en Historial
+                        </div>
+                    )}
+                    <button
+                        onClick={() => {
+                            const isChrome = navigator.userAgent.includes('Chrome');
+                            const isFirefox = navigator.userAgent.includes('Firefox');
+                            let instrucciones = 'Para imprimir sin encabezado ni pie de página del navegador:\n\n';
+                            if (isChrome) {
+                                instrucciones += 'Chrome:\n→ En el diálogo, hacé clic en "Más opciones"\n→ Desactivá "Encabezados y pies de página"';
+                            } else if (isFirefox) {
+                                instrucciones += 'Firefox:\n→ En el diálogo, ir a "Página"\n→ Desactivá encabezado y pie en los desplegables';
+                            } else {
+                                instrucciones += '→ En el diálogo, buscá "Encabezados y pies de página" y desactivalo';
+                            }
+                            instrucciones += '\n\nEsta configuración se guarda para futuras impresiones.';
+                            alert(instrucciones);
+                            window.print();
+                        }}
+                        className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg"
+                    >
+                        <Printer size={16}/> Imprimir
+                    </button>
                 </div>
             </div>
             <div className="print-container relative w-[210mm] min-h-[297mm] bg-white shadow-2xl print:shadow-none flex flex-col">
@@ -2297,8 +3413,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                     <div className="text-right">
                         <div className="text-sm font-bold flex items-center justify-end gap-2">
                             Ref: {quoteId}
-                            {quoteVersion && <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">v{quoteVersion}</span>}
                         </div>
+                        {quoteVersion && <div className="text-[10px] text-gray-300 mt-0.5">v{quoteVersion}</div>}
                         <div className="text-xs font-light text-gray-300">1/1</div>
                     </div>
                 </header>
@@ -2312,64 +3428,141 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                     <div className="mb-6">
                         <h3 className="font-bold border-b border-black mb-4 uppercase text-sm pb-1">Detalle y Precios por Item: {quoteItemTitle}</h3>
                         <div className="space-y-4">
-                                    {items.map((item, idx) => {
-                                        const prices = getRecalculatedItemPrices(item, activeSettings);
+                                    {(selectedItemIds.size > 0 ? items.filter(i => selectedItemIds.has(i.id)) : items).map((item, idx) => {
+                                        // Siempre recalcular con engine actual usando snapshot del presupuesto
+                                        const budgetSnapshot = (editingEstimate?.settingsSnapshot || activeSettings) as CostSettings;
+                                        const prices = getRecalculatedItemPrices(item, budgetSnapshot);
                                         return (
                                             <div key={idx} className="text-sm mb-4 border-b border-gray-200 pb-2 break-inside-avoid">
                                                 <div className="flex justify-between items-start gap-4">
                                                     <div className="flex-1">
                                                         <p className="font-bold mb-1 text-base uppercase">• {item.name}</p>
+                                                        {/* Ítem manual: sin detalle de materiales ni herrajes */}
+                                                        {!((item as any).isManualItem || item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID)) && (
                                                         <div className="pl-4 text-gray-700">
                                                             <p className="italic mb-1 text-xs">Diseño y medidas según proyecto.</p>
                                                             <ul className="list-disc pl-5 space-y-0 text-[10px] text-gray-500 leading-tight">
-                                                                {Array.from(new Set(item.modules.flatMap(m => [
+                                                                {Array.from(new Set(item.modules?.flatMap(m => [
                                                                     m.calculateHinges ? HINGE_LABELS[m.hingeType || 'COMMON'] : null,
                                                                     m.calculateSlides ? SLIDE_LABELS[m.slideType || 'TELESCOPIC'] : null,
                                                                     m.hasGasPistons ? 'Pistones a Gas' : null
                                                                 ].filter(Boolean)))).map((hw, i) => <li key={i}>{cleanHardwareName(hw as string)}</li>)}
-                                                                {item.modules.flatMap(m => m.extras || []).map((ex, i) => <li key={`ex${i}`}>{ex.description} ({ex.quantity} {ex.unit})</li>)}
+                                                                {item.modules?.flatMap(m => m.extras || []).map((ex, i) => <li key={`ex${i}`}>{ex.description} ({ex.quantity} {ex.unit})</li>)}
                                                             </ul>
                                                         </div>
+                                                        )}
                                                     </div>
 
-                                                    <div className="w-56 shrink-0">
-                                                        <table className="w-full text-xs border-collapse">
-                                                            <thead>
-                                                                <tr className="border-b border-gray-300">
-                                                                    <th className="text-left py-1 text-[9px] text-gray-400">Variante</th>
-                                                                    <th className="text-right py-1 text-[9px] text-gray-400">Base Aglo</th>
-                                                                    <th className="text-right py-1 text-[9px] text-gray-400">Base MDF</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {enabledScenarios.white && (
-                                                                    <tr className={`border-b border-gray-100 last:border-0 ${item.modules.every(m => !m.materialFrontName || m.materialFrontName.toLowerCase().includes('blanca')) && item.modules.some(m => m.materialColorName?.toLowerCase().includes('blanca')) ? 'bg-yellow-50 ring-1 ring-yellow-200' : ''}`}>
-                                                                        <td className="py-1 text-gray-500 text-[10px] pl-1">Melamina Bca. {item.modules.every(m => !m.materialFrontName || m.materialFrontName.toLowerCase().includes('blanca')) && item.modules.some(m => m.materialColorName?.toLowerCase().includes('blanca')) && <span className="text-[8px] font-bold text-amber-600 ml-1">(Seleccionado)</span>}</td>
-                                                                        <td className="py-1 text-right font-bold">{formatCurrency(roundUp10(prices.whiteAglo))}</td>
-                                                                        <td className="py-1 text-right font-bold pr-1">{formatCurrency(roundUp10(prices.whiteMDF))}</td>
-                                                                    </tr>
-                                                                )}
-                                                                {enabledScenarios.textured && (
-                                                                    <tr className={`border-b border-gray-100 last:border-0 ${item.modules.some(m => m.materialFrontName?.toLowerCase().includes('color') || m.materialFrontName?.toLowerCase().includes('texturada') || (!m.materialFrontName && (m.materialColorName?.toLowerCase().includes('color') || m.materialColorName?.toLowerCase().includes('texturada')))) ? 'bg-yellow-50 ring-1 ring-yellow-200' : ''}`}>
-                                                                        <td className="py-1 text-gray-500 text-[10px] pl-1">Melamina Color {item.modules.some(m => m.materialFrontName?.toLowerCase().includes('color') || m.materialFrontName?.toLowerCase().includes('texturada') || (!m.materialFrontName && (m.materialColorName?.toLowerCase().includes('color') || m.materialColorName?.toLowerCase().includes('texturada')))) && <span className="text-[8px] font-bold text-amber-600 ml-1">(Seleccionado)</span>}</td>
-                                                                        <td className="py-1 text-right font-bold">{formatCurrency(roundUp10(prices.colorAglo))}</td>
-                                                                        <td className="py-1 text-right font-bold pr-1">{formatCurrency(roundUp10(prices.colorMDF))}</td>
-                                                                    </tr>
-                                                                )}
-                                                                {enabledScenarios.lacquer && (
-                                                                    <tr className={`border-b border-gray-100 last:border-0 ${item.modules.some(m => m.moduleType?.includes('LACQUER')) ? 'bg-yellow-50 ring-1 ring-yellow-200' : ''}`}>
-                                                                        <td className="py-1 text-gray-500 text-[10px] pl-1">Laqueado {item.modules.some(m => m.moduleType?.includes('LACQUER')) && <span className="text-[8px] font-bold text-amber-600 ml-1">(Seleccionado)</span>}</td>
-                                                                        <td colSpan={2} className="py-1 text-right font-bold pr-1">{formatCurrency(roundUp10(prices.lacquer))}</td>
-                                                                    </tr>
-                                                                )}
-                                                                {enabledScenarios.veneer && (
-                                                                    <tr className={`border-b border-gray-100 last:border-0 ${item.modules.some(m => m.moduleType?.includes('VENEER')) ? 'bg-yellow-50 ring-1 ring-yellow-200' : ''}`}>
-                                                                        <td className="py-1 text-gray-500 text-[10px] pl-1">Enchapado {item.modules.some(m => m.moduleType?.includes('VENEER')) && <span className="text-[8px] font-bold text-amber-600 ml-1">(Seleccionado)</span>}</td>
-                                                                        <td colSpan={2} className="py-1 text-right font-bold pr-1">{formatCurrency(roundUp10(prices.veneer))}</td>
-                                                                    </tr>
-                                                                )}
-                                                            </tbody>
-                                                        </table>
+                                                    {/* PRECIOS — un renglón por configuración, sin tabla ni títulos */}
+                                                    <div className="w-64 shrink-0 flex flex-col gap-0.5">
+                                                        {(() => {
+                                                            // Ítem manual: solo precio, sin leyenda de material
+                                                            const isManualItem = (item as any).isManualItem ||
+                                                                item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
+
+                                                            if (isManualItem) {
+                                                                return (
+                                                                    <div className="flex justify-end items-baseline border-b border-gray-300 pb-1.5 mb-1">
+                                                                        <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{formatCurrency(roundUp10(prices.colorAglo))}</span>
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            // Detectar configuración real del item
+                                                            const hasLacquer = item.modules?.some((m: any) => (m.moduleType || '').includes('LACQUER'));
+                                                            const hasVeneer  = item.modules?.some((m: any) => (m.moduleType || '').includes('VENEER'));
+                                                            const isWhite    = item.modules?.every((m: any) => m.isWhiteStructure);
+                                                            const isMDF      = item.modules?.every((m: any) => m.structureCore === 'MDF');
+
+                                                            // Descripción larga de la configuración real
+                                                            let configDescLocal = '';
+                                                            if (hasLacquer) {
+                                                                const struc = isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP');
+                                                                configDescLocal = `${struc} + Frentes Laca Semi Mate`;
+                                                            } else if (hasVeneer) {
+                                                                const struc = isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP');
+                                                                configDescLocal = `${struc} + Frentes Enchapado Kiri`;
+                                                            } else if (isWhite && isMDF) {
+                                                                configDescLocal = 'Melamina Blanca MDF';
+                                                            } else if (isWhite) {
+                                                                configDescLocal = 'Melamina Blanca MDP';
+                                                            } else if (isMDF) {
+                                                                configDescLocal = 'Melamina Color MDF';
+                                                            } else {
+                                                                configDescLocal = 'Melamina Color MDP';
+                                                            }
+
+                                                            let configPrice = prices.colorAglo;
+                                                            if (hasLacquer) configPrice = prices.lacquer;
+                                                            else if (hasVeneer) configPrice = prices.veneer;
+                                                            else if (isWhite && isMDF) configPrice = prices.whiteMDF;
+                                                            else if (isWhite) configPrice = prices.whiteAglo;
+                                                            else if (isMDF) configPrice = prices.colorMDF;
+
+                                                            return (
+                                                                // Configuración original: negrita, sin fondo
+                                                                <div className="flex justify-between items-baseline border-b border-gray-300 pb-1.5 mb-1">
+                                                                    <span className="text-[10px] font-bold text-gray-800 leading-tight mr-3">{configDescLocal}</span>
+                                                                    <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{formatCurrency(roundUp10(configPrice))}</span>
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {/* Alternativas: sin negrita, tono gris — excluir la que ya es configuración principal */}
+                                                        {(() => {
+                                                            const isManualItem = (item as any).isManualItem ||
+                                                                item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
+                                                            if (isManualItem) return null;
+                                                            const hasLacquer = item.modules?.some((m: any) => (m.moduleType || '').includes('LACQUER'));
+                                                            const hasVeneer  = item.modules?.some((m: any) => (m.moduleType || '').includes('VENEER'));
+                                                            const isWhite    = item.modules?.every((m: any) => m.isWhiteStructure);
+                                                            const isMDF      = item.modules?.every((m: any) => m.structureCore === 'MDF');
+                                                            let configDesc = '';
+                                                            if (hasLacquer) configDesc = (isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP')) + ' + Frentes Laca Semi Mate';
+                                                            else if (hasVeneer) configDesc = (isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP')) + ' + Frentes Enchapado Kiri';
+                                                            else if (isWhite && isMDF) configDesc = 'Melamina Blanca MDF';
+                                                            else if (isWhite) configDesc = 'Melamina Blanca MDP';
+                                                            else if (isMDF) configDesc = 'Melamina Color MDF';
+                                                            else configDesc = 'Melamina Color MDP';
+                                                            return (<>
+                                                        {enabledScenarios.white && configDesc !== 'Melamina Blanca MDP' && (
+                                                            <div className="flex justify-between items-baseline py-0.5">
+                                                                <span className="text-[10px] text-gray-400 leading-tight mr-3">Melamina Blanca MDP</span>
+                                                                <span className="text-xs text-gray-500 whitespace-nowrap">{formatCurrency(roundUp10(prices.whiteAglo))}</span>
+                                                            </div>
+                                                        )}
+                                                        {enabledScenarios.white && configDesc !== 'Melamina Blanca MDF' && (
+                                                            <div className="flex justify-between items-baseline py-0.5">
+                                                                <span className="text-[10px] text-gray-400 leading-tight mr-3">Melamina Blanca MDF</span>
+                                                                <span className="text-xs text-gray-500 whitespace-nowrap">{formatCurrency(roundUp10(prices.whiteMDF))}</span>
+                                                            </div>
+                                                        )}
+                                                        {enabledScenarios.textured && configDesc !== 'Melamina Color MDP' && (
+                                                            <div className="flex justify-between items-baseline py-0.5">
+                                                                <span className="text-[10px] text-gray-400 leading-tight mr-3">Melamina Color MDP</span>
+                                                                <span className="text-xs text-gray-500 whitespace-nowrap">{formatCurrency(roundUp10(prices.colorAglo))}</span>
+                                                            </div>
+                                                        )}
+                                                        {enabledScenarios.textured && configDesc !== 'Melamina Color MDF' && (
+                                                            <div className="flex justify-between items-baseline py-0.5">
+                                                                <span className="text-[10px] text-gray-400 leading-tight mr-3">Melamina Color MDF</span>
+                                                                <span className="text-xs text-gray-500 whitespace-nowrap">{formatCurrency(roundUp10(prices.colorMDF))}</span>
+                                                            </div>
+                                                        )}
+                                                        {enabledScenarios.lacquer && !configDesc.includes('Laca') && (
+                                                            <div className="flex justify-between items-baseline py-0.5">
+                                                                <span className="text-[10px] text-gray-400 leading-tight mr-3">Melamina + Frentes Laca Semi Mate</span>
+                                                                <span className="text-xs text-gray-500 whitespace-nowrap">{formatCurrency(roundUp10(prices.lacquer))}</span>
+                                                            </div>
+                                                        )}
+                                                        {enabledScenarios.veneer && !configDesc.includes('Enchapado') && (
+                                                            <div className="flex justify-between items-baseline py-0.5">
+                                                                <span className="text-[10px] text-gray-400 leading-tight mr-3">Melamina + Frentes Enchapado Kiri</span>
+                                                                <span className="text-xs text-gray-500 whitespace-nowrap">{formatCurrency(roundUp10(prices.veneer))}</span>
+                                                            </div>
+                                                        )}
+                                                            </>);
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2425,27 +3618,54 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 <button onClick={() => setView('RESULTS')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${view === 'RESULTS' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-100'}`}><DollarSign size={16}/> Resultados</button>
                 <div className="w-px h-8 bg-gray-200 mx-2"></div>
                 <button onClick={() => setView('HISTORY')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${view === 'HISTORY' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-100'}`}><History size={16}/> Historial</button>
-                <button onClick={() => setView('PROJECTS')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${view === 'PROJECTS' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-100'}`}><Package size={16}/> Proyectos</button>
+
             </div>
         </header>
 
         <div className="flex-1 p-8 max-w-6xl mx-auto w-full flex flex-col min-h-0">
             {view === 'SETUP' && (
                 <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-8">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-4"><h3 className="text-lg font-bold">Gestión de Precios</h3><div className="flex gap-4 items-center"><input type="text" placeholder="Nombre Lista" className="border p-2 rounded text-sm w-48" value={newListName} onChange={(e) => setNewListName(e.target.value)} /><button onClick={handleSavePriceList} className="bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold flex items-center gap-2 hover:bg-emerald-700"><Save size={14} /> Guardar</button><div className="h-8 w-px bg-gray-200"></div><select className="border p-2 rounded text-sm w-48 bg-gray-50" onChange={(e) => handleLoadPriceList(e.target.value)} value=""><option value="" disabled>Cargar Historial...</option>{priceHistory.map(h => (<option key={h.id} value={h.id}>{h.name}</option>))}</select></div></div>
+                    <div className="border-b border-gray-100 pb-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-bold">Gestión de Precios</h3>
+                            <div className="flex gap-4 items-center">
+                                <input type="text" placeholder="Nombre Lista" className="border p-2 rounded text-sm w-48" value={newListName} onChange={(e) => setNewListName(e.target.value)} />
+                                <button onClick={handleSavePriceList} className="bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold flex items-center gap-2 hover:bg-emerald-700"><Save size={14} /> Guardar</button>
+                                <div className="h-8 w-px bg-gray-200"></div>
+                                <select className="border p-2 rounded text-sm w-48 bg-gray-50" onChange={(e) => handleLoadPriceList(e.target.value)} value="">
+                                    <option value="" disabled>Cargar Historial...</option>
+                                    {priceHistory.map(h => (<option key={h.id} value={h.id}>{h.name}</option>))}
+                                </select>
+                            </div>
+                        </div>
+                        {/* Lista activa */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-gray-500 uppercase font-bold tracking-wide">Lista activa:</span>
+                            <span className={`text-sm font-bold px-3 py-1 rounded-full ${
+                                activeSettings.name && activeSettings.name !== 'Lista Actual'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                            }`}>
+                                {activeSettings.name || 'Lista Actual (sin guardar)'}
+                            </span>
+                            {(!activeSettings.name || activeSettings.name === 'Lista Actual') && (
+                                <span className="text-[10px] text-amber-600 italic">— editando en memoria, no guardada</span>
+                            )}
+                        </div>
+                    </div>
                     
                     <div className="grid grid-cols-2 gap-8">
                         {/* Placas */}
                         <div className="space-y-4">
                             <h4 className="font-bold text-sm text-gray-500 uppercase border-b pb-2">Placas</h4>
                             <div className="space-y-2">
-                                <div><label className="text-xs block">Placa melamina blanca base aglomerado 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18WhiteAglo} onChange={e => setSettings({...settings, priceBoard18WhiteAglo: Number(e.target.value)})} /></div>
+                                <div><label className="text-xs block">Placa melamina blanca MDP 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18WhiteAglo} onChange={e => setSettings({...settings, priceBoard18WhiteAglo: Number(e.target.value)})} /></div>
                                 <div><label className="text-xs block">Placa melamina blanca base mdf 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18WhiteMDF} onChange={e => setSettings({...settings, priceBoard18WhiteMDF: Number(e.target.value)})} /></div>
-                                <div><label className="text-xs block">Placa melamina texturada base aglomerado 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18ColorAglo} onChange={e => setSettings({...settings, priceBoard18ColorAglo: Number(e.target.value)})} /></div>
+                                <div><label className="text-xs block">Placa melamina color MDP 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18ColorAglo} onChange={e => setSettings({...settings, priceBoard18ColorAglo: Number(e.target.value)})} /></div>
                                 <div><label className="text-xs block">Placa melamina texturada base mdf 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18ColorMDF} onChange={e => setSettings({...settings, priceBoard18ColorMDF: Number(e.target.value)})} /></div>
                                 <div><label className="text-xs block">Placa mdf crudo 1 cara blanca 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18MDFCrudo1Face} onChange={e => setSettings({...settings, priceBoard18MDFCrudo1Face: Number(e.target.value)})} /></div>
                                 <div><label className="text-xs block">Placa madera enchapada base mdf 18mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard18VeneerMDF} onChange={e => setSettings({...settings, priceBoard18VeneerMDF: Number(e.target.value)})} /></div>
-                                <div><label className="text-xs block">Placa melamina blanca 15mm base aglo</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard15WhiteAglo} onChange={e => setSettings({...settings, priceBoard15WhiteAglo: Number(e.target.value)})} /></div>
+                                <div><label className="text-xs block">Placa melamina blanca 15mm base MDP</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBoard15WhiteAglo} onChange={e => setSettings({...settings, priceBoard15WhiteAglo: Number(e.target.value)})} /></div>
                                 <div><label className="text-xs block">Placa fondo blanco 3mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBacking3White} onChange={e => setSettings({...settings, priceBacking3White: Number(e.target.value)})} /></div>
                                 <div><label className="text-xs block">Placa fondo texturado 5.5mm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceBacking55Color} onChange={e => setSettings({...settings, priceBacking55Color: Number(e.target.value)})} /></div>
                             </div>
@@ -2583,6 +3803,13 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsTemplatesPanelOpen(true)}
+                                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors border border-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-50"
+                                        >
+                                            <History size={12} /> Cargar Item
+                                        </button>
                                         <button 
                                             onClick={() => {
                                                 if (confirm("¿Deseas iniciar otro proyecto? Se mantendrán los módulos actuales pero cambiarás el nombre de la obra.")) {
@@ -2598,6 +3825,38 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 </div>
                                 
                                 <form onSubmit={handleAddModule} className="flex flex-col gap-4">
+
+                            {/* Selector Tipo de Módulo */}
+                            <div className="flex gap-2 items-center">
+                                <span className="text-[10px] text-gray-500 uppercase font-bold">Tipo:</span>
+                                {[
+                                    { id: 'STANDARD', label: 'Estándar' },
+                                    { id: 'SPECIAL',  label: 'Especial' },
+                                    { id: 'MANUAL',   label: 'Manual'   },
+                                ].map(k => (
+                                    <button
+                                        key={k.id}
+                                        type="button"
+                                        onClick={() => { setModuleKind(k.id as any); setSpecialTemplateId(''); setSpecialOptions({}); }}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${moduleKind === k.id ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
+                                    >
+                                        {k.label}
+                                    </button>
+                                ))}
+                                {moduleKind === 'SPECIAL' && (
+                                    <select
+                                        className="border p-1.5 rounded text-xs bg-white ml-2"
+                                        value={specialTemplateId}
+                                        onChange={e => { setSpecialTemplateId(e.target.value); setSpecialOptions({}); }}
+                                    >
+                                        <option value="">— Elegir template —</option>
+                                        {SPECIAL_MODULE_TEMPLATES.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+
                             {/* Row 1: Geometry & Basic Config */}
                             <div className="flex flex-wrap gap-4 items-end">
                                 <div className="flex-1 min-w-[200px]">
@@ -2609,10 +3868,23 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Ancho</label>
                                     <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.width} onChange={e => handleInputChange('width', Number(e.target.value))} />
                                 </div>
-                                <div className="w-20">
-                                    <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Alto</label>
-                                    <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.height} onChange={e => handleInputChange('height', Number(e.target.value))} />
-                                </div>
+                                {(() => {
+                                    // Ocultar "Alto" si el template especial no lo usa (ej: Estante Flotante)
+                                    const activeTmpl = moduleKind === 'SPECIAL' && specialTemplateId ? getTemplate(specialTemplateId) : null;
+                                    const hideHeight = activeTmpl && !activeTmpl.params.includes('height');
+                                    if (hideHeight) return (
+                                        <div className="w-20">
+                                            <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Alto</label>
+                                            <div className="w-full border border-dashed border-gray-300 p-2 rounded text-xs text-center bg-gray-50 text-gray-400 font-mono">Fijo: 36mm</div>
+                                        </div>
+                                    );
+                                    return (
+                                        <div className="w-20">
+                                            <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Alto</label>
+                                            <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.height} onChange={e => handleInputChange('height', Number(e.target.value))} />
+                                        </div>
+                                    );
+                                })()}
                                 <div className="w-20">
                                     <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Prof.</label>
                                     <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.depth} onChange={e => handleInputChange('depth', Number(e.target.value))} />
@@ -2624,6 +3896,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
                                 <div className="w-px h-10 bg-gray-200 mx-2 self-center"></div>
 
+                                {moduleKind !== 'MANUAL' && (
                                 <div className="flex gap-2">
                                     <div className="w-16">
                                         <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Puertas</label>
@@ -2638,10 +3911,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <input type="number" min="0" className="w-full border p-2 rounded text-sm text-center" value={moduleForm.cntDrawers} onChange={e => handleInputChange('cntDrawers', Number(e.target.value))}/>
                                     </div>
                                 </div>
+                                )}
                             </div>
 
-                            {/* Row 2: Tech Specs & Extras & Buttons */}
-                            <div className="flex flex-wrap gap-4 items-center border-t border-gray-100 pt-3">
+                            {/* Row 2: Tech Specs — oculto en módulo manual */}
+                            {moduleKind !== 'MANUAL' && (
+                                <div className="flex flex-wrap gap-4 items-center border-t border-gray-100 pt-3">
                                 {/* Hardware Toggles */}
                                 <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
                                     <div className="flex items-center gap-2">
@@ -2659,49 +3934,121 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700 border-l border-gray-300 pl-4"><input type="checkbox" className="w-4 h-4" checked={moduleForm.hasGasPistons} onChange={e => handleInputChange('hasGasPistons', e.target.checked)}/><span>Pistones Gas</span></label>
                                 </div>
 
-                                {/* Material Configuration Section */}
+                                {/* Material Configuration Section — dos selectores independientes */}
                                 <div className="flex flex-wrap items-center gap-4 bg-amber-50 p-3 rounded-xl border border-amber-200">
-                                    <div className="flex items-center gap-3 border-r border-amber-200 pr-4">
-                                        <div className="flex flex-col">
-                                            <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Estructura</label>
-                                            <div className="flex gap-1">
-                                                <select className="border p-1.5 rounded text-xs bg-white w-24" value={moduleForm.structureCore} onChange={e => handleInputChange('structureCore', e.target.value)}>
-                                                    <option value="AGLO">Base Aglo</option>
-                                                    <option value="MDF">Base MDF</option>
-                                                </select>
-                                                <select 
-                                                    className="border p-1.5 rounded text-xs bg-white w-32"
-                                                    value={moduleForm.materialColorName}
-                                                    onChange={e => handleInputChange('materialColorName', e.target.value)}
-                                                >
-                                                    <option value="">Material a definir</option>
-                                                    {BOARD_OPTIONS.map(opt => <option key={opt.value} value={opt.label}>{opt.label}</option>)}
-                                                </select>
-                                            </div>
-                                        </div>
+
+                                    {/* SELECTOR ESTRUCTURA */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] text-amber-800 uppercase font-bold">Estructura</label>
+                                        <select
+                                            className="border p-2 rounded text-xs bg-white w-48 font-medium"
+                                            value={(() => {
+                                                const mt = moduleForm.moduleType || 'MELAMINE_FULL';
+                                                if (mt === 'LACQUER_FULL')  return 'laca';
+                                                if (mt === 'VENEER_FULL')   return 'enchapad';
+                                                const isWhite = moduleForm.isWhiteStructure;
+                                                const isMDF   = moduleForm.structureCore === 'MDF';
+                                                if (isWhite && !isMDF)  return 'mel_blanca_aglo';
+                                                if (isWhite && isMDF)   return 'mel_blanca_mdf';
+                                                if (!isWhite && !isMDF) return 'mel_color_aglo';
+                                                return 'mel_color_mdf';
+                                            })()}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                const mt = moduleForm.moduleType || 'MELAMINE_FULL';
+                                                // Si los frentes son terminación especial, respetar el moduleType de frentes
+                                                const isFrontsSpecial = mt === 'MELAMINE_STRUCT_LACQUER' || mt === 'MELAMINE_STRUCT_VENEER';
+                                                if (val === 'laca') {
+                                                    setModuleForm(prev => ({ ...prev, moduleType: 'LACQUER_FULL', isWhiteStructure: false, structureCore: 'MDF', frontsCore: 'MDF', frontsType: 'LACQUER' }));
+                                                } else if (val === 'enchapad') {
+                                                    setModuleForm(prev => ({ ...prev, moduleType: 'VENEER_FULL', isWhiteStructure: false, structureCore: 'MDF', frontsCore: 'MDF', frontsType: 'VENEER' }));
+                                                } else {
+                                                    const isWhite = val.includes('blanca');
+                                                    const isMDF   = val.includes('mdf');
+                                                    // Si frentes son especiales, mantener moduleType de frentes; si no, MELAMINE_FULL
+                                                    const newModuleType = isFrontsSpecial ? mt : 'MELAMINE_FULL';
+                                                    setModuleForm(prev => ({ ...prev, moduleType: newModuleType as any, isWhiteStructure: isWhite, structureCore: isMDF ? 'MDF' : 'AGLO' }));
+                                                }
+                                            }}
+                                        >
+                                            <optgroup label="Melamina">
+                                                <option value="mel_blanca_aglo">Blanca MDP</option>
+                                                <option value="mel_blanca_mdf">Blanca — MDF</option>
+                                                <option value="mel_color_aglo">Color MDP</option>
+                                                <option value="mel_color_mdf">Color — MDF</option>
+                                            </optgroup>
+                                            <optgroup label="Terminación completa">
+                                                <option value="laca">Laqueado (todo el mueble)</option>
+                                                <option value="enchapad">Enchapado Kiri (todo el mueble)</option>
+                                            </optgroup>
+                                        </select>
                                     </div>
 
-                                    <div className="flex items-center gap-3 border-r border-amber-200 pr-4">
-                                        <div className="flex flex-col">
-                                            <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Frentes</label>
-                                            <div className="flex gap-1">
-                                                <select className="border p-1.5 rounded text-xs bg-white w-24" value={moduleForm.frontsCore} onChange={e => handleInputChange('frontsCore', e.target.value)}>
-                                                    <option value="AGLO">Base Aglo</option>
-                                                    <option value="MDF">Base MDF</option>
-                                                </select>
-                                                <select 
-                                                    className="border p-1.5 rounded text-xs bg-white w-32"
-                                                    value={moduleForm.materialFrontName}
-                                                    onChange={e => handleInputChange('materialFrontName', e.target.value)}
-                                                >
-                                                    <option value="">Material a definir</option>
-                                                    {BOARD_OPTIONS.map(opt => <option key={opt.value} value={opt.label}>{opt.label}</option>)}
-                                                </select>
-                                            </div>
-                                        </div>
+                                    <div className="w-px h-10 bg-amber-300 self-center"></div>
+
+                                    {/* SELECTOR FRENTES — completamente independiente de estructura */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] text-amber-800 uppercase font-bold">Frentes</label>
+                                        <select
+                                            className="border p-2 rounded text-xs bg-white w-48 font-medium"
+                                            value={(() => {
+                                                const mt = moduleForm.moduleType || 'MELAMINE_FULL';
+                                                if (mt === 'MELAMINE_STRUCT_LACQUER' || mt === 'LACQUER_FULL') return 'laca';
+                                                if (mt === 'MELAMINE_STRUCT_VENEER'  || mt === 'VENEER_FULL')  return 'enchapad';
+                                                // Melamina: leer materialFrontName para saber si es blanca o color
+                                                const frontName = (moduleForm.materialFrontName || '').toLowerCase();
+                                                const isFrontWhite = frontName.includes('blanca') || frontName.includes('white') || (!frontName && moduleForm.isWhiteStructure);
+                                                const isMDF = moduleForm.frontsCore === 'MDF';
+                                                if (isFrontWhite && !isMDF)  return 'mel_blanca_aglo';
+                                                if (isFrontWhite && isMDF)   return 'mel_blanca_mdf';
+                                                if (!isFrontWhite && !isMDF) return 'mel_color_aglo';
+                                                return 'mel_color_mdf';
+                                            })()}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                const mt = moduleForm.moduleType || 'MELAMINE_FULL';
+                                                const isStructFull = mt === 'LACQUER_FULL' || mt === 'VENEER_FULL';
+                                                if (val === 'laca') {
+                                                    const newMt = isStructFull ? 'LACQUER_FULL' : 'MELAMINE_STRUCT_LACQUER';
+                                                    setModuleForm(prev => ({ ...prev, moduleType: newMt as any, frontsCore: 'MDF', frontsType: 'LACQUER', materialFrontName: 'Laqueado' }));
+                                                } else if (val === 'enchapad') {
+                                                    const newMt = isStructFull ? 'VENEER_FULL' : 'MELAMINE_STRUCT_VENEER';
+                                                    setModuleForm(prev => ({ ...prev, moduleType: newMt as any, frontsCore: 'MDF', frontsType: 'VENEER', materialFrontName: 'Enchapado Kiri' }));
+                                                } else {
+                                                    // Frentes melamina — completamente independiente de la estructura
+                                                    const isFrontWhite = val.includes('blanca');
+                                                    const isMDF        = val.includes('mdf');
+                                                    const frontName    = isFrontWhite ? 'Melamina Blanca' : 'Melamina Color';
+                                                    // moduleType: si estructura es MELAMINE, combinar; si es terminación full, mantener
+                                                    const newMt = isStructFull ? mt : 'MELAMINE_FULL';
+                                                    setModuleForm(prev => ({
+                                                        ...prev,
+                                                        moduleType:       newMt as any,
+                                                        frontsCore:       isMDF ? 'MDF' : 'AGLO',
+                                                        frontsType:       'MELAMINE',
+                                                        materialFrontName: frontName,
+                                                    }));
+                                                }
+                                            }}
+                                            disabled={moduleForm.moduleType === 'LACQUER_FULL' || moduleForm.moduleType === 'VENEER_FULL'}
+                                        >
+                                            <optgroup label="Melamina">
+                                                <option value="mel_blanca_aglo">Blanca MDP</option>
+                                                <option value="mel_blanca_mdf">Blanca — MDF</option>
+                                                <option value="mel_color_aglo">Color MDP</option>
+                                                <option value="mel_color_mdf">Color — MDF</option>
+                                            </optgroup>
+                                            <optgroup label="Terminación">
+                                                <option value="laca">Laca Semi Mate</option>
+                                                <option value="enchapad">Enchapado Kiri</option>
+                                            </optgroup>
+                                        </select>
+                                        {(moduleForm.moduleType === 'LACQUER_FULL' || moduleForm.moduleType === 'VENEER_FULL') && (
+                                            <span className="text-[9px] text-amber-600 italic">Igual a estructura</span>
+                                        )}
                                     </div>
 
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col border-l border-amber-200 pl-4">
                                         <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Fondo</label>
                                         <select 
                                             className="border p-1.5 rounded text-xs bg-white w-32" 
@@ -2709,17 +4056,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             onChange={e => handleInputChange('backingType', e.target.value)}
                                         >
                                             {BACKING_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                        </select>
-                                    </div>
-
-                                    <div className="flex flex-col">
-                                        <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Acabado</label>
-                                        <select className="border p-1.5 rounded text-xs bg-white w-36" value={moduleForm.moduleType} onChange={e => handleInputChange('moduleType', e.target.value)}>
-                                            <option value="MELAMINE_FULL">Melamina</option>
-                                            <option value="MELAMINE_STRUCT_LACQUER">Laqueado (Frentes)</option>
-                                            <option value="MELAMINE_STRUCT_VENEER">Enchapado (Frentes)</option>
-                                            <option value="LACQUER_FULL">Todo Laqueado</option>
-                                            <option value="VENEER_FULL">Todo Enchapado</option>
                                         </select>
                                     </div>
 
@@ -2742,14 +4078,82 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     {moduleForm.extras && moduleForm.extras.length > 0 && <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">+{moduleForm.extras.length} Extras</span>}
                                 </div>
 
-                                {/* Action Buttons */}
+                                {/* Opciones extra del template especial */}
+                                {moduleKind === 'SPECIAL' && specialTemplateId && (() => {
+                                    const tmpl = getTemplate(specialTemplateId);
+                                    if (!tmpl?.extraOptions?.length) return null;
+                                    return (
+                                        <div className="flex gap-3 items-center flex-wrap bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg">
+                                            {tmpl.extraOptions.map(opt => (
+                                                <div key={opt.key} className="flex flex-col gap-1">
+                                                    <label className="text-[10px] text-purple-700 uppercase font-bold">{opt.label}</label>
+                                                    {opt.type === 'number' ? (
+                                                        <input
+                                                            type="number"
+                                                            className="border p-1.5 rounded text-xs bg-white w-20 text-center"
+                                                            min={opt.min ?? 1}
+                                                            max={opt.max ?? 99}
+                                                            value={specialOptions[opt.key] ?? String(opt.defaultValue ?? 1)}
+                                                            onChange={e => setSpecialOptions(prev => ({ ...prev, [opt.key]: e.target.value }))}
+                                                        />
+                                                    ) : (
+                                                        <select
+                                                            className="border p-1.5 rounded text-xs bg-white"
+                                                            value={specialOptions[opt.key] || opt.options[0].value}
+                                                            onChange={e => setSpecialOptions(prev => ({ ...prev, [opt.key]: e.target.value }))}
+                                                        >
+                                                            {opt.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                                </div>
+                            )}
+
+                            {/* Formulario Manual — lista libre de ítems */}
+                                {moduleKind === 'MANUAL' && (
+                                    <div className="w-full bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                        <p className="text-[10px] text-orange-700 uppercase font-bold mb-2">Ítems del módulo especial manual</p>
+                                        <div className="flex gap-1 mb-2">
+                                            <input type="text" placeholder="Descripción (ej: Tapa mármol)" className="flex-1 p-1.5 text-xs border rounded" value={newManualItem.description} onChange={e => setNewManualItem(p => ({...p, description: e.target.value}))} />
+                                            <input type="number" placeholder="Cant" className="w-12 p-1.5 text-xs border rounded text-center" value={newManualItem.quantity} onChange={e => setNewManualItem(p => ({...p, quantity: Number(e.target.value)}))} />
+                                            <input type="text" placeholder="Un" className="w-14 p-1.5 text-xs border rounded text-center" value={newManualItem.unit} onChange={e => setNewManualItem(p => ({...p, unit: e.target.value}))} />
+                                            <input type="number" placeholder="$ unit" className="w-24 p-1.5 text-xs border rounded text-right" value={newManualItem.unitPrice} onChange={e => setNewManualItem(p => ({...p, unitPrice: Number(e.target.value)}))} />
+                                            <button type="button" onClick={() => {
+                                                if (!newManualItem.description.trim()) return;
+                                                setManualItems(prev => [...prev, { ...newManualItem, id: `mi_${Date.now()}` }]);
+                                                setNewManualItem({ id: '', description: '', quantity: 1, unit: 'un', unitPrice: 0 });
+                                            }} className="bg-orange-500 text-white px-2 rounded hover:bg-orange-600"><Plus size={14}/></button>
+                                        </div>
+                                        {manualItems.length > 0 && (
+                                            <div className="space-y-1">
+                                                {manualItems.map((item, i) => (
+                                                    <div key={i} className="flex justify-between items-center text-xs bg-white border rounded px-2 py-1">
+                                                        <span className="flex-1">{item.description}</span>
+                                                        <span className="text-gray-500 mx-2">{item.quantity} {item.unit}</span>
+                                                        <span className="font-bold text-gray-700 mr-2">${(item.unitPrice * item.quantity).toLocaleString('es-AR')}</span>
+                                                        <button type="button" onClick={() => setManualItems(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={12}/></button>
+                                                    </div>
+                                                ))}
+                                                <div className="text-right text-xs font-bold text-orange-700 pt-1 border-t border-orange-200">
+                                                    Total: ${manualItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0).toLocaleString('es-AR')}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                            {/* Action Buttons */}
                                 <div className="flex gap-2">
                                     <button type="submit" className="bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
                                         {editingId ? <Save size={16}/> : <Plus size={16}/>} {editingId ? 'Actualizar' : 'Agregar'}
                                     </button>
                                 </div>
-                            </div>
-                        </form>
+
+                    </form>
                     </div>
 
                     {/* Bottom: Lists Split View */}
@@ -2862,21 +4266,35 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                         ))}
                     </div>
                     
-                    <div className="flex gap-4 justify-center pt-4 border-t border-gray-100">
-                        <button 
-                            onClick={handleGenerateCostSheet}
-                            disabled={selectedItemIds.size === 0}
-                            className="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
-                        >
-                            <PieChart size={18}/> Generar Planilla de Costos
-                        </button>
-                        <button 
-                            onClick={handleOpenQuoteModal} 
-                            disabled={selectedItemIds.size === 0}
-                            className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center gap-2"
-                        >
-                            <FileText size={18}/> Generar Presupuesto Cliente
-                        </button>
+                    <div className="flex flex-col gap-3 pt-4 border-t border-gray-100">
+                        {/* Badge lista de precios activa */}
+                        <div className="flex justify-center">
+                            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+                                <span className="text-[10px] text-amber-600 uppercase font-bold tracking-wide">Lista de precios:</span>
+                                <span className="text-sm font-bold text-amber-900">
+                                    {activeSettings.name || 'Lista Actual'}
+                                </span>
+                                {activeSettings.name && activeSettings.name !== 'Lista Actual' && (
+                                    <span className="text-[10px] text-amber-500">· activa para nuevos cálculos</span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex gap-4 justify-center">
+                            <button 
+                                onClick={handleGenerateCostSheet}
+                                disabled={selectedItemIds.size === 0}
+                                className="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
+                            >
+                                <PieChart size={18}/> Generar Planilla de Costos
+                            </button>
+                            <button 
+                                onClick={handleOpenQuoteModal} 
+                                disabled={selectedItemIds.size === 0}
+                                className="bg-black text-white px-8 py-3 rounded-xl font-bold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center gap-2"
+                            >
+                                <FileText size={18}/> Generar Presupuesto Cliente
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -2963,7 +4381,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-6">
+                                        <div className="flex items-center gap-4">
                                             <div className="hidden md:flex flex-col items-end">
                                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estado Comercial</span>
                                                 <select
@@ -2977,218 +4395,113 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                     ))}
                                                 </select>
                                             </div>
-
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const allDocs = project.docs;
+                                                    const msg = allDocs.length > 1
+                                                        ? `¿Eliminar el legajo "${project.name}" y sus ${allDocs.length} versiones? Esta acción no se puede deshacer.`
+                                                        : `¿Eliminar el presupuesto "${project.name}"? Esta acción no se puede deshacer.`;
+                                                    if (!confirm(msg)) return;
+                                                    allDocs.forEach((doc: any) => { if (onDeleteEstimate) onDeleteEstimate(doc.id); });
+                                                }}
+                                                className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Eliminar legajo"
+                                            >
+                                                <Trash2 size={16}/>
+                                            </button>
                                             <div className={`p-2 rounded-full transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-gray-100' : 'bg-gray-50'}`}>
                                                 <ChevronDown size={20} className="text-gray-400"/>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* EXPANDED VIEW */}
+                                    {/* EXPANDED VIEW — simplificado */}
                                     {isExpanded && (
                                         <div className="border-t border-gray-100 bg-gray-50/30 animate-slide-down">
-                                            <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                                {/* QUICK ACTIONS / ICONS */}
-                                                <div className="lg:col-span-2 space-y-4">
-                                                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Documentación de Obra</h5>
-                                                    <div className="grid grid-cols-4 gap-4">
-                                                        <button 
+                                            <div className="p-6 flex flex-col gap-5">
+
+                                                {/* Documentos */}
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Documentos</p>
+                                                    <div className="flex gap-3 flex-wrap">
+                                                        <button
                                                             onClick={() => executeViewQuote(latestDoc)}
-                                                            className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-2xl hover:border-indigo-500 hover:shadow-lg transition-all group"
+                                                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 text-xs font-bold text-gray-700 transition-all"
                                                         >
-                                                            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl mb-2 group-hover:scale-110 transition-transform">
-                                                                <FileText size={20}/>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-gray-700">Presupuesto</span>
+                                                            <FileText size={14} className="text-indigo-500"/> Presupuesto
                                                         </button>
-                                                        <button 
+                                                        <button
                                                             onClick={() => { setPrintMode('COSTS'); setActiveSettings(latestDoc.settingsSnapshot); setTechnicalItems(latestDoc.items || []); }}
-                                                            className="flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-2xl hover:border-amber-500 hover:shadow-lg transition-all group"
+                                                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-amber-400 hover:bg-amber-50 text-xs font-bold text-gray-700 transition-all"
                                                         >
-                                                            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl mb-2 group-hover:scale-110 transition-transform">
-                                                                <PieChart size={20}/>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-gray-700">Costos</span>
+                                                            <PieChart size={14} className="text-amber-500"/> Planilla de Costos
                                                         </button>
-                                                        <button 
-                                                            disabled={!latestDoc.hasTechnicalDefinition}
-                                                            onClick={() => executeLoad(latestDoc)}
-                                                            className={`flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-2xl transition-all group ${
-                                                                latestDoc.hasTechnicalDefinition 
-                                                                ? 'hover:border-blue-500 hover:shadow-lg' 
-                                                                : 'opacity-40 cursor-not-allowed grayscale'
+                                                        <button
+                                                            onClick={() => handleGenerateProductionOrder(latestDoc.id)}
+                                                            disabled={latestDoc.commercialStatus !== CommercialStatus.APPROVED}
+                                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                                                latestDoc.commercialStatus === CommercialStatus.APPROVED
+                                                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-600'
+                                                                    : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
                                                             }`}
                                                         >
-                                                            <div className={`p-3 rounded-xl mb-2 group-hover:scale-110 transition-transform ${latestDoc.hasTechnicalDefinition ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                                <ShoppingCart size={20}/>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-gray-700">Insumos</span>
+                                                            <Package size={14}/> Orden de Producción
                                                         </button>
-                                                        <button 
-                                                            disabled={!latestDoc.hasTechnicalDefinition}
-                                                            onClick={() => { setPrintMode('CUTTING'); setActiveSettings(latestDoc.settingsSnapshot); }}
-                                                            className={`flex flex-col items-center justify-center p-4 bg-white border border-gray-200 rounded-2xl transition-all group ${
-                                                                latestDoc.hasTechnicalDefinition 
-                                                                ? 'hover:border-emerald-500 hover:shadow-lg' 
-                                                                : 'opacity-40 cursor-not-allowed grayscale'
-                                                            }`}
-                                                        >
-                                                            <div className={`p-3 rounded-xl mb-2 group-hover:scale-110 transition-transform ${latestDoc.hasTechnicalDefinition ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                                <Scissors size={20}/>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-gray-700">Planilla de Corte</span>
-                                                        </button>
-                                                    </div>
-
-                                                    {showArchived && (
-                                                        <div className="mt-6 p-5 bg-indigo-50 border border-indigo-100 rounded-2xl">
-                                                            <h6 className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                                <Archive size={12}/> Legajo de Obra Realizada
-                                                            </h6>
-                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[10px] mb-4">
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Fecha de Entrega</p>
-                                                                    <p className="font-bold text-gray-900">
-                                                                        {latestDoc.auditLog?.find(a => a.to === ProductionStatus.READY)?.timestamp 
-                                                                            ? new Date(latestDoc.auditLog.find(a => a.to === ProductionStatus.READY)!.timestamp).toLocaleDateString() 
-                                                                            : 'N/A'}
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Versión Final</p>
-                                                                    <p className="font-bold text-gray-900">v{latestDoc.version || 1}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Items / Módulos</p>
-                                                                    <p className="font-bold text-gray-900">{latestDoc.items?.length || 0} Items · {latestDoc.modules.length} Módulos</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Estado Final</p>
-                                                                    <p className="font-bold text-emerald-600 uppercase">Entregado</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Fecha de Cotización</p>
-                                                                    <p className="font-bold text-gray-900">{latestDoc.date ? new Date(latestDoc.date).toLocaleDateString() : 'N/A'}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Referencia / Proyecto</p>
-                                                                    <p className="font-bold text-gray-900 truncate">{latestDoc.customProjectName || getProjectTitleById(latestDoc.projectId || '') || '—'}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Técnica Definida</p>
-                                                                    <p className={`font-bold ${latestDoc.hasTechnicalDefinition ? 'text-emerald-600' : 'text-gray-400'}`}>
-                                                                        {latestDoc.hasTechnicalDefinition ? 'Sí' : 'No'}
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-gray-500 mb-1">Inicio en Taller</p>
-                                                                    <p className="font-bold text-gray-900">
-                                                                        {latestDoc.auditLog?.find(a => a.to === CommercialStatus.IN_PRODUCTION)?.timestamp
-                                                                            ? new Date(latestDoc.auditLog.find(a => a.to === CommercialStatus.IN_PRODUCTION)!.timestamp).toLocaleDateString()
-                                                                            : 'N/A'}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            {/* Resumen de Items */}
-                                                            {latestDoc.items && latestDoc.items.length > 0 && (
-                                                                <div className="border-t border-indigo-100 pt-3">
-                                                                    <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mb-2">Detalle de Items</p>
-                                                                    <div className="space-y-1">
-                                                                        {latestDoc.items.map((item: any, idx: number) => (
-                                                                            <div key={idx} className="flex justify-between items-center text-[10px]">
-                                                                                <span className="font-medium text-gray-700">• {item.name}</span>
-                                                                                <span className="text-gray-500">{item.modules?.length || 0} módulos</span>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between pt-4">
-                                                        <div className="flex gap-2">
-                                                            <button 
-                                                                onClick={() => { setVinculandoEstimateId(latestDoc.id); setVinculandoProjectId(latestDoc.projectId || ''); }}
-                                                                className="px-6 py-2.5 bg-black text-white rounded-xl text-xs font-bold hover:bg-gray-800 transition-all flex items-center gap-2 shadow-md"
-                                                            >
-                                                                <Link size={14}/> Vincular a Proyecto
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleGenerateNewVersion(latestDoc)}
-                                                                className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
-                                                            >
-                                                                <Copy size={14}/> Nueva Versión
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleUpdatePrices(latestDoc)}
-                                                                className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
-                                                            >
-                                                                <ArrowUpCircle size={14}/> Actualizar Precios
-                                                            </button>
-                                                            <button 
-                                                                disabled={latestDoc.commercialStatus !== CommercialStatus.APPROVED}
-                                                                onClick={() => handleGenerateProductionOrder(latestDoc.id)}
-                                                                className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
-                                                                    latestDoc.commercialStatus === CommercialStatus.APPROVED 
-                                                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
-                                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                }`}
-                                                            >
-                                                                <Package size={14}/> Generar Orden Producción
-                                                            </button>
-                                                            <button 
-                                                                disabled={latestDoc.commercialStatus !== CommercialStatus.APPROVED}
-                                                                onClick={() => handleOpenTechnicalDefinition(latestDoc)}
-                                                                className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
-                                                                    latestDoc.commercialStatus === CommercialStatus.APPROVED 
-                                                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                }`}
-                                                            >
-                                                                <Hammer size={14}/> Definir Técnica
-                                                            </button>
-                                                        </div>
-                                                        
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => handleArchive(latestDoc.id)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Archivar"><Archive size={18}/></button>
-                                                            <button onClick={(e) => handleDelete(e, latestDoc.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Borrar"><Trash2 size={18}/></button>
-                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                {/* STATUS & AUDIT */}
-                                                <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6">
+                                                {/* Items del presupuesto */}
+                                                {latestDoc.items && latestDoc.items.length > 0 && (
                                                     <div>
-                                                        <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                            <Activity size={12}/> Estado de Producción
-                                                        </h5>
-                                                        <select
-                                                            className="w-full border border-gray-200 p-3 rounded-xl text-sm font-bold bg-gray-50 focus:ring-2 focus:ring-black outline-none"
-                                                            value={latestDoc.productionStatus || ProductionStatus.PENDING}
-                                                            onChange={(e) => handleProductionStatusChange(latestDoc.id, e.target.value as ProductionStatus)}
-                                                        >
-                                                            {Object.values(ProductionStatus).filter(s => s !== ProductionStatus.READY).map(status => (
-                                                                <option key={status} value={status}>{status}</option>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Ítems</p>
+                                                        <div className="space-y-1">
+                                                            {latestDoc.items.map((item: any, idx: number) => (
+                                                                <div key={idx} className="flex justify-between items-center text-[11px] bg-white border border-gray-100 rounded-lg px-3 py-1.5">
+                                                                    <span className="font-medium text-gray-700">• {item.name}</span>
+                                                                    <span className="text-gray-400">{item.modules?.length || 0} módulos</span>
+                                                                </div>
                                                             ))}
-                                                        </select>
-                                                        <p className="text-[9px] text-gray-400 mt-1.5 italic">La finalización solo se confirma desde la solapa Taller al entregar la obra.</p>
-                                                    </div>
-
-                                                    <div>
-                                                        <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                            <Clock size={12}/> Auditoría de Obra
-                                                        </h5>
-                                                        <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-                                                            {latestDoc.auditLog?.slice().reverse().map((log: any, i: number) => (
-                                                                <div key={i} className="text-[10px] border-l-2 border-indigo-500 pl-3 py-1">
-                                                                    <p className="text-gray-800 font-bold">{log.from} → {log.to}</p>
-                                                                    <p className="text-gray-400">{new Date(log.timestamp).toLocaleString()} • {log.user}</p>
-                                                                </div>
-                                                            )) || <p className="text-xs text-gray-400 italic">No hay registros aún.</p>}
                                                         </div>
                                                     </div>
+                                                )}
+
+                                                {/* Acciones */}
+                                                <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                                                    <div className="flex gap-2 flex-wrap">
+                                                        <button
+                                                            onClick={() => handleGenerateNewVersion(latestDoc)}
+                                                            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                                                        >
+                                                            <Copy size={13}/> Nueva Versión
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleUpdatePrices(latestDoc)}
+                                                            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                                                        >
+                                                            <ArrowUpCircle size={13}/> Actualizar Precios
+                                                        </button>
+                                                        {latestDoc.commercialStatus === CommercialStatus.APPROVED && (
+                                                            <button
+                                                                onClick={() => handleOpenTechnicalDefinition(latestDoc)}
+                                                                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white border border-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all"
+                                                            >
+                                                                <Check size={13}/> Confirmar Terminación
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => { setVinculandoEstimateId(latestDoc.id); setVinculandoProjectId(latestDoc.projectId || ''); }}
+                                                            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                                                        >
+                                                            <Link size={13}/> Vincular
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => handleArchive(latestDoc.id)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Archivar"><Archive size={16}/></button>
+                                                        <button onClick={(e) => handleDelete(e, latestDoc.id)} className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Borrar"><Trash2 size={16}/></button>
+                                                    </div>
                                                 </div>
+
                                             </div>
                                         </div>
                                     )}
@@ -3200,260 +4513,90 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 </div>
             )}
 
-            {view === 'PROJECTS' && (
-                <div className="flex flex-col h-full animate-fade-in">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h3 className="text-2xl font-bold text-gray-900">Gestión de Taller</h3>
-                            <p className="text-sm text-gray-500">Obras aprobadas y en producción activa.</p>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="bg-white border border-gray-200 rounded-xl px-4 py-2 flex items-center gap-3 shadow-sm">
-                                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                                <span className="text-xs font-bold text-gray-600">
-                                    {savedEstimates.filter(e => e.commercialStatus === CommercialStatus.IN_PRODUCTION).length} En Producción
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 overflow-y-auto pr-2 pb-8">
-                        {savedEstimates
-                            .filter(e => e.commercialStatus === CommercialStatus.APPROVED || e.commercialStatus === CommercialStatus.IN_PRODUCTION)
-                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                            .map(project => {
-                                const daysInProduction = Math.floor((new Date().getTime() - new Date(project.date).getTime()) / (1000 * 60 * 60 * 24));
-                                
-                                return (
-                                    <div key={project.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div>
-                                                <h4 className="font-bold text-lg text-gray-900">{project.customProjectName || getProjectTitleById(project.projectId)}</h4>
-                                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">{project.quoteData?.reference || 'Sin Ref'}</p>
-                                            </div>
-                                            <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                                                project.productionStatus === ProductionStatus.READY ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'
-                                            }`}>
-                                                {project.productionStatus || ProductionStatus.PENDING}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 flex-1">
-                                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Progreso de Taller</p>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                        <div 
-                                                            className="h-full bg-indigo-600 transition-all duration-500" 
-                                                            style={{ width: 
-                                                                project.productionStatus === ProductionStatus.READY ? '100%' : 
-                                                                project.productionStatus === ProductionStatus.ASSEMBLY ? '66%' : 
-                                                                project.productionStatus === ProductionStatus.CUTTING ? '33%' : '5%' 
-                                                            }}
-                                                        ></div>
-                                                    </div>
-                                                    <span className="text-[10px] font-bold text-gray-600">
-                                                        {project.productionStatus === ProductionStatus.READY ? '100%' : 
-                                                         project.productionStatus === ProductionStatus.ASSEMBLY ? '66%' : 
-                                                         project.productionStatus === ProductionStatus.CUTTING ? '33%' : '5%'}
-                                                    </span>
-                                                </div>
-                                                <select 
-                                                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-xs font-bold outline-none focus:ring-2 focus:ring-black"
-                                                    value={project.productionStatus || ProductionStatus.PENDING}
-                                                    onChange={(e) => handleProductionStatusChange(project.id, e.target.value as ProductionStatus)}
-                                                >
-                                                    {Object.values(ProductionStatus).filter(s => s !== ProductionStatus.READY).map(status => (
-                                                        <option key={status} value={status}>{status}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button 
-                                                    onClick={() => { setPrintMode('CUTTING'); setActiveSettings(project.settingsSnapshot); }}
-                                                    className="flex items-center justify-center gap-2 p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-xs font-bold text-gray-700"
-                                                >
-                                                    <Scissors size={14}/> Corte
-                                                </button>
-                                                <button 
-                                                    onClick={() => executeLoad(project)}
-                                                    className="flex items-center justify-center gap-2 p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-xs font-bold text-gray-700"
-                                                >
-                                                    <Package size={14}/> Insumos
-                                                </button>
-                                            </div>
-
-                                            {/* CONFIRMAR ENTREGA - única forma de finalizar */}
-                                            <button
-                                                onClick={() => {
-                                                    if (confirm(`¿Confirmar entrega de la obra "${project.customProjectName || getProjectTitleById(project.projectId || '')}"? Esta acción la moverá al archivo de obras realizadas.`)) {
-                                                        handleProductionStatusChange(project.id, ProductionStatus.READY);
-                                                    }
-                                                }}
-                                                className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors text-xs font-bold shadow-sm"
-                                            >
-                                                <Check size={14}/> Confirmar Entrega de Obra
-                                            </button>
-                                        </div>
-
-                                        <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <Clock size={14} className="text-gray-400"/>
-                                                <span className="text-[10px] font-medium text-gray-500">{daysInProduction} días en taller</span>
-                                            </div>
-                                            {project.isPublished && (
-                                                <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
-                                                    <Check size={12}/> Actualizado
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        
-                        {savedEstimates.filter(e => e.commercialStatus === CommercialStatus.APPROVED || e.commercialStatus === CommercialStatus.IN_PRODUCTION).length === 0 && (
-                            <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
-                                <Box size={64} className="mb-4 opacity-10"/>
-                                <p className="text-lg font-medium">No hay proyectos activos en taller.</p>
-                                <p className="text-sm">Las obras aparecerán aquí cuando sean aprobadas comercialmente.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* TECHNICAL DEFINITION MODAL (FROM HISTORY) */}
             {isTechnicalModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl p-0 flex flex-col max-h-[90vh]">
-                        <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+
+                        {/* Header */}
+                        <div className="p-5 border-b border-gray-100 flex justify-between items-start">
                             <div>
-                                <h3 className="text-xl font-bold flex items-center gap-2"><Settings size={20}/> Definición Técnica para Producción</h3>
-                                <p className="text-sm text-gray-500">
-                                    Proyecto: <span className="font-bold text-black">{loadedEstimateInfo?.projectName}</span> • 
-                                    Fecha Cotización: {loadedEstimateInfo?.date ? new Date(loadedEstimateInfo.date).toLocaleDateString() : '-'}
-                                </p>
+                                <h3 className="text-lg font-bold flex items-center gap-2"><Settings size={18}/> Confirmar Terminación Aprobada</h3>
+                                <p className="text-sm text-gray-500 mt-0.5">Seleccioná la opción que aprobó el cliente para cada ítem</p>
                             </div>
-                            <button onClick={handleConfirmTechnicalDefinition}><X className="text-gray-400 hover:text-black"/></button>
+                            <button onClick={() => setIsTechnicalModalOpen(false)}><X className="text-gray-400 hover:text-black"/></button>
                         </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-6 bg-white">
-                            {technicalItems.map((item, itemIdx) => (
-                                <div key={item.id} className="mb-8 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                                    <div className="bg-gray-100 p-3 border-b border-gray-200 flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={technicalSelectedIds.has(item.id)}
-                                                onChange={() => handleToggleTechnicalItem(item.id)}
-                                                className="w-5 h-5 cursor-pointer accent-black"
-                                                title="Incluir Item en Reporte"
-                                            />
-                                            <h4 className="font-bold text-gray-800 flex items-center gap-2"><Box size={16}/> {item.name}</h4>
+
+                        {/* Items */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                            {technicalItems.map((item) => {
+                                const enabledScenarios = originalEstimateForComparison?.quoteData?.enabledScenarios as any;
+                                return (
+                                    <div key={item.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                                        <div className="bg-gray-50 px-4 py-2.5 flex justify-between items-center border-b border-gray-200">
+                                            <span className="font-bold text-sm text-gray-800">{item.name}</span>
+                                            <span className="text-[10px] text-gray-400">{item.modules.length} módulos</span>
                                         </div>
-                                        <span className="text-xs bg-white px-2 py-1 rounded border border-gray-300 font-medium">{item.modules.length} Módulos</span>
+                                        <div className="p-4">
+                                            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide mb-3">Terminación aprobada</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {/* Siempre mostrar la configuración original */}
+                                                {[
+                                                    { key: 'base',     label: (() => {
+                                                        const hasL = item.modules?.some((m:any) => (m.moduleType||'').includes('LACQUER'));
+                                                        const hasV = item.modules?.some((m:any) => (m.moduleType||'').includes('VENEER'));
+                                                        const isW  = item.modules[0]?.isWhiteStructure;
+                                                        if (hasL) return 'Mel. + Laca Semi Mate';
+                                                        if (hasV) return 'Mel. + Enchapado Kiri';
+                                                        return isW ? 'Melamina Blanca' : 'Melamina Color';
+                                                    })(), always: true },
+                                                    { key: 'white',    label: 'Melamina Blanca',  show: enabledScenarios?.white    },
+                                                    { key: 'textured', label: 'Melamina Color',    show: enabledScenarios?.textured },
+                                                    { key: 'lacquer',  label: 'Laca Semi Mate',    show: enabledScenarios?.lacquer  },
+                                                    { key: 'veneer',   label: 'Enchapado Kiri',    show: enabledScenarios?.veneer   },
+                                                ].filter(o => o.always || o.show).map(option => (
+                                                    <button
+                                                        key={option.key}
+                                                        onClick={() => updateTechnicalModule(item.id, '', 'finalTerminationScenario', option.key)}
+                                                        className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all text-left ${
+                                                            (item as any).finalTerminationScenario === option.key || (!((item as any).finalTerminationScenario) && option.key === 'base')
+                                                                ? 'bg-black text-white border-black'
+                                                                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                                                        }`}
+                                                    >
+                                                        {option.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <table className="w-full text-left text-xs">
-                                        <thead>
-                                            <tr className="border-b border-gray-200 text-gray-500 bg-gray-50/50">
-                                                <th className="p-3 w-40">Módulo</th>
-                                                <th className="p-3">Estructura (Caja)</th>
-                                                <th className="p-3">Frentes (Puertas/Cajones)</th>
-                                                <th className="p-3">Herrajes (Confirmación)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {item.modules.map((mod) => (
-                                                <tr key={mod.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                                                    <td className="p-3 font-medium align-top">
-                                                        <div className="text-sm">{mod.name}</div>
-                                                        <div className="text-gray-400 text-[10px]">{mod.width}x{mod.height}x{mod.depth}</div>
-                                                    </td>
-                                                    
-                                                    {/* STRUCTURE DEFINITION */}
-                                                    <td className="p-3 align-top">
-                                                        <div className="flex gap-2 mb-1">
-                                                            <select 
-                                                                className="border p-1 rounded bg-white w-20 font-bold"
-                                                                value={mod.structureCore || 'AGLO'}
-                                                                onChange={(e) => updateTechnicalModule(item.id, mod.id, 'structureCore', e.target.value)}
-                                                            >
-                                                                <option value="AGLO">Aglo</option>
-                                                                <option value="MDF">MDF</option>
-                                                            </select>
-                                                            <input 
-                                                                type="text" 
-                                                                className="border p-1 rounded flex-1 min-w-[120px]" 
-                                                                value={mod.materialColorName}
-                                                                onChange={(e) => updateTechnicalModule(item.id, mod.id, 'materialColorName', e.target.value)}
-                                                                placeholder="Material Estructura"
-                                                            />
-                                                        </div>
-                                                    </td>
+                                );
+                            })}
 
-                                                    {/* FRONTS DEFINITION */}
-                                                    <td className="p-3 align-top">
-                                                        {(mod.cntDoors > 0 || mod.cntDrawers > 0) ? (
-                                                            <div className="flex gap-2 mb-1">
-                                                                <select 
-                                                                    className="border p-1 rounded bg-white w-20 font-bold"
-                                                                    value={mod.frontsCore || 'AGLO'}
-                                                                    onChange={(e) => updateTechnicalModule(item.id, mod.id, 'frontsCore', e.target.value)}
-                                                                >
-                                                                    <option value="AGLO">Aglo</option>
-                                                                    <option value="MDF">MDF</option>
-                                                                </select>
-                                                                <input 
-                                                                    type="text" 
-                                                                    className="border p-1 rounded flex-1 min-w-[120px]" 
-                                                                    value={mod.materialFrontName || mod.materialColorName}
-                                                                    onChange={(e) => updateTechnicalModule(item.id, mod.id, 'materialFrontName', e.target.value)}
-                                                                    placeholder="Material Frentes"
-                                                                />
-                                                            </div>
-                                                        ) : <span className="text-gray-300">-</span>}
-                                                    </td>
-
-                                                    {/* HARDWARE */}
-                                                    <td className="p-3 space-y-1 align-top">
-                                                        {(mod.cntDoors > 0 || mod.cntFlaps > 0) && (
-                                                            <select className="w-full border p-1 rounded text-[10px]" value={mod.hingeType} onChange={(e) => updateTechnicalModule(item.id, mod.id, 'hingeType', e.target.value)}>
-                                                                {Object.entries(HINGE_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                                                            </select>
-                                                        )}
-                                                        {mod.cntDrawers > 0 && (
-                                                            <select className="w-full border p-1 rounded text-[10px]" value={mod.slideType} onChange={(e) => updateTechnicalModule(item.id, mod.id, 'slideType', e.target.value)}>
-                                                                {Object.entries(SLIDE_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
-                                                            </select>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ))}
-
-                            <div className="mt-6 pt-6 border-t border-gray-200">
-                                <label className="block font-bold text-gray-700 mb-2 flex items-center gap-2">
-                                    <FileCheck size={18}/> Observaciones Generales para Reporte Técnico
-                                </label>
-                                <textarea 
-                                    className="w-full p-4 border border-gray-300 rounded-lg focus:ring-1 focus:ring-black outline-none min-h-[120px] text-sm"
-                                    placeholder="Ingrese aquí detalles de entrega, instrucciones de montaje, especificaciones de cantos especiales, etc..."
+                            <div className="border border-gray-200 rounded-xl p-4">
+                                <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wide mb-2">Observaciones para el taller</p>
+                                <textarea
+                                    className="w-full border border-gray-200 rounded-lg p-2 text-sm resize-none outline-none focus:ring-1 focus:ring-black"
+                                    rows={2}
+                                    placeholder="Instrucciones especiales, detalles de entrega..."
                                     value={technicalObservations}
                                     onChange={(e) => setTechnicalObservations(e.target.value)}
-                                ></textarea>
+                                />
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
-                            <button onClick={() => setIsTechnicalModalOpen(false)} className="px-4 py-2 border rounded-lg text-sm font-bold hover:bg-white transition-colors">Cancelar</button>
-                            <button onClick={handleConfirmAssociationAndGenerate} className="bg-roden-black text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 flex items-center gap-2 shadow-lg">
-                                <Printer size={16}/> Confirmar y Generar Documentos
+                        {/* Footer */}
+                        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+                            <button onClick={() => setIsTechnicalModalOpen(false)} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-black">Cancelar</button>
+                            <button
+                                onClick={handleConfirmTechnicalDefinition}
+                                className="bg-black text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 flex items-center gap-2"
+                            >
+                                <Check size={16}/> Confirmar y guardar
                             </button>
                         </div>
+
                     </div>
                 </div>
             )}
@@ -3577,16 +4720,24 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 </select>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Margen Beneficio Taller (%)</label>
-                                <input 
-                                    type="number" 
-                                    className="w-full border p-3 rounded-lg text-lg font-bold"
-                                    value={costSheetMargin} 
-                                    onChange={e => setCostSheetMargin(Number(e.target.value))}
-                                />
-                                <p className="text-xs text-gray-400 mt-1">Este porcentaje se aplicará sobre el costo directo total.</p>
-                            </div>
+                            {/* Beneficio Taller: viene de cada ítem — solo se muestra */}
+                            {(() => {
+                                const selectedItems = items.filter(i => selectedItemIds.has(i.id));
+                                const margins = [...new Set(selectedItems.map(i => i.margins?.workshop ?? 35))];
+                                return (
+                                    <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Beneficio Taller</p>
+                                        {margins.length === 1
+                                            ? <p className="text-lg font-bold text-gray-800">{margins[0]}%
+                                                <span className="text-xs text-gray-400 font-normal ml-2">— definido en el ítem</span>
+                                              </p>
+                                            : <p className="text-sm text-gray-600">Márgenes: {margins.join('%, ')}%
+                                                <span className="text-xs text-gray-400 block mt-0.5">Cada ítem usa su propio margen</span>
+                                              </p>
+                                        }
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -3610,7 +4761,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                            <h3 className="font-bold text-lg">Seleccionar Lista de Precios</h3>
+                            <h3 className="font-bold text-lg">
+                                {updatePricesEstimate ? 'Elegir Lista para Recalcular' : 'Seleccionar Lista de Precios'}
+                            </h3>
                             <button onClick={() => setIsPriceListModalOpen(false)} className="text-gray-400 hover:text-black"><X size={20}/></button>
                         </div>
                         <div className="p-6 space-y-4">
@@ -3668,12 +4821,38 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 <textarea className="w-full border p-3 rounded-lg outline-none focus:ring-1 focus:ring-black text-sm h-20" value={quoteConditions} onChange={(e) => setQuoteConditions(e.target.value)}></textarea>
                             </div>
 
-                            <div className="pt-2 border-t border-gray-100"><label className="block text-sm font-medium text-gray-700 mb-2">Seleccionar Alternativas a Mostrar</label><div className="space-y-2">
-                                <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.white} onChange={e => setEnabledScenarios({...enabledScenarios, white: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Melamina Blanca</span></label>
-                                <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.textured} onChange={e => setEnabledScenarios({...enabledScenarios, textured: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Melamina Texturada / Color</span></label>
-                                <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.lacquer} onChange={e => setEnabledScenarios({...enabledScenarios, lacquer: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Laqueado</span></label>
-                                <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.veneer} onChange={e => setEnabledScenarios({...enabledScenarios, veneer: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Enchapado</span></label>
-                            </div></div>
+                            <div className="pt-2 border-t border-gray-100">
+                                {/* Precio base: configuración real de los items */}
+                                {(() => {
+                                    const selectedItems = items.filter(i => selectedItemIds.has(i.id));
+                                    // Detectar la terminación predominante de los items seleccionados
+                                    const allModules = selectedItems.flatMap(i => i.modules || []);
+                                    const hasLacquer = allModules.some(m => (m.moduleType || '').includes('LACQUER'));
+                                    const hasVeneer  = allModules.some(m => (m.moduleType || '').includes('VENEER'));
+                                    const isWhite    = allModules.every(m => m.isWhiteStructure);
+                                    let baseLabel = 'Melamina Color — MDP';
+                                    if (hasLacquer) baseLabel = 'Estructura Mel. + Frentes Laqueados';
+                                    else if (hasVeneer) baseLabel = 'Estructura Mel. + Frentes Enchapados';
+                                    else if (isWhite) baseLabel = 'Melamina Blanca — MDP';
+                                    return (
+                                        <div className="mb-3 bg-gray-900 rounded-lg p-3 flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-white shrink-0"></div>
+                                            <div>
+                                                <p className="text-xs font-bold text-white">{baseLabel}</p>
+                                                <p className="text-[10px] text-gray-400">Configuración de los módulos — siempre incluida</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Alternativas adicionales a mostrar</label>
+                                <p className="text-[11px] text-gray-400 mb-2">Dejá en blanco para presupuestar solo la configuración base.</p>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.white} onChange={e => setEnabledScenarios({...enabledScenarios, white: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Melamina Blanca</span></label>
+                                    <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.textured} onChange={e => setEnabledScenarios({...enabledScenarios, textured: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Melamina Color</span></label>
+                                    <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.lacquer} onChange={e => setEnabledScenarios({...enabledScenarios, lacquer: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Laqueado</span></label>
+                                    <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 border border-gray-100 cursor-pointer"><input type="checkbox" checked={enabledScenarios.veneer} onChange={e => setEnabledScenarios({...enabledScenarios, veneer: e.target.checked})} className="w-4 h-4"/><span className="text-sm">Enchapado Kiri</span></label>
+                                </div>
+                            </div>
                             <button onClick={handleGenerateQuote} className="w-full bg-roden-black text-white py-3 rounded-lg font-bold mt-4">Confirmar y Ver Presupuesto</button>
                         </div>
                     </div>
@@ -3692,12 +4871,29 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 </button>
                             </div>
                             <div className="p-6 space-y-4">
+                                {/* Asociar a Proyecto */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Proyecto en Taller</label>
+                                    <select
+                                        value={productionOrderForm.linkedProjectId}
+                                        onChange={(e) => setProductionOrderForm(prev => ({ ...prev, linkedProjectId: e.target.value }))}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none"
+                                    >
+                                        <option value="">— Sin asignar —</option>
+                                        {projects
+                                            .filter(p => ['PRODUCTION', 'READY', 'PROPOSAL', 'QUOTING'].includes(p.status))
+                                            .map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Descripción del Item</label>
                                     <textarea 
                                         value={productionOrderForm.itemDescription}
                                         onChange={(e) => setProductionOrderForm(prev => ({ ...prev, itemDescription: e.target.value }))}
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none min-h-[100px]"
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none min-h-[80px]"
                                         placeholder="Ej: Mueble de cocina completo según diseño..."
                                     />
                                 </div>
@@ -3729,6 +4925,15 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         onChange={(e) => setProductionOrderForm(prev => ({ ...prev, assignedOperators: e.target.value }))}
                                         className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none"
                                         placeholder="Ej: Juan Perez, Alberto Gomez"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Observaciones</label>
+                                    <textarea
+                                        value={productionOrderForm.observations}
+                                        onChange={(e) => setProductionOrderForm(prev => ({ ...prev, observations: e.target.value }))}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-black outline-none min-h-[80px]"
+                                        placeholder="Notas para el taller, detalles especiales, etc."
                                     />
                                 </div>
                             </div>
@@ -3943,6 +5148,81 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 </div>
             )}
 
+            {/* PANEL: HISTORIAL DE ITEM TEMPLATES */}
+            {isTemplatesPanelOpen && (
+                <div className="fixed inset-0 z-[300] flex justify-end">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsTemplatesPanelOpen(false)} />
+                    <div className="relative bg-white w-full max-w-md h-full shadow-2xl flex flex-col">
+                        {/* Header */}
+                        <div className="flex justify-between items-center p-5 border-b border-gray-100">
+                            <div>
+                                <h3 className="font-bold text-lg flex items-center gap-2"><History size={18}/> Historial de Items</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">Items guardados automáticamente al crearlos</p>
+                            </div>
+                            <button onClick={() => setIsTemplatesPanelOpen(false)}><X className="text-gray-400 hover:text-black"/></button>
+                        </div>
+
+                        {/* Buscador */}
+                        <div className="p-4 border-b border-gray-100">
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre..."
+                                    className="w-full pl-8 pr-3 py-2 border rounded-lg text-sm focus:ring-1 focus:ring-black outline-none"
+                                    value={templateSearch}
+                                    onChange={e => setTemplateSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Lista */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {itemTemplates.length === 0 && (
+                                <p className="text-center text-gray-400 text-sm py-12">
+                                    No hay items guardados aún.<br/>
+                                    <span className="text-xs">Se guardan automáticamente al crear cada Item.</span>
+                                </p>
+                            )}
+                            {itemTemplates
+                                .filter(t => !templateSearch || t.name.toLowerCase().includes(templateSearch.toLowerCase()))
+                                .map((tpl, i) => (
+                                    <div key={tpl.id || i} className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:border-indigo-300 transition-colors">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="font-bold text-sm">{tpl.name}</p>
+                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                    {new Date(tpl.created_at).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' })}
+                                                    {' · '}{tpl.modules?.length || 0} módulos
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                                            <span className="bg-white border rounded px-2 py-0.5">{tpl.labor?.workers ?? 2} op. · {tpl.labor?.days ?? 3} días</span>
+                                            <span className="bg-white border rounded px-2 py-0.5">T: {tpl.margins?.workshop ?? 35}% · R: {tpl.margins?.roden ?? 25}%</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleLoadTemplate(tpl, false)}
+                                                className="flex-1 bg-black text-white text-xs font-bold py-1.5 rounded-lg hover:bg-gray-800 flex items-center justify-center gap-1"
+                                            >
+                                                <Copy size={12}/> Copiar
+                                            </button>
+                                            <button
+                                                onClick={() => handleLoadTemplate(tpl, true)}
+                                                className="flex-1 border border-gray-300 text-gray-700 text-xs font-bold py-1.5 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1"
+                                            >
+                                                <Pencil size={12}/> Usar como base
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {costComparisonAlert && costComparisonAlert.isOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -3983,7 +5263,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                     </div>
                 </div>
             )}
-
         </div>
     </div>
   );

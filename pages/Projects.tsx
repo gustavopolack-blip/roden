@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
-import { Project, ProjectStatus, Client, User, ProductionStep } from '../types';
+import { Project, ProjectStatus, Client, User, ProductionStep, ProductionOrder } from '../types';
 import { generateChecklist } from '../services/geminiService';
-import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator, Zap } from 'lucide-react';
+import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator, Zap, FileText, Link2 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
+import { translateProductionStep } from '../translations';
 
 interface ProjectsProps {
   projects: Project[];
   clients: Client[];
   user: User;
-  onAddProject: (project: Project) => void;
+  productionOrders?: ProductionOrder[];
+  onAddProject: (project: Omit<Project, 'id'>) => void;
   onUpdateProject: (project: Project) => void;
+  onDeleteProject?: (projectId: string) => void;
   onNavigateToEstimator?: (projectId: string) => void;
 }
 
@@ -50,16 +53,9 @@ const PROJECT_GROUPS: { id: ProjectGroup; label: string; statuses: ProjectStatus
     }
 ];
 
-const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
-    'ANTICIPO_PLANOS': 'Anticipo y Planos',
-    'COMPRA_MATERIALES': 'Materiales',
-    'FABRICACION': 'Fabricación',
-    'LUSTRE': 'Lustre',
-    'PREPARACION': 'Preparación',
-    'LISTO': 'Listo'
-};
+// PRODUCTION_STEP_LABELS se importa desde translations.ts vía translateProductionStep
 
-const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProject, onUpdateProject, onNavigateToEstimator }) => {
+const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, productionOrders = [], onAddProject, onUpdateProject, onDeleteProject, onNavigateToEstimator }) => {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -69,6 +65,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
   const [filterClient, setFilterClient] = useState('');
   const [filterText, setFilterText] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [viewingOP, setViewingOP] = useState<ProductionOrder | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -150,24 +147,23 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
         };
         onUpdateProject(updated);
     } else {
-        const project: Project = {
-            id: `p${Date.now()}`,
+        const project: Omit<Project, 'id'> = {
             clientId: formData.clientId,
             title: formData.title,
-            startDate: formData.startDate,
-            productionStartDate: formData.productionStartDate,
+            startDate: formData.startDate || null,
+            productionStartDate: formData.productionStartDate || null,
             status: formData.status,
-            deadline: formData.deadline,
+            deadline: formData.deadline || null,
             progress: 0,
-            budget: 0, // Default 0
+            budget: 0,
             tasksTotal: 5,
             tasksCompleted: 0,
             productionStep: 'ANTICIPO_PLANOS',
             stepDates: {
                 'ANTICIPO_PLANOS': new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit'})
             },
-            driveFolderUrl: formData.driveFolderUrl,
-            archiveReason: formData.archiveReason
+            driveFolderUrl: formData.driveFolderUrl || null,
+            archiveReason: formData.archiveReason || null
         };
         onAddProject(project);
     }
@@ -198,7 +194,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
   // --- User Search Filters ---
   const filteredProjects = roleFilteredProjects.filter(p => {
     const matchesClient = filterClient ? p.clientId === filterClient : true;
-    const matchesText = filterText ? p.title.toLowerCase().includes(filterText.toLowerCase()) : true;
+    const matchesText = filterText ? (p.title || '').toLowerCase().includes(filterText.toLowerCase()) : true;
     
     // Hide Completed/Cancelled Projects by default unless showCompleted is true
     const isArchived = p.status === 'COMPLETED' || p.status === 'CANCELLED';
@@ -327,7 +323,13 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                     return (
                     <div 
                       key={project.id} 
-                      onClick={(e) => { e.stopPropagation(); openEditModal(project); }}
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        // Solo admin puede editar proyectos
+                        if (user.role === 'administrador') {
+                          openEditModal(project);
+                        }
+                      }}
                       className={`bg-white border border-gray-100 p-4 rounded-lg shadow-sm transition-all group border-l-4 ${isArchived ? 'border-l-gray-400 opacity-75' : group.accent} ${user.role === 'administrador' ? 'hover:shadow-md cursor-pointer' : 'cursor-default'}`}
                     >
                       {/* 1. Header: Edit & Drive Buttons (Top Right) */}
@@ -352,7 +354,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                                     : 'text-amber-700 bg-amber-50 border-amber-100'
                                 }`}>
                                     {project.status === 'READY' ? <Check size={10} /> : <Hammer size={10} />}
-                                    {PRODUCTION_STEP_LABELS[project.productionStep] || project.productionStep}
+                                    {translateProductionStep(project.productionStep)}
                                 </span>
                             )}
                          </div>
@@ -380,6 +382,18 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                                     <Calculator size={14} />
                                 </button>
                             )}
+                            {(() => {
+                                const linkedOP = productionOrders.find((o: any) => o.linkedProjectId === project.id);
+                                return linkedOP ? (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setViewingOP(linkedOP as any); }}
+                                        className="text-gray-300 hover:text-emerald-600 p-1 hover:bg-emerald-50 rounded transition-colors"
+                                        title="Ver Orden de Producción"
+                                    >
+                                        <FileText size={14} />
+                                    </button>
+                                ) : null;
+                            })()}
                             {user.role === 'administrador' && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); openEditModal(project); }}
@@ -568,18 +582,85 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, onAddProje
                               </div>
                           </div>
                           
-                          <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100">
-                              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
-                                  Cancelar
-                              </button>
-                              <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
-                                  {isEditMode ? 'Guardar Cambios' : 'Crear Proyecto'}
-                              </button>
+                          <div className="pt-4 flex justify-between items-center bg-white border-t border-gray-100">
+                              {/* BOTÓN ELIMINAR (solo en modo edición y para admin) */}
+                              {isEditMode && user.role === 'administrador' && onDeleteProject && formData.id && (
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`¿Estás seguro de que querés eliminar el proyecto "${formData.title}"?\n\nEsta acción no se puede deshacer.`)) {
+                                      onDeleteProject(formData.id);
+                                      setIsModalOpen(false);
+                                    }
+                                  }}
+                                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg transition-colors"
+                                >
+                                  Eliminar Proyecto
+                                </button>
+                              )}
+                              
+                              <div className={`flex gap-3 ${!isEditMode || user.role !== 'administrador' ? 'ml-auto' : ''}`}>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-50 rounded-lg transition-colors">
+                                    Cancelar
+                                </button>
+                                <button type="submit" className="px-6 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
+                                    {isEditMode ? 'Guardar Cambios' : 'Crear Proyecto'}
+                                </button>
+                              </div>
                           </div>
                       </form>
                   </div>
               </div>
           </div>
+      )}
+
+      {/* ── MODAL: VER ORDEN DE PRODUCCIÓN ── */}
+      {viewingOP && (
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Orden de Producción</p>
+                <h3 className="text-lg font-bold text-roden-black">#{(viewingOP as any).orderNumber} — {(viewingOP as any).clientName}</h3>
+              </div>
+              <button onClick={() => setViewingOP(null)} className="text-gray-400 hover:text-black p-1">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              {(viewingOP as any).itemDescription && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Descripción</p>
+                  <p className="text-gray-700">{(viewingOP as any).itemDescription}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Inicio</p>
+                  <p className="font-medium">{(viewingOP as any).startDate || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Entrega Estimada</p>
+                  <p className="font-medium">{(viewingOP as any).estimatedDeliveryDate || '—'}</p>
+                </div>
+              </div>
+              {(viewingOP as any).assignedOperators?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Operarios</p>
+                  <p className="text-gray-700">{(viewingOP as any).assignedOperators.join(', ')}</p>
+                </div>
+              )}
+              <div className="pt-2 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={() => setViewingOP(null)}
+                  className="px-4 py-2 bg-roden-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

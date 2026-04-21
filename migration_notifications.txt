@@ -1,0 +1,60 @@
+-- ============================================================
+-- rødën OS — Sistema de Notificaciones
+-- Ejecutar en: Supabase > SQL Editor
+-- ============================================================
+
+create table if not exists notifications (
+  id            uuid primary key default gen_random_uuid(),
+  "createdAt"   timestamptz not null default now(),
+  "fromUserId"  uuid,                        -- quién generó el evento (null = sistema)
+  "fromUserName" text,                       -- nombre legible, evita JOIN al leer
+  "toRole"      text not null default 'all', -- 'all' | 'administrador' | 'gerente_taller' | 'operario_taller'
+  type          text not null,               -- ver catálogo abajo
+  title         text not null,
+  body          text,
+  "entityId"    text,                        -- ID del recurso relacionado
+  "entityType"  text,                        -- 'task' | 'project' | 'production_order' | 'workshop'
+  "readBy"      jsonb not null default '[]'  -- array de userIds que ya la leyeron
+);
+
+-- Índice para leer por fecha desc (la consulta más frecuente)
+create index if not exists notifications_created_at_idx
+  on notifications ("createdAt" desc);
+
+-- RLS: todos los usuarios autenticados pueden leer y crear
+alter table notifications enable row level security;
+
+drop policy if exists "Authenticated users can read notifications" on notifications;
+create policy "Authenticated users can read notifications"
+  on notifications for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Authenticated users can insert notifications" on notifications;
+create policy "Authenticated users can insert notifications"
+  on notifications for insert
+  to authenticated
+  with check (true);
+
+drop policy if exists "Authenticated users can update notifications" on notifications;
+create policy "Authenticated users can update notifications"
+  on notifications for update
+  to authenticated
+  using (true);
+
+-- Habilitar Realtime para esta tabla
+-- (también se puede activar desde Supabase > Database > Replication)
+alter publication supabase_realtime add table notifications;
+
+-- ============================================================
+-- CATÁLOGO DE TIPOS (referencia, no es constraint)
+-- ============================================================
+-- task.created              → Nueva tarea creada
+-- task.deleted              → Tarea eliminada
+-- project.status_changed    → Cambio de estado de proyecto
+-- project.step_changed      → Avance/retroceso de paso en Taller
+-- project.note_added        → Nueva nota en proyecto
+-- production_order.created  → Nueva orden de producción
+-- production_order.updated  → Cambio de estado de OP
+-- workshop.project_added    → Proyecto agregado al Taller
+-- ============================================================

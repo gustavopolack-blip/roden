@@ -53,26 +53,27 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
   const filteredEstimates = estimates.filter(est => {
     const matchesStatus = filterStatus === 'ALL' || est.status === filterStatus;
     const projectName = getProjectName(est.projectId || '').toLowerCase();
-    const title = est.title.toLowerCase();
+    const title = (est.title || '').toLowerCase();
     const matchesSearch = projectName.includes(searchTerm.toLowerCase()) || 
                           title.includes(searchTerm.toLowerCase()) ||
-                          est.id.toLowerCase().includes(searchTerm.toLowerCase());
+                          (est.id || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
   // Financial Metrics Logic
-  const totalReceivedDownPayments = estimates.filter(e => e.status === 'APPROVED' || e.status === 'PRODUCTION').reduce((acc, e) => acc + (e.downPayment || 0), 0);
-  const totalPendingBalances = estimates.filter(e => e.status === 'APPROVED' || e.status === 'PRODUCTION').reduce((acc, e) => acc + (e.balance || 0), 0);
+  console.log('[Budgets] estimates recibidos:', estimates.length, estimates.map(e => ({ id: e.id, status: e.status, totalAmount: e.totalAmount, downPayment: e.downPayment, balance: e.balance })));
+  const totalReceivedDownPayments = estimates.filter(e => ['APPROVED', 'PRODUCTION', 'SENT'].includes(e.status)).reduce((acc, e) => acc + (e.downPayment || 0), 0);
+  const totalPendingBalances = estimates.filter(e => ['APPROVED', 'PRODUCTION', 'SENT'].includes(e.status)).reduce((acc, e) => acc + (e.balance || 0), 0);
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   const monthlyBilling = estimates.filter(e => {
         const d = new Date(e.createdAt);
-        return (e.status === 'APPROVED' || e.status === 'PRODUCTION') && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        return ['APPROVED', 'PRODUCTION', 'SENT'].includes(e.status) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     }).reduce((acc, e) => acc + e.totalAmount, 0);
 
   // Profitability Analysis
   const profitabilityData = projects.map(project => {
-      const income = estimates.filter(e => e.projectId === project.id && (e.status === 'APPROVED' || e.status === 'PRODUCTION')).reduce((sum, e) => sum + e.totalAmount, 0);
+      const income = estimates.filter(e => e.projectId === project.id && ['APPROVED', 'PRODUCTION', 'SENT'].includes(e.status)).reduce((sum, e) => sum + e.totalAmount, 0);
       const expenses = supplierPayments.filter(sp => sp.projectId === project.id).reduce((sum, sp) => sum + sp.totalAmount, 0);
       const profit = income - expenses;
       const margin = income > 0 ? (profit / income) * 100 : 0;
@@ -163,8 +164,8 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
     <div className="space-y-8 animate-fade-in relative">
       <header className="flex justify-between items-center border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Presupuestos</h2>
-          <p className="text-roden-gray text-sm mt-1">Gestión de cobros, anticipos y rentabilidad.</p>
+          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Finanzas</h2>
+          <p className="text-roden-gray text-sm mt-1">Gestión de ingresos, cobros y rentabilidad.</p>
         </div>
         <div className="flex gap-3">
             <RodenAIButton 
@@ -189,7 +190,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                     <div className="p-1.5 bg-emerald-100 rounded text-emerald-600"><CheckCircle size={16}/></div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Anticipos Recibidos</p>
                 </div>
-                <p className="text-3xl font-bold text-roden-black">${totalReceivedDownPayments.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-roden-black">${(totalReceivedDownPayments || 0).toLocaleString()}</p>
               </div>
           </div>
           <div className="bg-white p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group hover:border-amber-300 transition-colors">
@@ -199,7 +200,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                     <div className="p-1.5 bg-amber-100 rounded text-amber-600"><Clock size={16}/></div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Saldos a Cobrar</p>
                 </div>
-                <p className="text-3xl font-bold text-roden-black">${totalPendingBalances.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-roden-black">${(totalPendingBalances || 0).toLocaleString()}</p>
               </div>
           </div>
           <div className="bg-white p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group">
@@ -209,7 +210,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                     <div className="p-1.5 bg-indigo-100 rounded text-indigo-600"><PieChart size={16}/></div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Facturación Mensual</p>
                 </div>
-                <p className="text-3xl font-bold text-roden-black">${monthlyBilling.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-roden-black">${(monthlyBilling || 0).toLocaleString()}</p>
               </div>
           </div>
       </div>
@@ -234,9 +235,9 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                     {profitabilityData.map(data => (
                         <tr key={data.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                             <td className="py-4 px-6"><p className="text-sm font-bold text-roden-black">{data.title}</p></td>
-                            <td className="py-4 px-6 text-right"><span className="text-sm font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded">${data.income.toLocaleString()}</span></td>
-                            <td className="py-4 px-6 text-right"><span className="text-sm font-medium text-rose-700 bg-rose-50 px-2 py-1 rounded">${data.expenses.toLocaleString()}</span></td>
-                            <td className="py-4 px-6 text-right"><p className={`text-sm font-bold ${data.profit < 0 ? 'text-red-600' : 'text-roden-black'}`}>${data.profit.toLocaleString()}</p></td>
+                            <td className="py-4 px-6 text-right"><span className="text-sm font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded">${(data.income || 0).toLocaleString()}</span></td>
+                            <td className="py-4 px-6 text-right"><span className="text-sm font-medium text-rose-700 bg-rose-50 px-2 py-1 rounded">${(data.expenses || 0).toLocaleString()}</span></td>
+                            <td className="py-4 px-6 text-right"><p className={`text-sm font-bold ${data.profit < 0 ? 'text-red-600' : 'text-roden-black'}`}>${(data.profit || 0).toLocaleString()}</p></td>
                             <td className="py-4 px-6 text-right"><div className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full border">{data.margin.toFixed(1)}%</div></td>
                         </tr>
                     ))}
@@ -289,9 +290,9 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                               <p className="text-sm font-bold text-roden-black">{getProjectName(estimate.projectId || '')}</p>
                               <p className="text-xs text-gray-500">{estimate.title}</p>
                           </td>
-                          <td className="py-4 px-6"><p className="text-sm font-medium text-emerald-600">+${estimate.downPayment?.toLocaleString()}</p></td>
-                          <td className="py-4 px-6"><p className="text-sm font-medium text-amber-600">${estimate.balance?.toLocaleString()}</p></td>
-                          <td className="py-4 px-6 text-sm font-bold text-roden-black">${estimate.totalAmount.toLocaleString()}</td>
+                          <td className="py-4 px-6"><p className="text-sm font-medium text-emerald-600">+${(estimate.downPayment || 0).toLocaleString()}</p></td>
+                          <td className="py-4 px-6"><p className="text-sm font-medium text-amber-600">${(estimate.balance || 0).toLocaleString()}</p></td>
+                          <td className="py-4 px-6 text-sm font-bold text-roden-black">${(estimate.totalAmount || 0).toLocaleString()}</td>
                           <td className="py-4 px-6">
                               <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${
                                   estimate.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
@@ -351,12 +352,12 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                           <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">Anticipo Recibido <CheckCircle size={12} className="text-emerald-500"/></label>
-                                <input required type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                <input type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
                                        value={estimateForm.downPayment} onChange={e => setEstimateForm({...estimateForm, downPayment: Number(e.target.value)})} />
                              </div>
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Anticipo</label>
-                                <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                <input type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
                                     value={estimateForm.downPaymentDate} onChange={e => setEstimateForm({...estimateForm, downPaymentDate: e.target.value})} />
                              </div>
                           </div>
@@ -364,12 +365,12 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                           <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">Saldo Pendiente <Clock size={12} className="text-amber-500"/></label>
-                                <input required type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
+                                <input type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
                                        value={estimateForm.balance} onChange={e => setEstimateForm({...estimateForm, balance: Number(e.target.value)})} />
                              </div>
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Cancelación</label>
-                                <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
+                                <input type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
                                     value={estimateForm.balanceDate} onChange={e => setEstimateForm({...estimateForm, balanceDate: e.target.value})} />
                              </div>
                           </div>

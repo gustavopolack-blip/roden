@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Task, Project, TaskPriority, User } from '../types';
-import { CheckCircle2, Clock, MoreHorizontal, Plus, X, Filter, UserPlus, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, MoreHorizontal, Plus, X, Filter, UserPlus, Trash2, Archive } from 'lucide-react';
+import { translateTaskPriority, getTaskPriorityColor } from '../translations';
 
 interface TasksProps {
   tasks: Task[];
@@ -11,9 +12,10 @@ interface TasksProps {
   currentUser?: User | null;
   onAddTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
+  onUpdateTask?: (task: Task) => void;
 }
 
-const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAddTask, onDeleteTask }) => {
+const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAddTask, onDeleteTask, onUpdateTask }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterProjectId, setFilterProjectId] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
@@ -33,13 +35,14 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
       return projects.find(p => p.id === id)?.title || 'Proyecto Desconocido';
   };
 
-  const priorityStyles = {
-      'HIGH': 'bg-rose-50 text-rose-600 border-rose-200',
-      'MEDIUM': 'bg-amber-50 text-amber-600 border-amber-200',
-      'LOW': 'bg-blue-50 text-blue-600 border-blue-200'
+  const getPriorityStyle = (priority: TaskPriority) => {
+    const c = getTaskPriorityColor(priority);
+    return `${c.bg} ${c.text} ${c.border}`;
   };
 
   const filteredTasks = tasks.filter(task => {
+      // No mostrar tareas archivadas por defecto
+      if ((task as any).status === 'ARCHIVED') return false;
       const matchesProject = filterProjectId ? task.projectId === filterProjectId : true;
       const matchesAssignee = filterAssignee ? task.assignee === filterAssignee : true;
       return matchesProject && matchesAssignee;
@@ -55,6 +58,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
           priority: newTask.priority,
           projectId: newTask.projectId || undefined,
           completed: false,
+          status: 'TODO',
           createdBy: currentUser?.name || 'Sistema'
       };
       onAddTask(task);
@@ -121,11 +125,15 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
           {filteredTasks.map(task => (
               <div key={task.id} className="bg-white border border-roden-border p-4 rounded-xl shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-all">
                   <div className="flex items-center gap-4">
-                      <button className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          task.completed 
-                          ? 'bg-emerald-500 border-emerald-500 text-white' 
-                          : 'border-gray-300 text-transparent hover:border-indigo-500'
-                      }`}>
+                      <button
+                          onClick={() => onUpdateTask && onUpdateTask({ ...task, completed: !task.completed })}
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              task.completed 
+                              ? 'bg-emerald-500 border-emerald-500 text-white' 
+                              : 'border-gray-300 text-transparent hover:border-indigo-500'
+                          }`}
+                          title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
+                      >
                           <CheckCircle2 size={14} />
                       </button>
                       
@@ -151,8 +159,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
                                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">Asignado a</p>
                                    <p className="text-xs font-bold text-gray-700">{task.assignee}</p>
                                </div>
-                               <div className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${priorityStyles[task.priority]}`}>
-                                   {task.priority === 'HIGH' ? 'ALTA' : task.priority === 'MEDIUM' ? 'MEDIA' : 'BAJA'}
+                               <div className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${getPriorityStyle(task.priority)}`}>
+                                   {translateTaskPriority(task.priority)}
                                </div>
                            </div>
                            {task.createdBy && (
@@ -163,20 +171,25 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {/* Only ADMIN can see delete button */}
+                        {/* Archivar: disponible para todos cuando la tarea está completada */}
+                        {task.completed && onUpdateTask && (
+                            <button
+                                onClick={() => onUpdateTask({ ...task, status: 'ARCHIVED' as any })}
+                                className="text-gray-300 hover:text-amber-500 hover:bg-amber-50 p-2 rounded-lg transition-colors"
+                                title="Archivar tarea completada"
+                            >
+                                <Archive size={18} />
+                            </button>
+                        )}
+                        {/* Eliminar: solo admin */}
                         {isAdmin && (
                             <button 
                                 onClick={() => onDeleteTask(task.id)}
                                 className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                                title="Eliminar/Archivar Tarea"
+                                title="Eliminar Tarea"
                             >
                                 <Trash2 size={18} />
                             </button>
-                        )}
-                        {!isAdmin && (
-                             <button className="text-gray-300 cursor-not-allowed opacity-50 p-2">
-                                <MoreHorizontal size={18} />
-                             </button>
                         )}
                       </div>
                   </div>

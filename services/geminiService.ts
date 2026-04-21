@@ -2,14 +2,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { BusinessData } from '../types';
 
-// 🛠️ Forzamos la lectura de la variable de Vite
 const getApiKey = () => {
-  // Primero intenta leer la de Vite (estándar) o process.env
-  // @ts-ignore
-  const key = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-  
+  const key = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
   if (!key || key === 'undefined') {
-    console.error("🚨 Error Crítico: GEMINI_API_KEY no detectada.");
+    console.error("🚨 Error Crítico: VITE_GEMINI_API_KEY no configurada en las variables de entorno.");
     return null;
   }
   return key;

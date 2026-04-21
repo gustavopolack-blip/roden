@@ -5,6 +5,7 @@ import MetricCard from '../components/MetricCard';
 import { DollarSign, Clock, CheckCircle, AlertTriangle, ArrowRight, FileText, Send, Hammer, Truck, Zap } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import RodenAIButton from '../components/RodenAIButton';
+import NotasGestion from '../components/NotasGestion';
 
 interface DashboardProps {
   data: BusinessData;
@@ -12,37 +13,46 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
+  const [mostrarNotas, setMostrarNotas] = React.useState(false);
   
   // 1. Propuestas en curso (Status: PROPOSAL)
-  const proposalsCount = data.projects.filter(p => p.status === 'PROPOSAL').length;
+  const proposalsCount = (data.projects || []).filter(p => p && p.status === 'PROPOSAL').length;
 
   // 2. Presupuestos enviados (Status: QUOTING)
-  const budgetsSentCount = data.projects.filter(p => p.status === 'QUOTING').length;
+  const budgetsSentCount = (data.projects || []).filter(p => p && p.status === 'QUOTING').length;
 
   // 3. Obras en fabricación (Status: PRODUCTION)
-  const productionCount = data.projects.filter(p => p.status === 'PRODUCTION').length;
+  const productionCount = (data.projects || []).filter(p => p && p.status === 'PRODUCTION').length;
 
   // 4. Listo para entregar (Status: READY)
-  const readyCount = data.projects.filter(p => p.status === 'READY').length;
+  const readyCount = (data.projects || []).filter(p => p && p.status === 'READY').length;
 
   // 5. Facturación del Mes (Budgets APPROVED && lastModified in current month)
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   
-  const monthlyBilling = data.budgets
+  const ACTIVE_STATUSES = ['APPROVED', 'PRODUCTION', 'SENT'];
+  const monthlyBilling = (data.budgets || [])
     .filter(b => {
-        const d = new Date(b.lastModified);
-        return b.status === 'APPROVED' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        if (!b || !b.status) return false;
+        if (!ACTIVE_STATUSES.includes(b.status)) return false;
+        const dateStr = b.date || b.lastModified || '';
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     })
-    .reduce((acc, curr) => acc + curr.total, 0);
+    .reduce((acc, curr) => acc + (curr.total || curr.amount || 0), 0);
 
-  const chartData = data.projects.map(p => ({
-    name: p.title.split(' ')[0],
-    progress: p.progress,
-    budget: p.budget / 100 
-  }));
+  const chartData = (data.projects || [])
+    .filter(p => p && p.title && typeof p.progress === 'number')
+    .map(p => ({
+      name: p.title.split(' ')[0],
+      progress: p.progress,
+      budget: (p.budget || 0) / 100 
+    }));
 
   return (
+    <>
     <div className="space-y-6 lg:space-y-8 animate-fade-in">
       <header className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-gray-200 pb-6 gap-4">
         <div>
@@ -50,6 +60,13 @@ const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
            <p className="text-roden-gray text-sm">Visión general del flujo de trabajo y finanzas.</p>
         </div>
         <div className="flex items-center gap-3 self-start md:self-auto">
+          <button
+            onClick={() => setMostrarNotas(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Notas
+          </button>
           <RodenAIButton 
             mode="dashboard_briefing" 
             data={data} 
@@ -90,7 +107,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
          <div className="col-span-2 md:col-span-1">
             <MetricCard 
               label="Facturación Mes" 
-              value={`$${monthlyBilling.toLocaleString()}`} 
+              value={`$${(monthlyBilling || 0).toLocaleString()}`} 
               icon={DollarSign} 
               trendUp={true} 
               color="gray"
@@ -147,6 +164,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
         </div>
       </div>
     </div>
+    {mostrarNotas && <NotasGestion onClose={() => setMostrarNotas(false)} />}
+    </>
   );
 };
 

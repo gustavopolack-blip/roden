@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
@@ -19,12 +20,19 @@
             },
             colors: {
               roden: {
-                black: '#171717', // Primary Text / Actions
-                dark: '#262626',
-                gray: '#737373', // Secondary Text
-                light: '#f5f5f5', // Backgrounds
-                white: '#ffffff', // Cards
-                border: '#e5e5e5' // Borders
+                black:  '#171717',
+                dark:   '#262626',
+                gray:   '#737373',
+                light:  '#f5f5f5',
+                white:  '#ffffff',
+                border: '#e5e5e5',
+                /* Dark palette tokens */
+                'dark-bg':     '#0f0f0f',
+                'dark-card':   '#1a1a1a',
+                'dark-surface':'#222222',
+                'dark-border': '#2a2a2a',
+                'dark-text':   '#e5e5e5',
+                'dark-muted':  '#737373',
               }
             }
           }
@@ -32,36 +40,613 @@
       }
     </script>
     <style>
+      /* ─── LIGHT MODE BASE ─────────────────────────────────── */
       body {
-        background-color: #f9fafb; /* Light Web Background */
+        background-color: #f9fafb;
         color: #171717;
+        transition: background-color 0.2s ease, color 0.2s ease;
       }
-      /* Custom Scrollbar for premium feel - Light Mode */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #d4d4d4; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #a3a3a3; 
-      }
+
+      /* Scrollbar — light */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #a3a3a3; }
+
       .animate-fade-in {
-        animation: fadeIn 0.5s ease-out forwards;
+        animation: fadeIn 0.35s ease-out forwards;
       }
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ─── 3D SHADOWS — LIGHT MODE ─────────────────────────── */
+      /* Sombras con capas (ambient + key light) para sensación tridimensional */
+      .shadow-sm {
+        box-shadow:
+          0 1px 2px rgba(17, 17, 17, 0.04),
+          0 2px 4px rgba(17, 17, 17, 0.06) !important;
+      }
+      .shadow {
+        box-shadow:
+          0 1px 2px rgba(17, 17, 17, 0.05),
+          0 3px 8px rgba(17, 17, 17, 0.08) !important;
+      }
+      .shadow-md {
+        box-shadow:
+          0 2px 4px rgba(17, 17, 17, 0.06),
+          0 6px 14px rgba(17, 17, 17, 0.10) !important;
+      }
+      .shadow-lg {
+        box-shadow:
+          0 3px 6px rgba(17, 17, 17, 0.07),
+          0 10px 24px rgba(17, 17, 17, 0.12) !important;
+      }
+      .shadow-xl {
+        box-shadow:
+          0 6px 12px rgba(17, 17, 17, 0.08),
+          0 18px 40px rgba(17, 17, 17, 0.14) !important;
+      }
+      .shadow-2xl {
+        box-shadow:
+          0 10px 20px rgba(17, 17, 17, 0.10),
+          0 24px 56px rgba(17, 17, 17, 0.18) !important;
+      }
+      .hover\:shadow-md:hover {
+        box-shadow:
+          0 3px 6px rgba(17, 17, 17, 0.08),
+          0 8px 18px rgba(17, 17, 17, 0.12) !important;
+      }
+      .hover\:shadow-lg:hover {
+        box-shadow:
+          0 4px 8px rgba(17, 17, 17, 0.09),
+          0 12px 28px rgba(17, 17, 17, 0.14) !important;
+      }
+
+      /* ─── COMPACTACIÓN — reducir padding excesivo en cards ── */
+      /* Cards con rounded-xl/2xl combinado con padding grande: achicamos ligeramente */
+      .rounded-xl.p-6,
+      .rounded-2xl.p-6 { padding: 1.125rem !important; }  /* 24px → 18px */
+      .rounded-xl.p-8,
+      .rounded-2xl.p-8 { padding: 1.375rem !important; }  /* 32px → 22px */
+      .rounded-xl.md\:p-8,
+      .rounded-2xl.md\:p-8 { padding: 1.375rem !important; }
+      /* Espaciados verticales un poco más compactos */
+      .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem !important; }  /* 32px → 24px */
+      .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.25rem !important; } /* 24px → 20px */
+      .lg\:space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem !important; }
+      /* Gaps en grids un poco más compactos */
+      .gap-8 { gap: 1.5rem !important; }
+      .lg\:gap-8 { gap: 1.5rem !important; }
+      .gap-6 { gap: 1.25rem !important; }
+      .lg\:gap-6 { gap: 1.25rem !important; }
+
+      /* ─── DARK MODE OVERRIDES ─────────────────────────────── */
+
+      /* Base */
+      .dark body {
+        background-color: #0f0f0f;
+        color: #e5e5e5;
+      }
+
+      /* Scrollbar — dark */
+      .dark ::-webkit-scrollbar-thumb { background: #333333; }
+      .dark ::-webkit-scrollbar-thumb:hover { background: #444444; }
+
+      /* ── Backgrounds ── */
+      .dark .bg-white           { background-color: #1a1a1a !important; }
+      .dark .bg-gray-50         { background-color: #141414 !important; }
+      .dark .bg-gray-100        { background-color: #1c1c1c !important; }
+      .dark .bg-gray-200        { background-color: #242424 !important; }
+      .dark .bg-gray-300        { background-color: #2e2e2e !important; }
+      .dark .bg-roden-light     { background-color: #141414 !important; }
+      .dark .bg-zinc-50         { background-color: #141414 !important; }
+      .dark .bg-neutral-50      { background-color: #141414 !important; }
+      .dark .bg-slate-50        { background-color: #141414 !important; }
+
+      /* Semi-transparent variants */
+      .dark .bg-white\/50       { background-color: rgba(26,26,26,0.5) !important; }
+      .dark .bg-white\/80       { background-color: rgba(26,26,26,0.8) !important; }
+      .dark .bg-gray-50\/50     { background-color: rgba(20,20,20,0.5) !important; }
+      .dark .bg-gray-100\/50    { background-color: rgba(28,28,28,0.5) !important; }
+      .dark .bg-gray-100\/80    { background-color: rgba(28,28,28,0.8) !important; }
+      .dark .bg-gray-200\/50    { background-color: rgba(36,36,36,0.5) !important; }
+
+      /* Colored light backgrounds → dark equivalents */
+      .dark .bg-indigo-50       { background-color: rgba(79,70,229,0.12) !important; }
+      .dark .bg-blue-50         { background-color: rgba(59,130,246,0.12) !important; }
+      .dark .bg-green-50        { background-color: rgba(34,197,94,0.10) !important; }
+      .dark .bg-emerald-50      { background-color: rgba(16,185,129,0.10) !important; }
+      .dark .bg-amber-50        { background-color: rgba(245,158,11,0.10) !important; }
+      .dark .bg-yellow-50       { background-color: rgba(234,179,8,0.10) !important; }
+      .dark .bg-red-50          { background-color: rgba(239,68,68,0.10) !important; }
+      .dark .bg-orange-50       { background-color: rgba(249,115,22,0.10) !important; }
+      .dark .bg-purple-50       { background-color: rgba(168,85,247,0.10) !important; }
+      .dark .bg-pink-50         { background-color: rgba(236,72,153,0.10) !important; }
+      .dark .bg-teal-50         { background-color: rgba(20,184,166,0.10) !important; }
+
+      /* Status badge backgrounds */
+      .dark .bg-green-100       { background-color: rgba(34,197,94,0.15) !important; }
+      .dark .bg-red-100         { background-color: rgba(239,68,68,0.15) !important; }
+      .dark .bg-amber-100       { background-color: rgba(245,158,11,0.15) !important; }
+      .dark .bg-yellow-100      { background-color: rgba(234,179,8,0.15) !important; }
+      .dark .bg-blue-100        { background-color: rgba(59,130,246,0.15) !important; }
+      .dark .bg-indigo-100      { background-color: rgba(99,102,241,0.15) !important; }
+      .dark .bg-purple-100      { background-color: rgba(168,85,247,0.15) !important; }
+      .dark .bg-pink-100        { background-color: rgba(236,72,153,0.15) !important; }
+      .dark .bg-orange-100      { background-color: rgba(249,115,22,0.15) !important; }
+      .dark .bg-teal-100        { background-color: rgba(20,184,166,0.15) !important; }
+      .dark .bg-emerald-100     { background-color: rgba(16,185,129,0.15) !important; }
+      .dark .bg-slate-100       { background-color: rgba(100,116,139,0.15) !important; }
+
+      /* ── Text ── */
+      .dark .text-roden-black   { color: #f0f0f0 !important; }
+      .dark .text-roden-gray    { color: #737373 !important; }
+      .dark .text-black         { color: #f0f0f0 !important; }
+      .dark .text-gray-950      { color: #f5f5f5 !important; }
+      .dark .text-gray-900      { color: #f0f0f0 !important; }
+      .dark .text-gray-800      { color: #e5e5e5 !important; }
+      .dark .text-gray-700      { color: #d4d4d4 !important; }
+      .dark .text-gray-600      { color: #a3a3a3 !important; }
+      .dark .text-gray-500      { color: #737373 !important; }
+      .dark .text-gray-400      { color: #555555 !important; }
+      .dark .text-gray-300      { color: #404040 !important; }
+      .dark .text-neutral-900   { color: #f0f0f0 !important; }
+      .dark .text-neutral-700   { color: #d4d4d4 !important; }
+      .dark .text-neutral-500   { color: #737373 !important; }
+
+      /* Status badge text */
+      .dark .text-green-800     { color: #86efac !important; }
+      .dark .text-green-700     { color: #86efac !important; }
+      .dark .text-green-600     { color: #4ade80 !important; }
+      .dark .text-red-800       { color: #fca5a5 !important; }
+      .dark .text-red-700       { color: #fca5a5 !important; }
+      .dark .text-red-600       { color: #f87171 !important; }
+      .dark .text-amber-800     { color: #fcd34d !important; }
+      .dark .text-amber-700     { color: #fcd34d !important; }
+      .dark .text-amber-600     { color: #fbbf24 !important; }
+      .dark .text-yellow-800    { color: #fde68a !important; }
+      .dark .text-yellow-700    { color: #fde68a !important; }
+      .dark .text-blue-800      { color: #93c5fd !important; }
+      .dark .text-blue-700      { color: #93c5fd !important; }
+      .dark .text-blue-600      { color: #60a5fa !important; }
+      .dark .text-indigo-700    { color: #a5b4fc !important; }
+      .dark .text-indigo-600    { color: #818cf8 !important; }
+      .dark .text-indigo-900    { color: #c7d2fe !important; }
+      .dark .text-purple-800    { color: #d8b4fe !important; }
+      .dark .text-purple-700    { color: #d8b4fe !important; }
+      .dark .text-purple-600    { color: #c084fc !important; }
+      .dark .text-orange-800    { color: #fdba74 !important; }
+      .dark .text-orange-700    { color: #fdba74 !important; }
+      .dark .text-teal-800      { color: #5eead4 !important; }
+      .dark .text-teal-700      { color: #5eead4 !important; }
+      .dark .text-emerald-700   { color: #6ee7b7 !important; }
+      .dark .text-slate-700     { color: #cbd5e1 !important; }
+      .dark .text-slate-600     { color: #94a3b8 !important; }
+
+      /* ── Borders ── */
+      .dark .border-roden-border { border-color: #2a2a2a !important; }
+      .dark .border-gray-100     { border-color: #242424 !important; }
+      .dark .border-gray-200     { border-color: #2a2a2a !important; }
+      .dark .border-gray-300     { border-color: #333333 !important; }
+      .dark .border-gray-400     { border-color: #444444 !important; }
+      .dark .border-neutral-200  { border-color: #2a2a2a !important; }
+      .dark .border-slate-200    { border-color: #2a2a2a !important; }
+
+      /* Colored borders */
+      .dark .border-indigo-200   { border-color: rgba(99,102,241,0.3) !important; }
+      .dark .border-green-200    { border-color: rgba(34,197,94,0.3) !important; }
+      .dark .border-red-200      { border-color: rgba(239,68,68,0.3) !important; }
+      .dark .border-amber-200    { border-color: rgba(245,158,11,0.3) !important; }
+      .dark .border-blue-200     { border-color: rgba(59,130,246,0.3) !important; }
+      .dark .border-purple-200   { border-color: rgba(168,85,247,0.3) !important; }
+      .dark .border-orange-200   { border-color: rgba(249,115,22,0.3) !important; }
+      .dark .border-teal-200     { border-color: rgba(20,184,166,0.3) !important; }
+
+      /* Dividers */
+      .dark .divide-gray-100 > * + * { border-color: #242424 !important; }
+      .dark .divide-gray-200 > * + * { border-color: #2a2a2a !important; }
+      .dark .divide-gray-300 > * + * { border-color: #333333 !important; }
+      .dark .divide-y > * + * { border-color: #2a2a2a !important; }
+
+      /* ── Hover states ── */
+      .dark .hover\:bg-white:hover      { background-color: #222222 !important; }
+      .dark .hover\:bg-gray-50:hover    { background-color: #1e1e1e !important; }
+      .dark .hover\:bg-gray-100:hover   { background-color: #252525 !important; }
+      .dark .hover\:bg-gray-200:hover   { background-color: #2a2a2a !important; }
+      .dark .hover\:bg-gray-300:hover   { background-color: #333333 !important; }
+      .dark .hover\:bg-red-50:hover     { background-color: rgba(239,68,68,0.12) !important; }
+      .dark .hover\:bg-indigo-50:hover  { background-color: rgba(79,70,229,0.12) !important; }
+      .dark .hover\:bg-green-50:hover   { background-color: rgba(34,197,94,0.10) !important; }
+      .dark .hover\:bg-amber-50:hover   { background-color: rgba(245,158,11,0.10) !important; }
+
+      .dark .hover\:text-roden-black:hover  { color: #f0f0f0 !important; }
+      .dark .hover\:text-gray-900:hover     { color: #f0f0f0 !important; }
+      .dark .hover\:text-gray-800:hover     { color: #e5e5e5 !important; }
+      .dark .hover\:text-gray-700:hover     { color: #d4d4d4 !important; }
+      .dark .hover\:text-black:hover        { color: #f0f0f0 !important; }
+      .dark .hover\:text-red-600:hover      { color: #f87171 !important; }
+
+      .dark .hover\:border-gray-300:hover   { border-color: #3a3a3a !important; }
+      .dark .hover\:border-gray-400:hover   { border-color: #4a4a4a !important; }
+
+      /* ── Shadows (3D layered) — Dark Mode ── */
+      .dark .shadow-sm  {
+        box-shadow:
+          0 1px 2px rgba(0,0,0,0.45),
+          0 2px 6px rgba(0,0,0,0.55) !important;
+      }
+      .dark .shadow     {
+        box-shadow:
+          0 2px 4px rgba(0,0,0,0.50),
+          0 4px 12px rgba(0,0,0,0.60) !important;
+      }
+      .dark .shadow-md  {
+        box-shadow:
+          0 3px 6px rgba(0,0,0,0.55),
+          0 8px 20px rgba(0,0,0,0.65) !important;
+      }
+      .dark .shadow-lg  {
+        box-shadow:
+          0 4px 8px rgba(0,0,0,0.60),
+          0 12px 30px rgba(0,0,0,0.70) !important;
+      }
+      .dark .shadow-xl  {
+        box-shadow:
+          0 6px 12px rgba(0,0,0,0.65),
+          0 18px 44px rgba(0,0,0,0.75) !important;
+      }
+      .dark .shadow-2xl {
+        box-shadow:
+          0 10px 20px rgba(0,0,0,0.70),
+          0 26px 60px rgba(0,0,0,0.85) !important;
+      }
+      .dark .hover\:shadow-md:hover {
+        box-shadow:
+          0 4px 8px rgba(0,0,0,0.60),
+          0 10px 24px rgba(0,0,0,0.70) !important;
+      }
+      .dark .hover\:shadow-lg:hover {
+        box-shadow:
+          0 5px 10px rgba(0,0,0,0.65),
+          0 14px 34px rgba(0,0,0,0.75) !important;
+      }
+
+      /* ── Dark mode: eliminar contornos blancos/grises de cuadros ── */
+      /* En modo oscuro, los bordes claros producen una línea blanca visible.
+         Los disolvemos y dejamos que la sombra dé la separación volumétrica. */
+      .dark .bg-white.border,
+      .dark .bg-white.border-roden-border,
+      .dark .bg-white.border-gray-100,
+      .dark .bg-white.border-gray-200,
+      .dark .bg-white.border-gray-300,
+      .dark .bg-white.border-neutral-200,
+      .dark .bg-white.border-slate-200 {
+        border-color: transparent !important;
+      }
+      /* Cards con rounded que usan fondo oscuro (tras override) + borde claro */
+      .dark .rounded-xl.border-roden-border,
+      .dark .rounded-2xl.border-roden-border,
+      .dark .rounded-xl.border-gray-200,
+      .dark .rounded-2xl.border-gray-200,
+      .dark .rounded-xl.border-gray-100,
+      .dark .rounded-2xl.border-gray-100,
+      .dark .rounded-lg.border-roden-border,
+      .dark .rounded-lg.border-gray-200,
+      .dark .rounded-lg.border-gray-100 {
+        border-color: transparent !important;
+        /* Sombra suave para mantener la separación visual sin línea */
+        box-shadow:
+          0 1px 3px rgba(0,0,0,0.55),
+          0 4px 12px rgba(0,0,0,0.55) !important;
+      }
+
+      /* ── Cards DE COLOR en dark mode (ej: MetricCard, banners de estado) ──
+         Los bordes de color en tonos -50/-100 se renderizan casi blancos
+         sobre fondo oscuro, generando un contorno molesto. Los disolvemos
+         y aplicamos sombra para mantener profundidad. */
+      .dark .rounded-lg.border-indigo-50,   .dark .rounded-xl.border-indigo-50,   .dark .rounded-2xl.border-indigo-50,
+      .dark .rounded-lg.border-indigo-100,  .dark .rounded-xl.border-indigo-100,  .dark .rounded-2xl.border-indigo-100,
+      .dark .rounded-lg.border-blue-50,     .dark .rounded-xl.border-blue-50,     .dark .rounded-2xl.border-blue-50,
+      .dark .rounded-lg.border-blue-100,    .dark .rounded-xl.border-blue-100,    .dark .rounded-2xl.border-blue-100,
+      .dark .rounded-lg.border-violet-50,   .dark .rounded-xl.border-violet-50,   .dark .rounded-2xl.border-violet-50,
+      .dark .rounded-lg.border-violet-100,  .dark .rounded-xl.border-violet-100,  .dark .rounded-2xl.border-violet-100,
+      .dark .rounded-lg.border-purple-50,   .dark .rounded-xl.border-purple-50,   .dark .rounded-2xl.border-purple-50,
+      .dark .rounded-lg.border-purple-100,  .dark .rounded-xl.border-purple-100,  .dark .rounded-2xl.border-purple-100,
+      .dark .rounded-lg.border-emerald-50,  .dark .rounded-xl.border-emerald-50,  .dark .rounded-2xl.border-emerald-50,
+      .dark .rounded-lg.border-emerald-100, .dark .rounded-xl.border-emerald-100, .dark .rounded-2xl.border-emerald-100,
+      .dark .rounded-lg.border-green-50,    .dark .rounded-xl.border-green-50,    .dark .rounded-2xl.border-green-50,
+      .dark .rounded-lg.border-green-100,   .dark .rounded-xl.border-green-100,   .dark .rounded-2xl.border-green-100,
+      .dark .rounded-lg.border-teal-50,     .dark .rounded-xl.border-teal-50,     .dark .rounded-2xl.border-teal-50,
+      .dark .rounded-lg.border-teal-100,    .dark .rounded-xl.border-teal-100,    .dark .rounded-2xl.border-teal-100,
+      .dark .rounded-lg.border-amber-50,    .dark .rounded-xl.border-amber-50,    .dark .rounded-2xl.border-amber-50,
+      .dark .rounded-lg.border-amber-100,   .dark .rounded-xl.border-amber-100,   .dark .rounded-2xl.border-amber-100,
+      .dark .rounded-lg.border-yellow-50,   .dark .rounded-xl.border-yellow-50,   .dark .rounded-2xl.border-yellow-50,
+      .dark .rounded-lg.border-yellow-100,  .dark .rounded-xl.border-yellow-100,  .dark .rounded-2xl.border-yellow-100,
+      .dark .rounded-lg.border-orange-50,   .dark .rounded-xl.border-orange-50,   .dark .rounded-2xl.border-orange-50,
+      .dark .rounded-lg.border-orange-100,  .dark .rounded-xl.border-orange-100,  .dark .rounded-2xl.border-orange-100,
+      .dark .rounded-lg.border-red-50,      .dark .rounded-xl.border-red-50,      .dark .rounded-2xl.border-red-50,
+      .dark .rounded-lg.border-red-100,     .dark .rounded-xl.border-red-100,     .dark .rounded-2xl.border-red-100,
+      .dark .rounded-lg.border-rose-50,     .dark .rounded-xl.border-rose-50,     .dark .rounded-2xl.border-rose-50,
+      .dark .rounded-lg.border-rose-100,    .dark .rounded-xl.border-rose-100,    .dark .rounded-2xl.border-rose-100,
+      .dark .rounded-lg.border-pink-50,     .dark .rounded-xl.border-pink-50,     .dark .rounded-2xl.border-pink-50,
+      .dark .rounded-lg.border-pink-100,    .dark .rounded-xl.border-pink-100,    .dark .rounded-2xl.border-pink-100,
+      .dark .rounded-lg.border-slate-100,   .dark .rounded-xl.border-slate-100,   .dark .rounded-2xl.border-slate-100,
+      .dark .rounded-lg.border-neutral-100, .dark .rounded-xl.border-neutral-100, .dark .rounded-2xl.border-neutral-100 {
+        border-color: transparent !important;
+        box-shadow:
+          0 2px 4px rgba(0,0,0,0.50),
+          0 6px 16px rgba(0,0,0,0.60) !important;
+      }
+      /* Contorno blanco explícito (ring) en dark mode: neutralizar */
+      .dark .ring-1,
+      .dark .ring-2 { --tw-ring-color: transparent !important; }
+      .dark .ring-white,
+      .dark .ring-gray-100,
+      .dark .ring-gray-200 { --tw-ring-color: transparent !important; }
+
+      /* ── Ring / Focus ── */
+      .dark .ring-gray-200 { --tw-ring-color: #2a2a2a !important; }
+      .dark .ring-gray-300 { --tw-ring-color: #333333 !important; }
+
+      /* ── Form elements ── */
+      .dark input:not([type="checkbox"]):not([type="radio"]),
+      .dark select,
+      .dark textarea {
+        background-color: #1f1f1f !important;
+        border-color: #333333 !important;
+        color: #e5e5e5 !important;
+      }
+      .dark input::placeholder,
+      .dark textarea::placeholder {
+        color: #4a4a4a !important;
+      }
+      .dark input:focus,
+      .dark select:focus,
+      .dark textarea:focus {
+        border-color: #555555 !important;
+        outline-color: #555555 !important;
+      }
+      .dark input[type="number"]::-webkit-inner-spin-button,
+      .dark input[type="number"]::-webkit-outer-spin-button {
+        filter: invert(0.7);
+      }
+
+      /* ── Tables ── */
+      .dark thead th {
+        background-color: #1c1c1c !important;
+        color: #a3a3a3 !important;
+        border-color: #2a2a2a !important;
+      }
+      .dark tbody tr:hover {
+        background-color: #1e1e1e !important;
+      }
+      .dark tbody td {
+        border-color: #2a2a2a !important;
+      }
+
+      /* ── Ring/Outline utilities ── */
+      .dark .outline-gray-200 { outline-color: #2a2a2a !important; }
+
+      /* ── Print always light ── */
+      @media print {
+        .dark body         { background-color: white !important; color: black !important; }
+        .dark .bg-white    { background-color: white !important; }
+        .dark .text-gray-900 { color: black !important; }
+        .dark .bg-gray-50  { background-color: #f9f9f9 !important; }
+        .dark .border-gray-200 { border-color: #e5e5e5 !important; }
+      }
+
+      /* ─── DOCUMENTOS: siempre fondo blanco (light scheme forzado) ──
+         Presupuestos, planillas de costos, informes, órdenes de producción.
+         Marcadores: .print-container, .a4-page, .roden-document.
+         Los documentos mantienen esquema claro incluso con .dark activo,
+         para garantizar legibilidad y fidelidad al formato impreso. */
+      .dark .print-container,
+      .dark .a4-page,
+      .dark .roden-document {
+        background-color: #ffffff !important;
+        color: #171717 !important;
+      }
+
+      /* Backgrounds internos — revertir a escala clara */
+      .dark .print-container .bg-white,
+      .dark .a4-page .bg-white,
+      .dark .roden-document .bg-white          { background-color: #ffffff !important; }
+      .dark .print-container .bg-gray-50,
+      .dark .a4-page .bg-gray-50,
+      .dark .roden-document .bg-gray-50        { background-color: #f9fafb !important; }
+      .dark .print-container .bg-gray-100,
+      .dark .a4-page .bg-gray-100,
+      .dark .roden-document .bg-gray-100       { background-color: #f3f4f6 !important; }
+      .dark .print-container .bg-gray-200,
+      .dark .a4-page .bg-gray-200,
+      .dark .roden-document .bg-gray-200       { background-color: #e5e7eb !important; }
+      .dark .print-container .bg-gray-300,
+      .dark .a4-page .bg-gray-300,
+      .dark .roden-document .bg-gray-300       { background-color: #d1d5db !important; }
+      .dark .print-container .bg-roden-light,
+      .dark .a4-page .bg-roden-light,
+      .dark .roden-document .bg-roden-light    { background-color: #f5f5f5 !important; }
+
+      /* Fondos de color pastel (avisos, acentos) en documentos */
+      .dark .print-container .bg-indigo-50,
+      .dark .a4-page .bg-indigo-50,
+      .dark .roden-document .bg-indigo-50      { background-color: #eef2ff !important; }
+      .dark .print-container .bg-blue-50,
+      .dark .a4-page .bg-blue-50,
+      .dark .roden-document .bg-blue-50        { background-color: #eff6ff !important; }
+      .dark .print-container .bg-green-50,
+      .dark .a4-page .bg-green-50,
+      .dark .roden-document .bg-green-50       { background-color: #f0fdf4 !important; }
+      .dark .print-container .bg-emerald-50,
+      .dark .a4-page .bg-emerald-50,
+      .dark .roden-document .bg-emerald-50     { background-color: #ecfdf5 !important; }
+      .dark .print-container .bg-amber-50,
+      .dark .a4-page .bg-amber-50,
+      .dark .roden-document .bg-amber-50       { background-color: #fffbeb !important; }
+      .dark .print-container .bg-yellow-50,
+      .dark .a4-page .bg-yellow-50,
+      .dark .roden-document .bg-yellow-50      { background-color: #fefce8 !important; }
+      .dark .print-container .bg-red-50,
+      .dark .a4-page .bg-red-50,
+      .dark .roden-document .bg-red-50         { background-color: #fef2f2 !important; }
+      .dark .print-container .bg-purple-50,
+      .dark .a4-page .bg-purple-50,
+      .dark .roden-document .bg-purple-50      { background-color: #faf5ff !important; }
+      .dark .print-container .bg-orange-50,
+      .dark .a4-page .bg-orange-50,
+      .dark .roden-document .bg-orange-50      { background-color: #fff7ed !important; }
+
+      /* Texto — revertir al esquema claro (oscuro sobre blanco) */
+      .dark .print-container .text-roden-black,
+      .dark .a4-page .text-roden-black,
+      .dark .roden-document .text-roden-black  { color: #171717 !important; }
+      .dark .print-container .text-black,
+      .dark .a4-page .text-black,
+      .dark .roden-document .text-black        { color: #000000 !important; }
+      .dark .print-container .text-gray-950,
+      .dark .a4-page .text-gray-950            { color: #030712 !important; }
+      .dark .print-container .text-gray-900,
+      .dark .a4-page .text-gray-900,
+      .dark .roden-document .text-gray-900     { color: #111827 !important; }
+      .dark .print-container .text-gray-800,
+      .dark .a4-page .text-gray-800,
+      .dark .roden-document .text-gray-800     { color: #1f2937 !important; }
+      .dark .print-container .text-gray-700,
+      .dark .a4-page .text-gray-700,
+      .dark .roden-document .text-gray-700     { color: #374151 !important; }
+      .dark .print-container .text-gray-600,
+      .dark .a4-page .text-gray-600,
+      .dark .roden-document .text-gray-600     { color: #4b5563 !important; }
+      .dark .print-container .text-gray-500,
+      .dark .a4-page .text-gray-500,
+      .dark .roden-document .text-gray-500     { color: #6b7280 !important; }
+      .dark .print-container .text-gray-400,
+      .dark .a4-page .text-gray-400,
+      .dark .roden-document .text-gray-400     { color: #9ca3af !important; }
+      .dark .print-container .text-roden-gray,
+      .dark .a4-page .text-roden-gray,
+      .dark .roden-document .text-roden-gray   { color: #737373 !important; }
+
+      /* Bordes — volver a tonos claros dentro del documento */
+      .dark .print-container .border-roden-border,
+      .dark .a4-page .border-roden-border,
+      .dark .roden-document .border-roden-border { border-color: #e5e5e5 !important; }
+      .dark .print-container .border-gray-100,
+      .dark .a4-page .border-gray-100,
+      .dark .roden-document .border-gray-100     { border-color: #f3f4f6 !important; }
+      .dark .print-container .border-gray-200,
+      .dark .a4-page .border-gray-200,
+      .dark .roden-document .border-gray-200     { border-color: #e5e7eb !important; }
+      .dark .print-container .border-gray-300,
+      .dark .a4-page .border-gray-300,
+      .dark .roden-document .border-gray-300     { border-color: #d1d5db !important; }
+      .dark .print-container .border-gray-400,
+      .dark .a4-page .border-gray-400,
+      .dark .roden-document .border-gray-400     { border-color: #9ca3af !important; }
+
+      /* Tablas dentro del documento */
+      .dark .print-container thead th,
+      .dark .a4-page thead th,
+      .dark .roden-document thead th {
+        background-color: #f9fafb !important;
+        color: #374151 !important;
+        border-color: #e5e7eb !important;
+      }
+      .dark .print-container tbody td,
+      .dark .a4-page tbody td,
+      .dark .roden-document tbody td {
+        border-color: #e5e7eb !important;
+        color: #171717 !important;
+      }
+      .dark .print-container tbody tr:hover,
+      .dark .a4-page tbody tr:hover,
+      .dark .roden-document tbody tr:hover {
+        background-color: #f9fafb !important;
+      }
+
+      /* Inputs dentro del documento (ej: campos editables de la planilla) */
+      .dark .print-container input:not([type="checkbox"]):not([type="radio"]),
+      .dark .print-container select,
+      .dark .print-container textarea,
+      .dark .a4-page input:not([type="checkbox"]):not([type="radio"]),
+      .dark .a4-page select,
+      .dark .a4-page textarea,
+      .dark .roden-document input:not([type="checkbox"]):not([type="radio"]),
+      .dark .roden-document select,
+      .dark .roden-document textarea {
+        background-color: #ffffff !important;
+        border-color: #d1d5db !important;
+        color: #171717 !important;
+      }
+      .dark .print-container input::placeholder,
+      .dark .print-container textarea::placeholder,
+      .dark .a4-page input::placeholder,
+      .dark .a4-page textarea::placeholder,
+      .dark .roden-document input::placeholder,
+      .dark .roden-document textarea::placeholder {
+        color: #9ca3af !important;
+      }
+
+      /* Los cuadros internos NO deben perder su borde (al contrario del resto
+         de la app en dark). Aseguramos que los bordes se vean. */
+      .dark .print-container .rounded-xl,
+      .dark .print-container .rounded-2xl,
+      .dark .print-container .rounded-lg,
+      .dark .a4-page .rounded-xl,
+      .dark .a4-page .rounded-2xl,
+      .dark .a4-page .rounded-lg,
+      .dark .roden-document .rounded-xl,
+      .dark .roden-document .rounded-2xl,
+      .dark .roden-document .rounded-lg {
+        box-shadow: none !important;
+      }
+
+      /* ─── PRINT — eliminar fondo gris en TODAS las páginas ────── */
+      @media print {
+        html, body, #root,
+        .animate-fade-in,
+        .min-h-screen,
+        .bg-gray-50,
+        .bg-gray-100\/50,
+        .bg-gray-100,
+        .bg-gray-200 {
+          background: white !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        /* Sidebar y elementos de navegación nunca se imprimen */
+        nav, aside, .no-print { display: none !important; }
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
+  <script>
+    // Fuerza fondo blanco en TODOS los elementos raíz antes de imprimir.
+    // Esto es más confiable que @media print CSS porque actúa directo sobre el DOM.
+    window.addEventListener('beforeprint', function() {
+      document.documentElement.style.setProperty('background', 'white', 'important');
+      document.body.style.setProperty('background', 'white', 'important');
+      var root = document.getElementById('root');
+      if (root) root.style.setProperty('background', 'white', 'important');
+      // Cualquier wrapper con fondo gris
+      document.querySelectorAll('.animate-fade-in, .min-h-screen').forEach(function(el) {
+        el.style.setProperty('background', 'white', 'important');
+      });
+    });
+    window.addEventListener('afterprint', function() {
+      document.documentElement.style.removeProperty('background');
+      document.body.style.removeProperty('background');
+      var root = document.getElementById('root');
+      if (root) root.style.removeProperty('background');
+      document.querySelectorAll('.animate-fade-in, .min-h-screen').forEach(function(el) {
+        el.style.removeProperty('background');
+      });
+    });
+  </script>
 </body>
 </html>

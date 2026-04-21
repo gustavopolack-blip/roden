@@ -63,27 +63,27 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
     if (p.status === 'ARCHIVED') return false; 
 
     // 2. Role Restriction: Manager only sees "Taller"
-    if (isManager && p.providerName.toLowerCase() !== 'taller') {
+    if (isManager && (p.providerName?.toLowerCase() || '') !== 'taller') {
         return false;
     }
 
     // 3. User Filters (Search & Project)
-    const matchesSearch = p.providerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.concept.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (p.providerName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                          (p.concept?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesProject = filterProjectId ? p.projectId === filterProjectId : true;
     
     return matchesSearch && matchesProject;
   });
 
   const filteredSuppliers = suppliers.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.contactName.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (s.category?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (s.contactName?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   // Calculate Totals for Footer
-  const totalFilteredBalance = filteredPayments.reduce((sum, p) => sum + p.balance, 0);
-  const totalFilteredAmount = filteredPayments.reduce((sum, p) => sum + p.totalAmount, 0);
+  const totalFilteredBalance = filteredPayments.reduce((sum, p) => sum + (p.balance || 0), 0);
+  const totalFilteredAmount = filteredPayments.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
 
   // --- Handlers ---
 
@@ -351,7 +351,7 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
                                   </p>
                               </td>
                               <td className="py-4 px-6">
-                                  <p className="text-sm font-medium text-emerald-600">${payment.downPayment.toLocaleString()}</p>
+                                  <p className="text-sm font-medium text-emerald-600">${(payment.downPayment || 0).toLocaleString()}</p>
                                   {payment.downPaymentDate && (
                                       <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1">
                                           <Calendar size={10} /> {payment.downPaymentDate}
@@ -359,15 +359,15 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
                                   )}
                               </td>
                               <td className="py-4 px-6">
-                                  <p className={`text-sm font-medium ${payment.balance > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                                      ${payment.balance.toLocaleString()}
+                                  <p className={`text-sm font-medium ${(payment.balance || 0) > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                                      ${(payment.balance || 0).toLocaleString()}
                                   </p>
-                                  {payment.balanceDate && payment.balance > 0 && (
+                                  {payment.balanceDate && (payment.balance || 0) > 0 && (
                                       <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1">
                                           <Calendar size={10} /> Vence: {payment.balanceDate}
                                       </div>
                                   )}
-                                  {payment.balance === 0 && (
+                                  {(payment.balance || 0) === 0 && (
                                       <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1 mt-1">
                                           <Check size={10} /> PAGADO
                                       </span>
@@ -375,7 +375,7 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
                               </td>
                               <td className="py-4 px-6 text-right">
                                   <span className="text-sm font-bold text-roden-black bg-gray-100 px-3 py-1 rounded-full">
-                                      ${payment.totalAmount.toLocaleString()}
+                                      ${(payment.totalAmount || 0).toLocaleString()}
                                   </span>
                               </td>
                               {isAdmin && (
@@ -415,10 +415,10 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
                                  Totales ({filterProjectId ? 'Filtrado' : 'General'}):
                              </td>
                              <td className="py-4 px-6">
-                                 <p className="text-sm font-bold text-amber-700">${totalFilteredBalance.toLocaleString()}</p>
+                                 <p className="text-sm font-bold text-amber-700">${(totalFilteredBalance || 0).toLocaleString()}</p>
                              </td>
                              <td className="py-4 px-6 text-right">
-                                 <p className="text-sm font-bold text-roden-black">${totalFilteredAmount.toLocaleString()}</p>
+                                 <p className="text-sm font-bold text-roden-black">${(totalFilteredAmount || 0).toLocaleString()}</p>
                              </td>
                              {isAdmin && <td></td>}
                         </tr>
@@ -554,7 +554,7 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
 
                           <div className="p-4 bg-gray-50 rounded-lg flex justify-between items-center border border-gray-200 mt-2">
                               <span className="text-sm font-bold text-gray-600">Monto Final Total</span>
-                              <span className="text-xl font-bold text-roden-black">${calculatedTotal.toLocaleString()}</span>
+                              <span className="text-xl font-bold text-roden-black">${(calculatedTotal || 0).toLocaleString()}</span>
                           </div>
 
                           <div className="pt-4 flex justify-end gap-3 bg-white border-t border-gray-100 sticky bottom-0 rounded-b-2xl p-4 -mx-6 -mb-6 mt-2">

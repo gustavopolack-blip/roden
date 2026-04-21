@@ -121,7 +121,8 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                   phone: formData.phone,
                   role: formData.role,
                   status: formData.status,
-                  joinedDate: formData.joinedDate
+                  joined_date: formData.joinedDate,  // ← FIX: usar snake_case en DB
+                  avatar_initials: formData.name.substring(0, 2).toUpperCase()  // ← FIX: calcular initials
               }).eq('id', editingUserId);
 
               if (error) throw error;
@@ -196,6 +197,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
   };
 
   const getWhatsappLink = (phone: string) => {
+      if (!phone) return '#';
       const cleanPhone = phone.replace(/[^0-9]/g, '');
       return `https://wa.me/${cleanPhone}`;
   };
@@ -310,7 +312,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                           </td>
                           <td className="py-4 px-6 text-sm text-gray-500">
                               <div className="flex items-center gap-2">
-                                  <Phone size={14} /> {user.phone}
+                                  <Phone size={14} /> {user.phone || '-'}
                               </div>
                           </td>
                           <td className="py-4 px-6">
@@ -325,7 +327,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                           </td>
                           <td className="py-4 px-6 text-sm text-gray-500">
                               <div className="flex items-center gap-2">
-                                  <Calendar size={14} className="text-gray-400" /> {user.joinedDate}
+                                  <Calendar size={14} className="text-gray-400" /> {user.joinedDate || '-'}
                               </div>
                           </td>
                           <td className="py-4 px-6 text-right">
