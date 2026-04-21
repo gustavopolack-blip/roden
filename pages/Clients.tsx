@@ -116,16 +116,17 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
       </header>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[640px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/50">
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Cliente / Empresa</th>
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Contacto</th>
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Origen</th>
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Cliente / Empresa</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Tipo</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Contacto</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Origen</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Estado</th>
               <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Valor Hist\u00f3rico (USD)</th>
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-center w-10">Acciones</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-center w-10 whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -186,12 +187,13 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
+          <div className="flex min-h-full items-start sm:items-center justify-center p-0 sm:p-4">
+            <div className="bg-white rounded-none sm:rounded-2xl w-full sm:max-w-lg shadow-2xl border-0 sm:border border-gray-200 min-h-screen sm:min-h-0">
               <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
                 <h3 className="text-xl font-bold text-roden-black">{editingClient ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
                 <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black"><X size={20} /></button>
@@ -201,7 +203,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo / Raz\u00f3n Social</label>
                   <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tel\u00e9fono</label>
                     <input type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
@@ -211,7 +213,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
                     <input required type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.joined_date || ''} onChange={e => setFormData({...formData, joined_date: e.target.value})} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cliente</label>
                     <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as ClientType})}>
@@ -229,7 +231,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Direcci\u00f3n / Obra</label>
                     <input type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />

@@ -490,9 +490,9 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
        {/* Create/Edit Project Modal */}
        {isModalOpen && user.role === 'administrador' && (
           <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="flex min-h-full items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
-                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+              <div className="flex min-h-full items-start sm:items-center justify-center p-0 sm:p-4">
+                  <div className="bg-white rounded-none sm:rounded-2xl w-full sm:max-w-lg shadow-2xl border-0 sm:border border-gray-200 min-h-screen sm:min-h-0">
+                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-none sm:rounded-t-2xl">
                           <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Proyecto' : 'Nuevo Proyecto'}</h3>
                           <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
                               <X size={20} />
@@ -544,7 +544,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
                              </div>
                           )}
 
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio (Admin)</label>
                                 <input type="date" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none"
@@ -561,7 +561,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
                                 />
                              </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Entrega</label>
                                 <input 
@@ -634,7 +634,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
                   <p className="text-gray-700">{(viewingOP as any).itemDescription}</p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Inicio</p>
                   <p className="font-medium">{(viewingOP as any).startDate || '—'}</p>

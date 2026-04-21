@@ -59,6 +59,7 @@ import {
 } from './utils/dataMapper';
 import { Loader2, Menu, ShieldAlert, RefreshCw, X, ShieldCheck } from 'lucide-react';
 import NotificationBell from './components/NotificationBell';
+import BottomNav from './components/BottomNav';
 import { emitNotification } from './utils/notificationHelpers';
 import { Session } from '@supabase/supabase-js';
 
@@ -1258,10 +1259,16 @@ const App: React.FC = () => {
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-6">
+            <main className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-6 pb-24 lg:pb-6">
               {renderProtectedRoutes()}
             </main>
           </div>
+
+          {/* Bottom Navigation — mobile only */}
+          <BottomNav
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            isDark={isDark}
+          />
         </>
       )}
     </div>

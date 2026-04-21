@@ -272,10 +272,11 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                   </select>
               </div>
           </div>
-          <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/50">
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Proyecto / Título</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Proyecto / Título</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Anticipo</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Saldo</th>
                       <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Total</th>
@@ -313,21 +314,22 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                   ))}
               </tbody>
           </table>
+          </div>
       </div>
 
        {/* Create/Edit Budget Modal */}
        {isModalOpen && createPortal(
           <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="flex min-h-full items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200">
-                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
+              <div className="flex min-h-full items-start sm:items-center justify-center p-0 sm:p-4">
+                  <div className="bg-white rounded-none sm:rounded-2xl w-full sm:max-w-lg shadow-2xl border-0 sm:border border-gray-200 min-h-screen sm:min-h-0">
+                      <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-none sm:rounded-t-2xl">
                           <h3 className="text-xl font-bold text-roden-black">{editingId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h3>
                           <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
                               <X size={20} />
                           </button>
                       </div>
                       <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
                                   <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
@@ -349,7 +351,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                                   value={estimateForm.description} onChange={e => setEstimateForm({...estimateForm, description: e.target.value})} placeholder="Detalles adicionales..." rows={2} />
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">Anticipo Recibido <CheckCircle size={12} className="text-emerald-500"/></label>
                                 <input type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
@@ -362,7 +364,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                              </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">Saldo Pendiente <Clock size={12} className="text-amber-500"/></label>
                                 <input type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none" 
@@ -375,7 +377,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                              </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">Monto Total</label>
                                   <input required type="number" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none font-bold" 

@@ -268,15 +268,16 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/50">
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Usuario</th>
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Contacto</th>
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Rol (Base de Datos)</th>
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha Alta</th>
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Estado</th>
-                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Acción</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Usuario</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Contacto</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Rol (Base de Datos)</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Fecha Alta</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right whitespace-nowrap">Estado</th>
+                      <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right whitespace-nowrap">Acción</th>
                   </tr>
               </thead>
               <tbody>
@@ -370,13 +371,14 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                   ))}
               </tbody>
           </table>
+          </div>
       </div>
 
       {/* User Modal (Create/Edit) - Using Portal */}
       {isModalOpen && createPortal(
-          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 relative flex flex-col max-h-[90vh]">
-                  <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10 rounded-t-2xl shrink-0">
+          <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in flex items-start sm:items-center justify-center p-0 sm:p-4">
+              <div className="bg-white rounded-none sm:rounded-2xl w-full sm:max-w-lg shadow-2xl border-0 sm:border border-gray-200 relative flex flex-col min-h-screen sm:min-h-0 sm:max-h-[90vh]">
+                  <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10 rounded-t-none sm:rounded-t-2xl shrink-0">
                       <h3 className="text-xl font-bold text-roden-black">{isEditMode ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
                       <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">
                           <X size={20} />
@@ -426,7 +428,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                                   )}
                               </div>
 
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                                 <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
@@ -442,7 +444,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                                         value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                               </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                                  <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
