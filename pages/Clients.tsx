@@ -98,25 +98,28 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-      <header className="flex justify-between items-center border-b border-gray-200 pb-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Clientes</h2>
-          <p className="text-roden-gray text-sm mt-1">Directorio y gesti\u00f3n de relaciones.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Clientes</h2>
+          <p className="text-roden-gray text-sm mt-1">Directorio y gestión de relaciones.</p>
         </div>
-        <div className="flex gap-3">
-          <RodenAIButton mode="clientes_cartera" data={{ clients: filteredClients }} userRole={user.role} />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex gap-2 items-center">
+            <RodenAIButton mode="clientes_cartera" data={{ clients: filteredClients }} userRole={user.role} />
+            <button onClick={handleOpenAddModal} className="bg-roden-black text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200 shrink-0">
+              <Plus size={18} /> <span className="hidden xs:inline sm:inline">Agregar</span> Cliente
+            </button>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input type="text" placeholder="Buscar clientes..." className="bg-white border border-gray-200 text-roden-black pl-10 pr-4 py-2.5 rounded-lg text-sm w-64 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input type="text" placeholder="Buscar clientes..." className="bg-white border border-gray-200 text-roden-black pl-10 pr-4 py-2.5 rounded-lg text-sm w-full sm:w-64 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-          <button onClick={handleOpenAddModal} className="bg-roden-black text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
-            <Plus size={18} /> Agregar Cliente
-          </button>
         </div>
       </header>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Tabla — solo visible en sm+ */}
+        <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[640px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/50">
@@ -187,6 +190,61 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
             )}
           </tbody>
         </table>
+        </div>
+
+        {/* Cards — solo visible en mobile */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {filteredClients.map((client) => {
+            const OriginIcon = ORIGIN_ICONS[client.origin] || Globe;
+            return (
+              <div
+                key={client.id}
+                onClick={() => handleOpenEditModal(client)}
+                className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors"
+              >
+                {/* Avatar */}
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${client.type === 'COMPANY' ? 'bg-blue-600' : 'bg-indigo-600'}`}>
+                  {client.type === 'COMPANY' ? <Building2 size={15} /> : <UserIcon size={15} />}
+                </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-bold text-roden-black truncate">{client.name}</p>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border tracking-wide shrink-0 ${statusClass(client.status)}`}>
+                      {statusLabel(client.status)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    {client.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone size={10} />
+                        {client.phone}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <OriginIcon size={10} />
+                      {ORIGIN_LABELS[client.origin]}
+                    </span>
+                  </div>
+                </div>
+                {/* Value */}
+                <div className="text-right flex-shrink-0">
+                  {client.totalValue ? (
+                    <p className="text-sm font-bold text-roden-black">
+                      USD {client.totalValue.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
+                  ) : (
+                    <span className="text-gray-300 text-xs">—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {filteredClients.length === 0 && (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              No se encontraron clientes.
+            </div>
+          )}
         </div>
       </div>
 

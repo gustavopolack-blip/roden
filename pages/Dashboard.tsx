@@ -56,24 +56,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
     <div className="space-y-6 lg:space-y-8 animate-fade-in">
       <header className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-gray-200 pb-6 gap-4">
         <div>
-           <h2 className="text-2xl md:text-3xl font-bold text-roden-black tracking-tight mb-2">Panel de Control</h2>
+           <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-roden-black tracking-tight mb-2">Panel de Control</h2>
            <p className="text-roden-gray text-sm">Visión general del flujo de trabajo y finanzas.</p>
         </div>
-        <div className="flex items-center gap-3 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
           <button
             onClick={() => setMostrarNotas(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+            className="flex items-center gap-2 px-3 py-2 md:px-4 bg-amber-400 hover:bg-amber-500 text-white text-sm font-bold rounded-lg transition-colors shadow-sm shrink-0"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             Notas
           </button>
-          <RodenAIButton 
-            mode="dashboard_briefing" 
-            data={data} 
+          <RodenAIButton
+            mode="dashboard_briefing"
+            data={data}
             userRole={userRole}
           />
-          <div className="text-xs md:text-sm font-medium text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 shadow-sm capitalize">
+          <div className="text-[10px] sm:text-xs md:text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-2 md:px-4 rounded-lg border border-indigo-100 shadow-sm capitalize shrink-0">
+            <span className="hidden sm:inline">
               {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+            <span className="sm:hidden">
+              {new Date().toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </span>
           </div>
         </div>
       </header>

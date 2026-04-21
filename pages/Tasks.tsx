@@ -68,26 +68,26 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-       <header className="flex flex-col gap-6 border-b border-gray-200 pb-6">
-        <div className="flex justify-between items-center">
+       <header className="flex flex-col gap-4 border-b border-gray-200 pb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <div>
-            <h2 className="text-3xl font-bold text-roden-black tracking-tight">Mis Tareas</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Mis Tareas</h2>
             <p className="text-roden-gray text-sm mt-1">Organización diaria y prioridades.</p>
             </div>
-            <button 
+            <button
                 onClick={() => setIsModalOpen(true)}
-                className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
+                className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200 self-start sm:self-auto">
                 <Plus size={16} /> Nueva Tarea
             </button>
         </div>
 
         {/* Filter Bar */}
-        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-            <div className="flex items-center gap-2 text-sm text-gray-500 font-medium mr-2">
+        <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-200">
+            <div className="flex items-center gap-2 text-sm text-gray-500 font-medium shrink-0">
                 <Filter size={16} /> Filtros:
             </div>
-            <div className="flex-1 max-w-xs">
-                <select 
+            <div className="flex-1 min-w-[140px]">
+                <select
                     className="w-full bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     value={filterProjectId}
                     onChange={(e) => setFilterProjectId(e.target.value)}
@@ -98,8 +98,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
                     ))}
                 </select>
             </div>
-            <div className="flex-1 max-w-xs">
-                <select 
+            <div className="flex-1 min-w-[140px]">
+                <select
                     className="w-full bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                     value={filterAssignee}
                     onChange={(e) => setFilterAssignee(e.target.value)}
@@ -111,11 +111,11 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
                 </select>
             </div>
             {(filterProjectId || filterAssignee) && (
-                 <button 
+                 <button
                     onClick={() => { setFilterProjectId(''); setFilterAssignee(''); }}
                     className="text-xs text-red-500 hover:text-red-700 font-medium underline ml-auto"
                 >
-                    Limpiar Filtros
+                    Limpiar
                 </button>
             )}
         </div>
@@ -123,74 +123,65 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
 
       <div className="grid grid-cols-1 gap-4">
           {filteredTasks.map(task => (
-              <div key={task.id} className="bg-white border border-roden-border p-4 rounded-xl shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-all">
-                  <div className="flex items-center gap-4">
-                      <button
-                          onClick={() => onUpdateTask && onUpdateTask({ ...task, completed: !task.completed })}
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                              task.completed 
-                              ? 'bg-emerald-500 border-emerald-500 text-white' 
-                              : 'border-gray-300 text-transparent hover:border-indigo-500'
-                          }`}
-                          title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
-                      >
-                          <CheckCircle2 size={14} />
-                      </button>
-                      
-                      <div>
-                          <h4 className={`text-sm font-bold ${task.completed ? 'text-gray-400 line-through' : 'text-roden-black'}`}>
+              <div key={task.id} className="bg-white border border-roden-border p-4 rounded-xl shadow-sm flex items-start gap-3 group hover:border-indigo-200 transition-all">
+                  {/* Checkbox */}
+                  <button
+                      onClick={() => onUpdateTask && onUpdateTask({ ...task, completed: !task.completed })}
+                      className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
+                          task.completed
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : 'border-gray-300 text-transparent hover:border-indigo-500'
+                      }`}
+                      title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
+                  >
+                      <CheckCircle2 size={14} />
+                  </button>
+
+                  {/* Main content */}
+                  <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                          <h4 className={`text-sm font-bold leading-snug ${task.completed ? 'text-gray-400 line-through' : 'text-roden-black'}`}>
                               {task.title}
                           </h4>
-                          <div className="flex items-center gap-3 mt-1">
-                              <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded">
-                                  {getProjectTitle(task.projectId)}
-                              </span>
-                              <span className="text-xs text-gray-400 flex items-center gap-1">
-                                  <Clock size={12} /> {task.dueDate}
-                              </span>
+                          {/* Actions — always visible */}
+                          <div className="flex items-center gap-1 shrink-0 ml-1">
+                            {task.completed && onUpdateTask && (
+                                <button
+                                    onClick={() => onUpdateTask({ ...task, status: 'ARCHIVED' as any })}
+                                    className="text-gray-300 hover:text-amber-500 hover:bg-amber-50 p-1.5 rounded-lg transition-colors"
+                                    title="Archivar tarea completada"
+                                >
+                                    <Archive size={16} />
+                                </button>
+                            )}
+                            {isAdmin && (
+                                <button
+                                    onClick={() => onDeleteTask(task.id)}
+                                    className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                                    title="Eliminar Tarea"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
                           </div>
                       </div>
-                  </div>
 
-                  <div className="flex items-center gap-6">
-                      <div className="flex flex-col items-end gap-1">
-                           <div className="text-right flex items-center gap-2">
-                               <div className="text-right hidden md:block">
-                                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Asignado a</p>
-                                   <p className="text-xs font-bold text-gray-700">{task.assignee}</p>
-                               </div>
-                               <div className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${getPriorityStyle(task.priority)}`}>
-                                   {translateTaskPriority(task.priority)}
-                               </div>
-                           </div>
-                           {task.createdBy && (
-                               <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                                   <UserPlus size={10} /> Creado por: <span className="font-medium text-gray-500">{task.createdBy}</span>
-                               </p>
-                           )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {/* Archivar: disponible para todos cuando la tarea está completada */}
-                        {task.completed && onUpdateTask && (
-                            <button
-                                onClick={() => onUpdateTask({ ...task, status: 'ARCHIVED' as any })}
-                                className="text-gray-300 hover:text-amber-500 hover:bg-amber-50 p-2 rounded-lg transition-colors"
-                                title="Archivar tarea completada"
-                            >
-                                <Archive size={18} />
-                            </button>
-                        )}
-                        {/* Eliminar: solo admin */}
-                        {isAdmin && (
-                            <button 
-                                onClick={() => onDeleteTask(task.id)}
-                                className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                                title="Eliminar Tarea"
-                            >
-                                <Trash2 size={18} />
-                            </button>
-                        )}
+                      {/* Meta row */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded truncate max-w-[140px] sm:max-w-none">
+                              {getProjectTitle(task.projectId)}
+                          </span>
+                          <span className="text-xs text-gray-400 flex items-center gap-1 shrink-0">
+                              <Clock size={11} /> {task.dueDate}
+                          </span>
+                          <div className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase shrink-0 ${getPriorityStyle(task.priority)}`}>
+                              {translateTaskPriority(task.priority)}
+                          </div>
+                          {task.assignee && (
+                              <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+                                  → {task.assignee}
+                              </span>
+                          )}
                       </div>
                   </div>
               </div>
@@ -205,8 +196,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
       {/* New Task Modal - Using Portal */}
       {isModalOpen && createPortal(
           <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/50 backdrop-blur-sm animate-fade-in">
-              <div className="flex min-h-full items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-200 relative">
+              <div className="flex min-h-full items-start sm:items-center justify-center p-0 sm:p-4">
+                  <div className="bg-white rounded-none sm:rounded-2xl w-full sm:max-w-lg shadow-2xl border-0 sm:border border-gray-200 relative min-h-screen sm:min-h-0">
                       <div className="flex justify-between items-center p-6 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
                           <h3 className="text-xl font-bold text-roden-black">Nueva Tarea</h3>
                           <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black">

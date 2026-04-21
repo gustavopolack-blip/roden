@@ -310,32 +310,29 @@ const Production: React.FC<ProductionProps> = ({
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-       <header className="flex justify-between items-center border-b border-gray-200 pb-6">
-        <div className="flex items-center gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-roden-black tracking-tight">Producción</h2>
-            <p className="text-roden-gray text-sm mt-1">Seguimiento en tiempo real del proceso productivo.</p>
-          </div>
-
-          <div className="ml-4">
-            <RodenAIButton 
-              mode="taller_checklist" 
-              data={{ projects: productionProjects, orders: productionOrders }} 
-              userRole={user.role}
-            />
-          </div>
+       <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center border-b border-gray-200 pb-6">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Producción</h2>
+          <p className="text-roden-gray text-sm mt-1">Seguimiento en tiempo real del proceso productivo.</p>
         </div>
-        {canManageProduction ? (
-            <button 
-                onClick={() => setIsModalOpen(true)}
-                className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
-                <Plus size={16} /> Nueva Obra
-            </button>
-        ) : (
-            <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-gray-500">
-                <Lock size={12} /> Gestión Restringida (Operario)
-            </div>
-        )}
+        <div className="flex flex-wrap gap-2 items-center self-start sm:self-auto">
+          <RodenAIButton
+            mode="taller_checklist"
+            data={{ projects: productionProjects, orders: productionOrders }}
+            userRole={user.role}
+          />
+          {canManageProduction ? (
+              <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="bg-roden-black text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
+                  <Plus size={16} /> Nueva Obra
+              </button>
+          ) : (
+              <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-gray-500">
+                  <Lock size={12} /> Gestión Restringida (Operario)
+              </div>
+          )}
+        </div>
       </header>
 
       {(

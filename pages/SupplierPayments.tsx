@@ -235,64 +235,66 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-      <header className="flex justify-between items-center border-b border-gray-200 pb-6 flex-wrap gap-4">
+      <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Proveedores</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Proveedores</h2>
           <p className="text-roden-gray text-sm mt-1">Gestión de pagos y directorio de contactos.</p>
         </div>
-        
-        <div className="flex gap-3 flex-wrap">
-             <RodenAIButton 
-                mode="proveedores_costos" 
-                data={{ payments: filteredPayments, suppliers: filteredSuppliers }} 
-                userRole={user.role}
-             />
-             {/* Filter Section */}
-             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-1">
-                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input 
-                        type="text" 
-                        placeholder="Buscar..." 
-                        className="bg-transparent text-roden-black pl-9 pr-4 py-1.5 rounded-lg text-sm w-32 focus:outline-none placeholder:text-gray-400"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                {activeTab === 'PAYMENTS' && (
-                    <>
-                        <div className="h-4 w-px bg-gray-300 mx-1"></div>
-                        <select 
-                            className="bg-transparent text-sm text-roden-black focus:outline-none py-1.5 pr-2 max-w-[150px]"
-                            value={filterProjectId}
-                            onChange={(e) => setFilterProjectId(e.target.value)}
-                        >
-                            <option value="">Todas las Obras</option>
-                            {projects.map(p => (
-                                <option key={p.id} value={p.id}>{p.title}</option>
-                            ))}
-                        </select>
-                    </>
-                )}
-                {(searchTerm || filterProjectId) && (
-                    <button onClick={() => { setSearchTerm(''); setFilterProjectId(''); }} className="text-gray-400 hover:text-red-500 p-1">
-                        <X size={14} />
-                    </button>
-                )}
-             </div>
-            
-            {/* Action Button based on Tab */}
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          {/* Search + filter row */}
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-1 flex-1 sm:flex-none">
+              <div className="relative flex-1 sm:flex-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                    type="text"
+                    placeholder="Buscar..."
+                    className="bg-transparent text-roden-black pl-9 pr-4 py-1.5 rounded-lg text-sm w-full sm:w-32 focus:outline-none placeholder:text-gray-400"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              {activeTab === 'PAYMENTS' && (
+                  <>
+                      <div className="h-4 w-px bg-gray-300 mx-1 shrink-0"></div>
+                      <select
+                          className="bg-transparent text-sm text-roden-black focus:outline-none py-1.5 pr-2 max-w-[130px] sm:max-w-[150px] flex-1 sm:flex-none"
+                          value={filterProjectId}
+                          onChange={(e) => setFilterProjectId(e.target.value)}
+                      >
+                          <option value="">Todas las Obras</option>
+                          {projects.map(p => (
+                              <option key={p.id} value={p.id}>{p.title}</option>
+                          ))}
+                      </select>
+                  </>
+              )}
+              {(searchTerm || filterProjectId) && (
+                  <button onClick={() => { setSearchTerm(''); setFilterProjectId(''); }} className="text-gray-400 hover:text-red-500 p-1 shrink-0">
+                      <X size={14} />
+                  </button>
+              )}
+          </div>
+
+          {/* AI + Action row */}
+          <div className="flex items-center gap-2">
+            <RodenAIButton
+               mode="proveedores_costos"
+               data={{ payments: filteredPayments, suppliers: filteredSuppliers }}
+               userRole={user.role}
+            />
             {isAdmin ? (
-                <button 
+                <button
                     onClick={activeTab === 'PAYMENTS' ? handleOpenCreatePayment : handleOpenCreateSupplier}
-                    className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-lg shadow-gray-200 flex items-center gap-2">
+                    className="bg-roden-black text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-lg shadow-gray-200 flex items-center gap-2 shrink-0">
                     <Plus size={16} /> {activeTab === 'PAYMENTS' ? 'Nuevo Pago' : 'Nuevo Proveedor'}
                 </button>
             ) : (
-                 <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-gray-500">
-                    <Lock size={12} /> Acceso de Lectura
-                 </div>
+                <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg text-xs font-bold text-gray-500 shrink-0">
+                   <Lock size={12} /> Solo Lectura
+                </div>
             )}
+          </div>
         </div>
       </header>
 
@@ -316,7 +318,67 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
           )}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm overflow-x-auto">
+      {/* ── Mobile cards — Pagos ───────────────────────────────────── */}
+      {activeTab === 'PAYMENTS' && (
+        <div className="sm:hidden space-y-3">
+          {filteredPayments.map((payment) => (
+            <div
+              key={payment.id}
+              onClick={() => isAdmin && handleOpenEditPayment(payment)}
+              className={`bg-white border border-gray-200 rounded-xl p-4 shadow-sm ${isAdmin ? 'cursor-pointer active:bg-gray-50' : ''} transition-colors`}
+            >
+              {/* Row 1: provider + total */}
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-gray-500 shrink-0">
+                    <Truck size={15} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-roden-black truncate">{payment.providerName}</p>
+                    <p className="text-xs text-gray-400 truncate">{payment.concept}</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-roden-black">${(payment.totalAmount || 0).toLocaleString()}</p>
+                  {(payment.balance || 0) === 0
+                    ? <span className="text-[9px] font-bold text-emerald-500">PAGADO</span>
+                    : <span className="text-[9px] font-bold text-amber-500">SALDO ${(payment.balance || 0).toLocaleString()}</span>
+                  }
+                </div>
+              </div>
+              {/* Row 2: project + actions */}
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded truncate flex-1 flex items-center gap-1">
+                  <Building2 size={11} /> {getProjectName(payment.projectId)}
+                </span>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleArchivePayment(payment); }}
+                    className="text-gray-300 hover:text-red-500 p-1.5 hover:bg-red-50 rounded transition-colors shrink-0"
+                    title="Archivar"
+                  >
+                    <Archive size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {filteredPayments.length === 0 && (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              {isManager ? 'No hay pagos asignados al "Taller".' : 'No se encontraron registros.'}
+            </div>
+          )}
+          {/* Summary */}
+          {filteredPayments.length > 0 && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex justify-between text-sm font-bold">
+              <span className="text-amber-600">Saldo: ${(totalFilteredBalance || 0).toLocaleString()}</span>
+              <span className="text-roden-black">Total: ${(totalFilteredAmount || 0).toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hidden sm:block overflow-x-auto">
           {activeTab === 'PAYMENTS' ? (
               // --- PAYMENTS TABLE ---
               <table className="w-full text-left border-collapse">

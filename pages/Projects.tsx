@@ -209,29 +209,29 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
   return (
     <div className="h-full flex flex-col animate-fade-in relative">
       <header className="mb-6 border-b border-gray-200 pb-4">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <div>
-            <h2 className="text-3xl font-bold text-roden-black tracking-tight">Proyectos</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Proyectos</h2>
             <p className="text-roden-gray text-sm mt-1">Gestiona el ciclo de vida de obras y amoblamientos.</p>
             </div>
-            <div className="flex gap-3">
-                <RodenAIButton 
-                    mode="proyectos_atencion" 
-                    data={{ projects: filteredProjects }} 
+            <div className="flex flex-wrap gap-2 items-center">
+                <RodenAIButton
+                    mode="proyectos_atencion"
+                    data={{ projects: filteredProjects }}
                     userRole={user.role}
                 />
-                <button 
+                <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 transition-colors ${
+                    className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 transition-colors ${
                         showFilters ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-gray-600 hover:bg-gray-100 border-gray-200'
                     }`}>
-                    <Filter size={16} /> {showFilters ? 'Ocultar Filtros' : 'Filtrar'}
+                    <Filter size={16} /> {showFilters ? 'Ocultar' : 'Filtrar'}
                 </button>
                 {/* Condition: Only Admin sees New Project */}
                 {user.role === 'administrador' && (
-                    <button 
+                    <button
                         onClick={openCreateModal}
-                        className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
+                        className="bg-roden-black text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
                     <Plus size={16} /> Nuevo Proyecto
                     </button>
                 )}
@@ -287,8 +287,92 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
         )}
       </header>
 
-      {/* Kanban Board Container */}
-      <div className="flex-1 overflow-hidden h-full">
+      {/* ── Vista Mobile: Lista apilada por estado ──────────────────── */}
+      <div className="sm:hidden space-y-4 pb-20 overflow-y-auto">
+        {PROJECT_GROUPS.map((group) => {
+          if (group.id === 'FINALIZADO' && !showCompleted) return null;
+          if (isWorkshopRole && (group.id === 'PROPUESTA' || group.id === 'PRESUPUESTO')) return null;
+          const groupProjects = filteredProjects.filter(p => group.statuses.includes(p.status));
+          if (groupProjects.length === 0) return null;
+          return (
+            <div key={group.id}>
+              {/* Group header */}
+              <div className={`flex items-center justify-between px-3 py-2 rounded-xl mb-2 ${group.bg} border ${group.border}`}>
+                <span className={`text-xs font-bold uppercase tracking-wider ${group.color}`}>{group.label}</span>
+                <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center text-white`}
+                  style={{ background: 'currentColor' }}>
+                  <span className={`${group.color} font-bold text-xs`}>{groupProjects.length}</span>
+                </span>
+              </div>
+              {/* Project cards */}
+              <div className="space-y-2">
+                {groupProjects.map((project) => {
+                  const daysRemaining = calculateDaysRemaining(project.deadline);
+                  const pendingTasks = project.tasksTotal - project.tasksCompleted;
+                  const isArchived = project.status === 'COMPLETED' || project.status === 'CANCELLED';
+                  const clientName = clients.find(c => c.id === project.clientId)?.name || '';
+                  return (
+                    <div
+                      key={project.id}
+                      onClick={() => { if (user.role === 'administrador') openEditModal(project); }}
+                      className={`bg-white border border-gray-100 rounded-xl p-4 shadow-sm border-l-4 ${isArchived ? 'border-l-gray-300 opacity-80' : group.accent} ${user.role === 'administrador' ? 'cursor-pointer active:bg-gray-50' : 'cursor-default'} transition-colors`}
+                    >
+                      {/* Title + status badge */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h4 className="text-sm font-extrabold text-roden-black leading-snug flex-1">{project.title}</h4>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded border shrink-0 ${
+                          project.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                          project.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-100' :
+                          'bg-gray-50 text-gray-500 border-gray-100'
+                        }`}>
+                          {project.status === 'COMPLETED' ? 'FINALIZADO' : project.status === 'CANCELLED' ? 'CANCELADO' : `${project.progress}%`}
+                        </span>
+                      </div>
+                      {/* Client name */}
+                      {clientName && (
+                        <p className="text-xs text-gray-400 mb-2 truncate">{clientName}</p>
+                      )}
+                      {/* Footer: deadline + tasks */}
+                      <div className="flex items-center gap-3 text-xs text-gray-400 pt-2 border-t border-gray-50">
+                        {project.deadline && (
+                          <span className="flex items-center gap-1">
+                            <Calendar size={11} />
+                            {project.deadline}
+                            {daysRemaining !== null && (
+                              <span className={`ml-1 font-bold ${daysRemaining < 0 ? 'text-red-500' : daysRemaining < 7 ? 'text-amber-500' : 'text-gray-400'}`}>
+                                ({daysRemaining < 0 ? `${Math.abs(daysRemaining)}d atraso` : `${daysRemaining}d`})
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        <span className={`flex items-center gap-1 ml-auto ${pendingTasks > 0 ? 'text-indigo-500 font-semibold' : 'text-emerald-500 font-semibold'}`}>
+                          <CheckSquare size={11} />
+                          {pendingTasks > 0 ? `${pendingTasks} pend.` : '¡Al día!'}
+                        </span>
+                        {project.driveFolderUrl && (
+                          <a href={project.driveFolderUrl} target="_blank" rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-indigo-400 hover:text-indigo-600 p-1">
+                            <HardDrive size={13} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        {filteredProjects.length === 0 && (
+          <div className="py-16 text-center text-gray-300">
+            <p className="text-sm font-medium">Sin proyectos para mostrar</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Kanban Board — solo desktop ──────────────────────────────── */}
+      <div className="hidden sm:flex flex-1 overflow-hidden h-full">
         <div className="flex gap-4 h-full w-full pb-4 overflow-x-auto">
           {PROJECT_GROUPS.map((group) => {
             
@@ -484,6 +568,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
               </div>
             );
           })}
+        </div>
         </div>
       </div>
 

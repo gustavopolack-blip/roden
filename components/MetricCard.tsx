@@ -24,10 +24,11 @@ const MetricCard: React.FC<MetricCardProps> = ({ label, value, trend, icon: Icon
   const styles = colorStyles[color];
 
   return (
-    <div className={`${styles.bg} border ${styles.border} p-6 rounded-xl hover:shadow-md transition-all duration-300 group`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-xl ${styles.iconBg} ${styles.text} shadow-sm transition-colors`}>
-          <Icon size={22} />
+    <div className={`${styles.bg} border ${styles.border} p-4 sm:p-6 rounded-xl hover:shadow-md transition-all duration-300 group`}>
+      <div className="flex justify-between items-start mb-2 sm:mb-4">
+        <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${styles.iconBg} ${styles.text} shadow-sm transition-colors`}>
+          <Icon size={18} className="sm:hidden" />
+          <Icon size={22} className="hidden sm:block" />
         </div>
         {trend && (
           <span className={`text-xs font-bold px-2 py-1 rounded-full bg-white/60 backdrop-blur-sm ${
@@ -37,8 +38,8 @@ const MetricCard: React.FC<MetricCardProps> = ({ label, value, trend, icon: Icon
           </span>
         )}
       </div>
-      <h3 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">{label}</h3>
-      <p className="text-3xl font-bold text-roden-black tracking-tight">{value}</p>
+      <h3 className="text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-wide sm:tracking-widest mb-1 truncate">{label}</h3>
+      <p className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">{value}</p>
     </div>
   );
 };

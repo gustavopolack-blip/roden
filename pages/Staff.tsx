@@ -204,14 +204,14 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-       <header className="flex justify-between items-center border-b border-gray-200 pb-6">
+       <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Personal</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Personal</h2>
           <p className="text-roden-gray text-sm mt-1">Gestión de usuarios, roles y permisos del sistema.</p>
         </div>
-        <button 
+        <button
             onClick={openCreateModal}
-            className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
+            className="bg-roden-black text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200 self-start sm:self-auto">
             <Plus size={16} /> Nuevo Usuario
         </button>
       </header>
@@ -268,7 +268,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/50">
@@ -371,6 +371,62 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
                   ))}
               </tbody>
           </table>
+          </div>
+
+          {/* Mobile cards — personal */}
+          <div className="sm:hidden divide-y divide-gray-100">
+              {users.length === 0 ? (
+                  <div className="py-12 text-center">
+                      <p className="text-gray-400 italic mb-4">No se encontraron usuarios en la base de datos.</p>
+                      <button
+                          onClick={handleSeedAdmin}
+                          disabled={isSeeding}
+                          className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 mx-auto"
+                      >
+                          {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                          Crear mi Perfil de Administrador
+                      </button>
+                  </div>
+              ) : users.map((user) => (
+                  <div key={user.id} className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${
+                          user.role === 'administrador' ? 'bg-roden-black' :
+                          user.role === 'gerente_taller' ? 'bg-slate-700' : 'bg-indigo-600'
+                      }`}>
+                          {user.avatarInitials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                  <p className="text-sm font-bold text-roden-black truncate">{user.name}</p>
+                                  <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
+                              </div>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                                  user.role === 'administrador' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                  user.role === 'gerente_taller' ? 'bg-sky-50 text-sky-700 border-sky-100' :
+                                  'bg-indigo-50 text-indigo-700 border-indigo-100'
+                              }`}>
+                                  {user.role === 'administrador' ? <Shield size={10} /> : user.role === 'gerente_taller' ? <Hammer size={10} /> : <UserIcon size={10} />}
+                                  {user.role ? user.role.replace('_', ' ') : 'sin rol'}
+                              </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                              <span className="text-[10px] text-gray-400">{user.phone || 'Sin teléfono'}</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  user.status === 'ACTIVE' ? 'text-emerald-600 bg-emerald-50' : 'text-gray-500 bg-gray-100'
+                              }`}>{user.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}</span>
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => openEditModal(user)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" title="Editar">
+                              <Edit size={14} />
+                          </button>
+                          <a href={getWhatsappLink(user.phone)} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="WhatsApp">
+                              <MessageCircle size={16} />
+                          </a>
+                      </div>
+                  </div>
+              ))}
           </div>
       </div>
 

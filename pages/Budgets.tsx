@@ -162,20 +162,20 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
 
   return (
     <div className="space-y-8 animate-fade-in relative">
-      <header className="flex justify-between items-center border-b border-gray-200 pb-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center border-b border-gray-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-roden-black tracking-tight">Finanzas</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Finanzas</h2>
           <p className="text-roden-gray text-sm mt-1">Gestión de ingresos, cobros y rentabilidad.</p>
         </div>
-        <div className="flex gap-3">
-            <RodenAIButton 
-                mode="finanzas_lectura" 
-                data={{ estimates, projects, supplierPayments, savedEstimates }} 
+        <div className="flex flex-wrap gap-2 items-center self-start sm:self-auto">
+            <RodenAIButton
+                mode="finanzas_lectura"
+                data={{ estimates, projects, supplierPayments, savedEstimates }}
                 userRole={userRole}
             />
-            <button 
+            <button
                 onClick={handleOpenCreate}
-                className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-lg shadow-gray-200">
+                className="bg-roden-black text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-lg shadow-gray-200">
                 Nuevo Presupuesto
             </button>
         </div>
@@ -272,7 +272,7 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                   </select>
               </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                   <tr className="border-b border-gray-200 bg-gray-50/50">
@@ -314,6 +314,41 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                   ))}
               </tbody>
           </table>
+          </div>
+
+          {/* Mobile cards — presupuestos */}
+          <div className="sm:hidden divide-y divide-gray-100">
+              {filteredEstimates.length === 0 ? (
+                  <div className="py-12 text-center text-gray-400">No se encontraron presupuestos.</div>
+              ) : filteredEstimates.map((estimate) => (
+                  <div key={estimate.id} className="px-4 py-4 hover:bg-indigo-50/30">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="min-w-0">
+                              <p className="text-sm font-bold text-roden-black truncate">{getProjectName(estimate.projectId || '')}</p>
+                              <p className="text-xs text-gray-500 truncate">{estimate.title}</p>
+                          </div>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                              estimate.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                              estimate.status === 'PRODUCTION' ? 'bg-blue-100 text-blue-700' :
+                              estimate.status === 'SENT' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-600'
+                          }`}>{estimate.status}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 mb-2.5">
+                          <span className="text-xs font-bold text-roden-black">${(estimate.totalAmount || 0).toLocaleString()}</span>
+                          <span className="text-xs text-emerald-600">+${(estimate.downPayment || 0).toLocaleString()} anticipo</span>
+                          <span className="text-xs text-amber-600">${(estimate.balance || 0).toLocaleString()} saldo</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <button onClick={() => handleOpenEdit(estimate)} className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded hover:bg-indigo-100 transition-colors">
+                              <Pencil size={13} /> Editar
+                          </button>
+                          <button onClick={() => onDeleteEstimate(estimate.id)} className="inline-flex items-center gap-1 text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded hover:bg-red-100 transition-colors">
+                              <Trash2 size={13} /> Eliminar
+                          </button>
+                      </div>
+                  </div>
+              ))}
           </div>
       </div>
 

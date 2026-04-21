@@ -155,27 +155,27 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   if (view === 'LIST') {
       return (
         <div className="space-y-8 animate-fade-in relative">
-            <header className="flex justify-between items-center border-b border-gray-200 pb-6">
+            <header className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center border-b border-gray-200 pb-6">
                 <div>
-                    <h2 className="text-3xl font-bold text-roden-black tracking-tight">Informes</h2>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-roden-black tracking-tight">Informes</h2>
                     <p className="text-roden-gray text-sm mt-1">Historial de reportes técnicos y hojas de ruta.</p>
                 </div>
-                <div className="flex gap-3">
-                     <RodenAIButton 
-                        mode="finanzas_lectura" 
-                        data={{ projects, reports }} 
+                <div className="flex flex-wrap gap-2 items-center self-start sm:self-auto">
+                     <RodenAIButton
+                        mode="finanzas_lectura"
+                        data={{ projects, reports }}
                         userRole={user.role}
                      />
                      <button
                         onClick={() => window.print()}
-                        className="bg-white border border-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm no-print"
+                        className="bg-white border border-gray-200 text-gray-700 px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm no-print"
                     >
-                        <Printer size={16} /> Imprimir Lista
+                        <Printer size={16} /> <span className="hidden sm:inline">Imprimir Lista</span><span className="sm:hidden">Imprimir</span>
                     </button>
-                    <button 
+                    <button
                         onClick={() => setIsModalOpen(true)}
-                        className="bg-roden-black text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
-                        <Plus size={16} /> Generar Informe Técnico
+                        className="bg-roden-black text-white px-4 sm:px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200">
+                        <Plus size={16} /> <span className="hidden sm:inline">Generar Informe Técnico</span><span className="sm:hidden">Nuevo Informe</span>
                     </button>
                 </div>
             </header>
@@ -215,6 +215,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
 
             {/* Table */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
@@ -270,6 +271,40 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                         )}
                     </tbody>
                 </table>
+                </div>
+
+                {/* Mobile cards — informes */}
+                <div className="sm:hidden divide-y divide-gray-100">
+                    {filteredReports.length === 0 ? (
+                        <div className="py-12 text-center text-gray-400">No hay informes que coincidan con los filtros.</div>
+                    ) : filteredReports.map(report => (
+                        <div key={report.id} className="px-4 py-4 hover:bg-gray-50">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                                <p className="text-sm font-bold text-roden-black truncate">{report.projectNameSnapshot}</p>
+                                <span className="text-[10px] text-gray-400 shrink-0 flex items-center gap-1">
+                                    <Calendar size={11} /> {new Date(report.generatedDate).toLocaleDateString('es-AR')}
+                                </span>
+                            </div>
+                            <p className="text-xs text-gray-500 italic truncate mb-2.5">{report.observations || '— Sin observaciones —'}</p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleViewReport(report)}
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded hover:bg-indigo-100 transition-colors"
+                                >
+                                    <Eye size={14} /> Ver / Imprimir
+                                </button>
+                                {user.role === 'administrador' && onDeleteReport && (
+                                    <button
+                                        onClick={() => onDeleteReport(report.id)}
+                                        className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2.5 py-1.5 rounded hover:bg-red-100 transition-colors"
+                                    >
+                                        <Trash2 size={14} /> Borrar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* Project Selection Modal */}
