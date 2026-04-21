@@ -3,8 +3,26 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>rødën | Diseño a medida</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>rødën | Sistema Operativo</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme color (barra de status del navegador) -->
+    <meta name="theme-color" content="#171717" />
+
+    <!-- iOS: comportamiento nativo al agregar a inicio -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="rødën OS" />
+
+    <!-- iOS: íconos para pantalla de inicio -->
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Android: íconos -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -625,6 +643,17 @@
   <body>
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
+
+  <!-- Registro del Service Worker para PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(reg) { console.log('SW registrado:', reg.scope); })
+          .catch(function(err) { console.warn('SW error:', err); });
+      });
+    }
+  </script>
   <script>
     // Fuerza fondo blanco en TODOS los elementos raíz antes de imprimir.
     // Esto es más confiable que @media print CSS porque actúa directo sobre el DOM.
