@@ -346,10 +346,10 @@ const Production: React.FC<ProductionProps> = ({
 
               return (
               <div key={project.id} className="bg-white border border-roden-border rounded-xl overflow-hidden shadow-sm flex flex-col hover:shadow-md transition-shadow duration-300">
-                  <div className={`p-6 border-b border-gray-100 flex justify-between items-start ${project.status === 'READY' ? 'bg-emerald-50/50' : 'bg-gray-50/50'}`}>
+                  <div className={`p-4 sm:p-6 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start ${project.status === 'READY' ? 'bg-emerald-50/50' : 'bg-gray-50/50'}`}>
                       <div>
-                          <div className="flex items-center gap-3 mb-1">
-                              <h3 className="text-lg font-bold text-roden-black">{project.title}</h3>
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="text-base sm:text-lg font-bold text-roden-black">{project.title}</h3>
                               <span className="text-xs font-medium text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">
                                   ID: {project.id.toUpperCase()}
                               </span>
@@ -374,26 +374,27 @@ const Production: React.FC<ProductionProps> = ({
                               )}
                           </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                           <div className="flex items-center gap-2">
+                      <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3 sm:gap-2">
+                           <div className="flex items-center gap-2 shrink-0">
                               <span className="text-xs font-bold text-gray-400 uppercase">Avance</span>
                               <span className="text-lg font-bold text-roden-black">{project.progress}%</span>
                            </div>
-                           <div className="flex gap-2">
-                               <div className="bg-yellow-100 border border-yellow-200 text-yellow-800 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-sm">
-                                   <Calendar size={14} className="text-yellow-700" />
-                                   <span className="text-sm font-bold">Entrega: {project.deadline}</span>
+                           <div className="flex flex-wrap gap-2">
+                               <div className="bg-yellow-100 border border-yellow-200 text-yellow-800 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                   <Calendar size={13} className="text-yellow-700 shrink-0" />
+                                   <span className="text-xs font-bold">Entrega: {project.deadline}</span>
                                </div>
-                               <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-sm">
-                                   <Clock size={14} className="text-red-500" />
-                                   <span className="text-sm font-extrabold">{daysRemaining} Días Restantes</span>
+                               <div className="bg-red-50 border border-red-200 text-red-600 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                   <Clock size={13} className="text-red-500 shrink-0" />
+                                   <span className="text-xs font-extrabold">{daysRemaining}d restantes</span>
                                </div>
                            </div>
                       </div>
                   </div>
 
-                  <div className="p-8">
-                      <div className="relative">
+                  <div className="p-4 sm:p-8">
+                      <div className="overflow-x-auto">
+                      <div className="relative min-w-[480px]">
                           <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -translate-y-1/2 rounded-full z-0"></div>
                           <div className="relative z-10 flex justify-between items-start">
                               {PRODUCTION_STEPS.map((step) => {
@@ -433,6 +434,7 @@ const Production: React.FC<ProductionProps> = ({
                                   );
                               })}
                           </div>
+                      </div>
                       </div>
                   </div>
 
@@ -481,7 +483,7 @@ const Production: React.FC<ProductionProps> = ({
                       )}
                   </div>
 
-                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center gap-3">
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-wrap justify-between items-center gap-2">
                        {canManageProduction ? (
                            <button
                               onClick={() => handleRegressStep(project)}
@@ -491,11 +493,11 @@ const Production: React.FC<ProductionProps> = ({
                            </button>
                        ) : <div></div>}
 
-                       <div className="flex gap-3">
-                          <button 
+                       <div className="flex flex-wrap gap-2">
+                          <button
                               onClick={() => openDetails(project)}
-                              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-black hover:border-gray-300 shadow-sm transition-colors">
-                              Ver Detalles y Notas
+                              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-black hover:border-gray-300 shadow-sm transition-colors">
+                              Ver Detalles
                           </button>
 
                           {/* Ver OP: si tiene OP asociada */}

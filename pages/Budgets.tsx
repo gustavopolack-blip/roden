@@ -182,43 +182,43 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
       </header>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group hover:border-emerald-300 transition-colors">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <div className="bg-white p-4 sm:p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group hover:border-emerald-300 transition-colors">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><CheckCircle size={80} className="text-emerald-500" /></div>
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                     <div className="p-1.5 bg-emerald-100 rounded text-emerald-600"><CheckCircle size={16}/></div>
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Anticipos Recibidos</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide sm:tracking-widest truncate">Anticipos Recibidos</p>
                 </div>
-                <p className="text-3xl font-bold text-roden-black">${(totalReceivedDownPayments || 0).toLocaleString()}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-roden-black">${(totalReceivedDownPayments || 0).toLocaleString()}</p>
               </div>
           </div>
-          <div className="bg-white p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group hover:border-amber-300 transition-colors">
+          <div className="bg-white p-4 sm:p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group hover:border-amber-300 transition-colors">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Clock size={80} className="text-amber-500" /></div>
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                     <div className="p-1.5 bg-amber-100 rounded text-amber-600"><Clock size={16}/></div>
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Saldos a Cobrar</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide sm:tracking-widest truncate">Saldos a Cobrar</p>
                 </div>
-                <p className="text-3xl font-bold text-roden-black">${(totalPendingBalances || 0).toLocaleString()}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-roden-black">${(totalPendingBalances || 0).toLocaleString()}</p>
               </div>
           </div>
-          <div className="bg-white p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group">
+          <div className="bg-white p-4 sm:p-6 rounded-xl border border-roden-border shadow-sm relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={80} className="text-indigo-500" /></div>
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                     <div className="p-1.5 bg-indigo-100 rounded text-indigo-600"><PieChart size={16}/></div>
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Facturación Mensual</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide sm:tracking-widest truncate">Facturación Mensual</p>
                 </div>
-                <p className="text-3xl font-bold text-roden-black">${(monthlyBilling || 0).toLocaleString()}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-roden-black">${(monthlyBilling || 0).toLocaleString()}</p>
               </div>
           </div>
       </div>
 
       {/* Profitability Analysis Section */}
       <section className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-roden-black flex items-center gap-2"><BarChart2 size={20} className="text-gray-500"/> Análisis de Rentabilidad por Proyecto</h3>
+          <div className="p-4 sm:p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+              <h3 className="text-base sm:text-lg font-bold text-roden-black flex items-center gap-2"><BarChart2 size={18} className="text-gray-500"/> Rentabilidad por Proyecto</h3>
           </div>
           <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
