@@ -570,7 +570,6 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
           })}
         </div>
         </div>
-      </div>
 
        {/* Create/Edit Project Modal */}
        {isModalOpen && user.role === 'administrador' && (
