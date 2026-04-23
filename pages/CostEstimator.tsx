@@ -2403,11 +2403,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                     );
 
                     const Ftr = () => (
-                        <div className="a4-ftr bg-gray-900 text-white flex items-center justify-between"
-                             style={{ padding: '0 10mm', borderTop: '1px solid #333' }}>
-                            <span style={{ fontSize:'9px', color:'#888', letterSpacing:'0.5px' }}>Devoto | Buenos Aires | Argentina</span>
+                        <div className="a4-ftr bg-gray-300 text-gray-800 flex items-center justify-between"
+                             style={{ padding: '0 10mm', borderTop: '1px solid #d1d5db' }}>
+                            <span style={{ fontSize:'9px', letterSpacing:'0.5px' }}>Devoto | Buenos Aires | Argentina</span>
                             <span style={{ fontSize:'11px', fontWeight:700 }}>www.rodenmobel.com</span>
-                            <span style={{ fontSize:'9px', color:'#888' }}>rødën {new Date().getFullYear()}</span>
                         </div>
                     );
 
@@ -2778,9 +2777,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <Hdr n={itemIndex + 1} total={itemsToPrint.length} />
                                         <div className="a4-body" style={{ padding:'4mm 9mm 0 9mm' }}>
                                             {/* TÍTULO */}
-                                            <div style={{ background:'#111', color:'#fff', padding:'2.5mm 4mm', marginBottom:'4mm', borderRadius:'2px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                            <div style={{ background:'#f3f4f6', color:'#111', padding:'2.5mm 4mm', marginBottom:'4mm', borderRadius:'2px', display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #e5e7eb' }}>
                                                 <span style={{ fontWeight:700, fontSize:'12px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{item.name}</span>
-                                                <span style={{ fontSize:'9px', color:'#bbb' }}>Ítem Manual · {item.labor?.workers||1} op. × {item.labor?.days||1} días</span>
+                                                <span style={{ fontSize:'9px', color:'#6b7280' }}>Ítem Manual · {item.labor?.workers||1} op. × {item.labor?.days||1} días</span>
                                             </div>
 
                                             {/* MATERIALES — ítems del módulo manual */}
@@ -2817,32 +2816,32 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             </table>
 
                                             {/* RESUMEN */}
-                                            <div style={{ background:'#111', color:'#fff', borderRadius:'2px', padding:'3mm 4mm', maxWidth:'240px', marginLeft:'auto' }}>
+                                            <div style={{ background:'#f3f4f6', color:'#111', borderRadius:'2px', padding:'3mm 4mm', maxWidth:'240px', marginLeft:'auto', border:'1px solid #e5e7eb' }}>
                                                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
-                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Materiales</span>
-                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(totalExtras)}</span>
+                                                    <span style={{ fontSize:'9px', color:'#6b7280' }}>Materiales</span>
+                                                    <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(totalExtras)}</span>
                                                 </div>
                                                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
-                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Mano de obra</span>
-                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(laborCost)}</span>
+                                                    <span style={{ fontSize:'9px', color:'#6b7280' }}>Mano de obra</span>
+                                                    <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(laborCost)}</span>
                                                 </div>
-                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'3px', borderTop:'1px solid #333', paddingTop:'2px' }}>
-                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Costo directo</span>
-                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(costoDirecto)}</span>
+                                                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'3px', borderTop:'1px solid #d1d5db', paddingTop:'2px' }}>
+                                                    <span style={{ fontSize:'9px', color:'#6b7280' }}>Costo directo</span>
+                                                    <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(costoDirecto)}</span>
                                                 </div>
                                                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
-                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Beneficio taller ({margins.workshop}%)</span>
-                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(precioTaller - costoDirecto)}</span>
+                                                    <span style={{ fontSize:'9px', color:'#6b7280' }}>Beneficio taller ({margins.workshop}%)</span>
+                                                    <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(precioTaller - costoDirecto)}</span>
                                                 </div>
                                                 {(margins.roden ?? 0) > 0 && (
                                                     <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'2px' }}>
-                                                        <span style={{ fontSize:'9px', color:'#aaa' }}>Beneficio Roden ({margins.roden}%)</span>
-                                                        <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(precioFinal - precioTaller)}</span>
+                                                        <span style={{ fontSize:'9px', color:'#6b7280' }}>Beneficio Roden ({margins.roden}%)</span>
+                                                        <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(precioFinal - precioTaller)}</span>
                                                     </div>
                                                 )}
-                                                <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #444', paddingTop:'2px', marginTop:'2px' }}>
+                                                <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #d1d5db', paddingTop:'2px', marginTop:'2px' }}>
                                                     <span style={{ fontSize:'12px', fontWeight:700 }}>PRECIO FINAL</span>
-                                                    <span style={{ fontSize:'14px', fontWeight:700 }}>{formatCurrency(precioFinal)}</span>
+                                                    <span style={{ fontSize:'14px', fontWeight:700, color:'#111' }}>{formatCurrency(precioFinal)}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -3009,9 +3008,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 <div className="a4-body" style={{ padding:'4mm 9mm 0 9mm' }}>
 
                                     {/* ── TÍTULO DEL ÍTEM ── */}
-                                    <div style={{ background:'#111', color:'#fff', padding:'2.5mm 4mm', marginBottom:'3mm', display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:'2px' }}>
+                                    <div style={{ background:'#f3f4f6', color:'#111', padding:'2.5mm 4mm', marginBottom:'3mm', display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:'2px', border:'1px solid #e5e7eb' }}>
                                         <span style={{ fontWeight:700, fontSize:'12px', textTransform:'uppercase', letterSpacing:'0.5px' }}>{item.name}</span>
-                                        <span style={{ fontSize:'9px', color:'#bbb' }}>
+                                        <span style={{ fontSize:'9px', color:'#6b7280' }}>
                                             Config: {descRealConfig} · {item.modules.length} mód. · {item.labor?.workers||1} op. × {item.labor?.days||1} días
                                         </span>
                                     </div>
@@ -3128,54 +3127,57 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             </table>
 
                                             {/* RESUMEN COSTO REAL */}
-                                            <div style={{ background:'#111', color:'#fff', borderRadius:'2px', padding:'2.5mm 3mm', marginBottom:'3mm' }}>
+                                            <div style={{ background:'#f3f4f6', color:'#111', borderRadius:'2px', padding:'2.5mm 3mm', marginBottom:'3mm', border:'1px solid #e5e7eb' }}>
                                                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1.5px' }}>
-                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Costo directo ({descRealConfig})</span>
-                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(totalDirectCost)}</span>
+                                                    <span style={{ fontSize:'9px', color:'#6b7280' }}>Costo directo ({descRealConfig})</span>
+                                                    <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(totalDirectCost)}</span>
                                                 </div>
                                                 <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'1.5px' }}>
-                                                    <span style={{ fontSize:'9px', color:'#aaa' }}>Beneficio taller ({margins.workshop}%)</span>
-                                                    <span style={{ fontSize:'9px', color:'#ddd' }}>{formatCurrency(totalWorkshop - totalDirectCost)}</span>
+                                                    <span style={{ fontSize:'9px', color:'#6b7280' }}>Beneficio taller ({margins.workshop}%)</span>
+                                                    <span style={{ fontSize:'9px', color:'#374151' }}>{formatCurrency(totalWorkshop - totalDirectCost)}</span>
                                                 </div>
-                                                <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #444', paddingTop:'2px', marginTop:'2px' }}>
+                                                <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid #d1d5db', paddingTop:'2px', marginTop:'2px' }}>
                                                     <span style={{ fontSize:'12px', fontWeight:700 }}>PRECIO TALLER</span>
-                                                    <span style={{ fontSize:'14px', fontWeight:700, color:'#fff' }}>{formatCurrency(totalWorkshop)}</span>
+                                                    <span style={{ fontSize:'14px', fontWeight:700, color:'#111' }}>{formatCurrency(totalWorkshop)}</span>
                                                 </div>
                                             </div>
 
-                                            {/* 14 TERMINACIONES — configuración real destacada */}
-                                            <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>
-                                                Comparativa 14 terminaciones · Benef. {margins.workshop}%
-                                            </p>
-                                            <table style={{ width:'100%', fontSize:'9.5px', borderCollapse:'collapse' }}>
-                                                <thead>
-                                                    <tr style={{ borderBottom:'1.5px solid #374151', background:'#f9fafb' }}>
-                                                        <th style={{ padding:'2px 0', textAlign:'left', fontWeight:600, color:'#4b5563' }}>Terminación</th>
-                                                        <th style={{ padding:'2px 3px', textAlign:'right', fontWeight:600, color:'#4b5563', width:'64px' }}>Costo dir.</th>
-                                                        <th style={{ padding:'2px 3px', textAlign:'right', fontWeight:600, color:'#b45309', width:'60px' }}>Benef.</th>
-                                                        <th style={{ padding:'2px 0', textAlign:'right', fontWeight:700, color:'#111', width:'72px' }}>P. Taller</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {terminaciones.map((t) => (
-                                                        <tr key={t.k} style={{
-                                                            borderBottom: '1px solid #f3f4f6',
-                                                            background: t.isReal ? '#f0fdf4' : 'transparent',
-                                                            fontWeight: t.isReal ? 700 : 400,
-                                                        }}>
-                                                            <td style={{ padding:'1.5px 0', color: t.isReal ? '#166534' : '#374151', display:'flex', alignItems:'center', gap:'3px' }}>
-                                                                {t.isReal && <span style={{ fontSize:'8px', background:'#16a34a', color:'#fff', borderRadius:'2px', padding:'0 2px', fontWeight:700, whiteSpace:'nowrap' }}>✓</span>}
-                                                                {t.label}
-                                                            </td>
-                                                            <td style={{ padding:'1.5px 3px', textAlign:'right', color: t.isReal ? '#166534' : '#6b7280', width:'64px' }}>{formatCurrency(t.r.d)}</td>
-                                                            <td style={{ padding:'1.5px 3px', textAlign:'right', color:'#b45309', width:'60px' }}>{formatCurrency(t.r.w - t.r.d)}</td>
-                                                            <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight: t.isReal ? 800 : 600, color: t.isReal ? '#166534' : '#111', width:'72px' }}>{formatCurrency(t.r.w)}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
                                         </div>
                                     </div>{/* fin grid 2 col */}
+
+                                    {/* ── TABLA COMPARATIVA 14 TERMINACIONES — abajo izquierda ── */}
+                                    <div style={{ maxWidth:'55%' }}>
+                                        <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>
+                                            Comparativa 14 terminaciones · Benef. {margins.workshop}%
+                                        </p>
+                                        <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse' }}>
+                                            <thead>
+                                                <tr style={{ borderBottom:'1.5px solid #374151', background:'#f9fafb' }}>
+                                                    <th style={{ padding:'2px 3px', textAlign:'left', fontWeight:600, color:'#4b5563' }}>Terminación</th>
+                                                    <th style={{ padding:'2px 4px', textAlign:'right', fontWeight:600, color:'#4b5563', width:'72px' }}>Costo dir.</th>
+                                                    <th style={{ padding:'2px 4px', textAlign:'right', fontWeight:600, color:'#b45309', width:'68px' }}>Benef.</th>
+                                                    <th style={{ padding:'2px 3px', textAlign:'right', fontWeight:700, color:'#111', width:'80px' }}>P. Taller</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {terminaciones.map((t) => (
+                                                    <tr key={t.k} style={{
+                                                        borderBottom: '1px solid #f3f4f6',
+                                                        background: t.isReal ? '#f0fdf4' : 'transparent',
+                                                        fontWeight: t.isReal ? 700 : 400,
+                                                    }}>
+                                                        <td style={{ padding:'2px 3px', color: t.isReal ? '#166534' : '#374151', display:'flex', alignItems:'center', gap:'4px' }}>
+                                                            {t.isReal && <span style={{ fontSize:'9px', background:'#16a34a', color:'#fff', borderRadius:'2px', padding:'0 3px', fontWeight:700, whiteSpace:'nowrap' }}>✓</span>}
+                                                            {t.label}
+                                                        </td>
+                                                        <td style={{ padding:'2px 4px', textAlign:'right', color: t.isReal ? '#166534' : '#6b7280', width:'72px' }}>{formatCurrency(t.r.d)}</td>
+                                                        <td style={{ padding:'2px 4px', textAlign:'right', color:'#b45309', width:'68px' }}>{formatCurrency(t.r.w - t.r.d)}</td>
+                                                        <td style={{ padding:'2px 3px', textAlign:'right', fontWeight: t.isReal ? 800 : 600, color: t.isReal ? '#166534' : '#111', width:'80px' }}>{formatCurrency(t.r.w)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
 
                                 </div>{/* fin a4-body costos */}
                                 <Ftr />
