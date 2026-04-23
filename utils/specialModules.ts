@@ -560,7 +560,7 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
 const TAPA_HORIZONTAL: SpecialModuleTemplate = {
   id: 'TAPA_HORIZONTAL',
   name: 'Tapa Horizontal',
-  description: 'Placa horizontal 18mm. Con regrueso = 2 placas superpuestas (36mm total).',
+  description: 'Placa 18mm. Con regrueso: agrega faja perimetral 50mm (total 36mm de espesor).',
   params: ['width', 'depth'],
   extraOptions: [
     {
@@ -569,25 +569,48 @@ const TAPA_HORIZONTAL: SpecialModuleTemplate = {
       type: 'select',
       options: [
         { label: '18mm (simple)',          value: '18mm' },
-        { label: 'Regrueso 36mm (doble)',   value: '36mm' },
+        { label: 'Regrueso 36mm (+ faja)', value: '36mm' },
       ]
     }
   ],
   calculate: ({ width: W, depth: D }, options = {}) => {
     const espesor = options.espesor || '18mm';
-    const qty = espesor === '36mm' ? 2 : 1;
     const parts: CalculatedPart[] = [];
 
+    // Placa principal (siempre 18mm)
     parts.push({
-      name:     espesor === '36mm' ? 'Tapa horizontal c/ regrueso' : 'Tapa horizontal',
+      name:     'Tapa horizontal 18mm',
       width:    W,
       height:   D,
       material: '18mm_Carcass',
-      quantity: qty,
+      quantity: 1,
       grain:    'horizontal'
     });
 
-    return { parts, hardware: {}, laborDays: 0.1 };
+    if (espesor === '36mm') {
+      // Faja perimetral 50mm pegada al canto para llegar a 36mm de espesor total
+      // 2 fajas largas (a lo ancho)
+      parts.push({
+        name:     'Faja regrueso — largo (×2)',
+        width:    W,
+        height:   50,
+        material: '18mm_Carcass',
+        quantity: 2,
+        grain:    'horizontal'
+      });
+      // 2 fajas cortas (a lo profundo, entre las largas)
+      const fajaCortaH = Math.max(0, D - 100);
+      parts.push({
+        name:     'Faja regrueso — profundidad (×2)',
+        width:    fajaCortaH,
+        height:   50,
+        material: '18mm_Carcass',
+        quantity: 2,
+        grain:    'horizontal'
+      });
+    }
+
+    return { parts, hardware: {}, laborDays: espesor === '36mm' ? 0.2 : 0.1 };
   }
 };
 
@@ -652,30 +675,18 @@ const LATERAL_APLICADO: SpecialModuleTemplate = {
 const AJUSTE: SpecialModuleTemplate = {
   id: 'AJUSTE',
   name: 'Ajuste',
-  description: 'Placa 18mm × 100mm de profundidad fija — solo largo. Vertical u horizontal.',
+  description: 'Placa 18mm × 100mm (ancho fijo). Solo se ingresa el largo.',
   params: ['width'],
-  extraOptions: [
-    {
-      key: 'orientacion',
-      label: 'Orientación',
-      type: 'select',
-      options: [
-        { label: 'Vertical',   value: 'vertical'   },
-        { label: 'Horizontal', value: 'horizontal' },
-      ]
-    }
-  ],
-  calculate: ({ width: W }, options = {}) => {
-    const orientacion = options.orientacion || 'vertical';
+  calculate: ({ width: W }) => {
     const parts: CalculatedPart[] = [];
 
     parts.push({
-      name:     `Ajuste ${orientacion} 18mm × 100mm`,
+      name:     'Ajuste 18mm × 100mm',
       width:    W,
       height:   100,
       material: '18mm_Carcass',
       quantity: 1,
-      grain:    orientacion === 'vertical' ? 'vertical' : 'horizontal'
+      grain:    'vertical'
     });
 
     return { parts, hardware: {}, laborDays: 0.05 };
