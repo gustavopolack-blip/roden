@@ -553,7 +553,356 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// TEMPLATE 9 — ESPECIAL MANUAL
+// TEMPLATE 9 — TAPA HORIZONTAL
+// Placa 18mm (simple) o regrueso 36mm (2 × 18mm superpuestas).
+// ─────────────────────────────────────────────────────────────
+
+const TAPA_HORIZONTAL: SpecialModuleTemplate = {
+  id: 'TAPA_HORIZONTAL',
+  name: 'Tapa Horizontal',
+  description: 'Placa horizontal 18mm. Con regrueso = 2 placas superpuestas (36mm total).',
+  params: ['width', 'depth'],
+  extraOptions: [
+    {
+      key: 'espesor',
+      label: 'Espesor',
+      type: 'select',
+      options: [
+        { label: '18mm (simple)',          value: '18mm' },
+        { label: 'Regrueso 36mm (doble)',   value: '36mm' },
+      ]
+    }
+  ],
+  calculate: ({ width: W, depth: D }, options = {}) => {
+    const espesor = options.espesor || '18mm';
+    const qty = espesor === '36mm' ? 2 : 1;
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     espesor === '36mm' ? 'Tapa horizontal c/ regrueso' : 'Tapa horizontal',
+      width:    W,
+      height:   D,
+      material: '18mm_Carcass',
+      quantity: qty,
+      grain:    'horizontal'
+    });
+
+    return { parts, hardware: {}, laborDays: 0.1 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 10 — DIVISOR VERTICAL
+// Placa 18mm. Solo alto y profundidad.
+// ─────────────────────────────────────────────────────────────
+
+const DIVISOR_VERTICAL: SpecialModuleTemplate = {
+  id: 'DIVISOR_VERTICAL',
+  name: 'Divisor Vertical',
+  description: 'Placa vertical 18mm interior — solo alto y profundidad.',
+  params: ['height', 'depth'],
+  calculate: ({ height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     'Divisor vertical 18mm',
+      width:    D,
+      height:   H,
+      material: '18mm_Carcass',
+      quantity: 1,
+      grain:    'vertical'
+    });
+
+    return { parts, hardware: {}, laborDays: 0.05 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 11 — LATERAL APLICADO
+// Placa 18mm aplicada sobre el costado de un módulo. Solo alto y profundidad.
+// ─────────────────────────────────────────────────────────────
+
+const LATERAL_APLICADO: SpecialModuleTemplate = {
+  id: 'LATERAL_APLICADO',
+  name: 'Lateral Aplicado',
+  description: 'Lateral 18mm aplicado sobre el costado de un módulo existente.',
+  params: ['height', 'depth'],
+  calculate: ({ height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     'Lateral aplicado 18mm',
+      width:    D,
+      height:   H,
+      material: '18mm_Carcass',
+      quantity: 1,
+      grain:    'vertical'
+    });
+
+    return { parts, hardware: {}, laborDays: 0.05 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 12 — AJUSTE
+// Placa 18mm. Profundidad fija 100mm. Solo largo (ancho).
+// Orientación visual: vertical u horizontal.
+// ─────────────────────────────────────────────────────────────
+
+const AJUSTE: SpecialModuleTemplate = {
+  id: 'AJUSTE',
+  name: 'Ajuste',
+  description: 'Placa 18mm × 100mm de profundidad fija — solo largo. Vertical u horizontal.',
+  params: ['width'],
+  extraOptions: [
+    {
+      key: 'orientacion',
+      label: 'Orientación',
+      type: 'select',
+      options: [
+        { label: 'Vertical',   value: 'vertical'   },
+        { label: 'Horizontal', value: 'horizontal' },
+      ]
+    }
+  ],
+  calculate: ({ width: W }, options = {}) => {
+    const orientacion = options.orientacion || 'vertical';
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     `Ajuste ${orientacion} 18mm × 100mm`,
+      width:    W,
+      height:   100,
+      material: '18mm_Carcass',
+      quantity: 1,
+      grain:    orientacion === 'vertical' ? 'vertical' : 'horizontal'
+    });
+
+    return { parts, hardware: {}, laborDays: 0.05 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 13 — MÓDULO BAJO MESADA
+// Sin tapa. Laterales + piso + fajas + fondo 3mm en ranuras.
+// Interior: estante regulable o cajones.
+// ─────────────────────────────────────────────────────────────
+
+const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
+  id: 'MODULO_BAJO_MESADA',
+  name: 'Módulo Bajo Mesada',
+  description: 'Sin tapa. Laterales, piso, faja frontal y trasera (100mm), fondo 3mm en ranuras.',
+  params: ['width', 'height', 'depth'],
+  extraOptions: [
+    {
+      key: 'interior',
+      label: 'Interior',
+      type: 'select',
+      options: [
+        { label: 'Estante regulable', value: 'ESTANTE'  },
+        { label: 'Cajones',           value: 'CAJONES'  },
+      ]
+    }
+  ],
+  calculate: ({ width: W, height: H, depth: D }, options = {}) => {
+    const interior = options.interior || 'ESTANTE';
+    const parts: CalculatedPart[] = [];
+
+    const innerW = Math.max(0, W - 36);
+
+    // Estructura
+    parts.push({ name: 'Lateral',       width: D,      height: H,                             material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
+    parts.push({ name: 'Piso',          width: innerW, height: D,                             material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja frontal',  width: innerW, height: 100,                           material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja trasera',  width: innerW, height: 100,                           material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Fondo 3mm',     width: innerW, height: Math.max(0, H - 100 - 10),    material: '3mm_White',    quantity: 1, grain: 'vertical'   });
+
+    let laborDays = 0.5;
+
+    if (interior === 'ESTANTE') {
+      parts.push({
+        name:     'Estante regulable',
+        width:    innerW,
+        height:   Math.max(0, D - 45),
+        material: '18mm_Carcass',
+        quantity: 1,
+        grain:    'horizontal'
+      });
+      laborDays += 0.05;
+
+    } else {
+      // Cajones: 1 cada ~180mm de altura interior disponible
+      const innerH    = Math.max(180, H - 100 - 18);
+      const cntDrawers = Math.max(1, Math.floor(innerH / 180));
+      const boxHeight  = Math.max(50, Math.floor(innerH / cntDrawers) - 10);
+      const boxDepth   = Math.max(80, D - 20);
+      const boxInnerW  = Math.max(0, innerW - 30);
+
+      parts.push({ name: `Lateral caja cajón 15mm (×${cntDrawers * 2})`, width: boxDepth,  height: boxHeight,                         material: '15mm_White',   quantity: cntDrawers * 2, grain: 'horizontal' });
+      parts.push({ name: `Testa cajón 15mm (×${cntDrawers * 2})`,        width: boxInnerW, height: boxHeight,                         material: '15mm_White',   quantity: cntDrawers * 2, grain: 'horizontal' });
+      parts.push({ name: `Fondo caja cajón 3mm (×${cntDrawers})`,        width: boxInnerW, height: boxDepth,                          material: '3mm_White',    quantity: cntDrawers,     grain: 'horizontal' });
+      parts.push({ name: `Frente exterior cajón (×${cntDrawers})`,       width: innerW,    height: Math.floor(H / cntDrawers),        material: '18mm_Front',   quantity: cntDrawers,     grain: 'vertical'   });
+      laborDays += cntDrawers * 0.22;
+    }
+
+    return { parts, hardware: {}, laborDays };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 14 — ESQUINERO
+// Bajo mesada para rincón. Panel fijo 620mm + puerta = total − 620 − 4mm.
+// ─────────────────────────────────────────────────────────────
+
+const ESQUINERO: SpecialModuleTemplate = {
+  id: 'ESQUINERO',
+  name: 'Esquinero',
+  description: 'Bajo mesada para rincón. Panel fijo 620mm. Puerta = ancho − 620 − 4mm.',
+  params: ['width', 'height', 'depth'],
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+
+    const innerW = Math.max(0, W - 36);
+    const doorW  = Math.max(0, W - 620 - 4);
+
+    // Estructura (igual a bajo mesada)
+    parts.push({ name: 'Lateral',       width: D,      height: H,                          material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
+    parts.push({ name: 'Piso',          width: innerW, height: D,                          material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja frontal',  width: innerW, height: 100,                        material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja trasera',  width: innerW, height: 100,                        material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Fondo 3mm',     width: innerW, height: Math.max(0, H - 100 - 10), material: '3mm_White',    quantity: 1, grain: 'vertical'   });
+
+    // Frentes
+    parts.push({ name: 'Panel fijo 620mm', width: 620,   height: H, material: '18mm_Front', quantity: 1, grain: 'vertical' });
+    if (doorW > 0) {
+      parts.push({ name: 'Puerta esquinero', width: doorW, height: H, material: '18mm_Front', quantity: 1, grain: 'vertical' });
+    }
+
+    return { parts, hardware: {}, laborDays: 0.7 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 15 — ESQUINERO EN L
+// Dos laterales de 560mm fijos. Dos brazos: largo1 (= ancho) y largo2.
+// ─────────────────────────────────────────────────────────────
+
+const ESQUINERO_EN_L: SpecialModuleTemplate = {
+  id: 'ESQUINERO_EN_L',
+  name: 'Esquinero en L',
+  description: 'Módulo esquinero en L. Dos laterales fijos 560mm. Brazo 1 = ancho, Brazo 2 = largo2.',
+  params: ['width', 'height', 'depth'],
+  extraOptions: [
+    {
+      key:          'largo2',
+      label:        'Largo brazo 2 (mm)',
+      type:         'number',
+      min:          300,
+      max:          1200,
+      defaultValue: 600
+    }
+  ],
+  calculate: ({ width: W, height: H, depth: D }, options = {}) => {
+    const largo2 = Math.max(300, parseInt(options.largo2 || '600', 10));
+    const parts: CalculatedPart[] = [];
+
+    // Dos laterales de esquina 560mm
+    parts.push({ name: 'Lateral de esquina 560mm', width: 560, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical' });
+
+    // Brazo 1 (ancho = W)
+    const arm1W = Math.max(0, W - 560 - 18);
+    parts.push({ name: 'Piso brazo 1',        width: arm1W, height: D,                        material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja frontal brazo 1', width: arm1W, height: 100,                      material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Fondo 3mm brazo 1',   width: arm1W, height: Math.max(0, H - 110),     material: '3mm_White',    quantity: 1, grain: 'vertical'   });
+
+    // Brazo 2 (largo2)
+    const arm2W = Math.max(0, largo2 - 560 - 18);
+    parts.push({ name: 'Piso brazo 2',        width: arm2W, height: D,                        material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja frontal brazo 2', width: arm2W, height: 100,                      material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Fondo 3mm brazo 2',   width: arm2W, height: Math.max(0, H - 110),     material: '3mm_White',    quantity: 1, grain: 'vertical'   });
+
+    return { parts, hardware: {}, laborDays: 1.0 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 16 — ZÓCALO APLICADO
+// Placa 18mm o 5.5mm. Solo largo y alto.
+// ─────────────────────────────────────────────────────────────
+
+const ZOCALO_APLICADO: SpecialModuleTemplate = {
+  id: 'ZOCALO_APLICADO',
+  name: 'Zócalo Aplicado',
+  description: 'Revestimiento de zócalo 18mm o 5.5mm — solo largo y alto.',
+  params: ['width', 'height'],
+  extraOptions: [
+    {
+      key: 'espesor',
+      label: 'Espesor',
+      type: 'select',
+      options: [
+        { label: '18mm (melamina)', value: '18mm'  },
+        { label: '5.5mm (fondo)',   value: '5.5mm' },
+      ]
+    }
+  ],
+  calculate: ({ width: W, height: H }, options = {}) => {
+    const espesor = options.espesor || '18mm';
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     `Zócalo aplicado ${espesor}`,
+      width:    W,
+      height:   H,
+      material: espesor === '5.5mm' ? '5.5mm_Color' : '18mm_Carcass',
+      quantity: 1,
+      grain:    'horizontal'
+    });
+
+    return { parts, hardware: {}, laborDays: 0.1 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 17 — ZÓCALO ESTRUCTURAL
+// Marco 18mm con refuerzos internos cada 500mm.
+// ≤600mm → 0 refuerzos; +1 por cada 500mm adicionales.
+// ─────────────────────────────────────────────────────────────
+
+const ZOCALO_ESTRUCTURAL: SpecialModuleTemplate = {
+  id: 'ZOCALO_ESTRUCTURAL',
+  name: 'Zócalo Estructural',
+  description: 'Marco 18mm con refuerzos internos cada 500mm (0 ≤600mm; +1 cada 500mm adicionales).',
+  params: ['width', 'height', 'depth'],
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+
+    const innerH       = Math.max(0, H - 36); // alto interior (H menos tapa y base)
+    const cntRefuerzos = W > 600 ? Math.floor((W - 600) / 500) + 1 : 0;
+
+    // Tapa + base
+    parts.push({ name: 'Tapa',    width: W,      height: D,  material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Base',    width: W,      height: D,  material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    // Laterales
+    parts.push({ name: 'Lateral', width: innerH, height: D,  material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
+
+    if (cntRefuerzos > 0) {
+      parts.push({
+        name:     `Refuerzo interno (×${cntRefuerzos})`,
+        width:    innerH,
+        height:   D,
+        material: '18mm_Carcass',
+        quantity: cntRefuerzos,
+        grain:    'vertical'
+      });
+    }
+
+    return { parts, hardware: {}, laborDays: 0.2 + cntRefuerzos * 0.05 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 18 — ESPECIAL MANUAL
 // Sin geometría calculada — el usuario ingresa piezas y costos libres
 // ─────────────────────────────────────────────────────────────
 
@@ -567,8 +916,20 @@ export const SPECIAL_MANUAL_ID = 'ESPECIAL_MANUAL';
 // ─────────────────────────────────────────────────────────────
 
 export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
+  // ── Módulos estructurales completos ──
   MODULO_ABIERTO,
   MODULO_HORIZONTAL,
+  MODULO_BAJO_MESADA,
+  ESQUINERO,
+  ESQUINERO_EN_L,
+  // ── Piezas sueltas / aplicados ──
+  TAPA_HORIZONTAL,
+  DIVISOR_VERTICAL,
+  LATERAL_APLICADO,
+  AJUSTE,
+  ZOCALO_APLICADO,
+  ZOCALO_ESTRUCTURAL,
+  // ── Muebles especiales ──
   ESTANTE_FLOTANTE,
   BOTINERO_EXTRAIBLE,
   BOTINERO_FIJO,
