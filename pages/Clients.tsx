@@ -15,9 +15,9 @@ interface ClientsProps {
 
 const ORIGIN_LABELS: Record<ClientOrigin, string> = {
     'REFERRAL': 'Referido',
-    'ORGANIC': 'Org\u00e1nico',
+    'ORGANIC': 'Orgánico',
     'SOCIAL_MEDIA': 'Redes Sociales',
-    'WEBSITE': 'P\u00e1gina Web',
+    'WEBSITE': 'Página Web',
     'OTHER': 'Otro'
 };
 
@@ -68,7 +68,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
 
   const handleDeleteClick = (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
-    if (window.confirm(`\u00bfEst\u00e1s seguro de que deseas eliminar al cliente "${name}"? Esta acci\u00f3n no se puede deshacer.`)) {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar al cliente "${name}"? Esta acción no se puede deshacer.`)) {
       onDeleteClient(id);
     }
   };
@@ -128,7 +128,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
               <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Contacto</th>
               <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Origen</th>
               <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Estado</th>
-              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Valor Hist\u00f3rico (USD)</th>
+              <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Valor Histórico (USD)</th>
               <th className="py-4 px-6 text-xs font-bold text-gray-400 uppercase tracking-wider text-center w-10 whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
@@ -185,7 +185,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
             })}
             {filteredClients.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">No se encontraron clientes que coincidan con la b\u00fasqueda.</td>
+                <td colSpan={7} className="py-12 text-center text-gray-400 text-sm">No se encontraron clientes que coincidan con la búsqueda.</td>
               </tr>
             )}
           </tbody>
@@ -258,12 +258,12 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo / Raz\u00f3n Social</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo / Razón Social</label>
                   <input required type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tel\u00e9fono</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                     <input type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
                   </div>
                   <div>
@@ -282,16 +282,16 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Origen del Contacto</label>
                     <select className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white" value={formData.origin} onChange={e => setFormData({...formData, origin: e.target.value as ClientOrigin})}>
-                      <option value="WEBSITE">P\u00e1gina Web</option>
+                      <option value="WEBSITE">Página Web</option>
                       <option value="SOCIAL_MEDIA">Redes Sociales</option>
                       <option value="REFERRAL">Referido</option>
-                      <option value="ORGANIC">Org\u00e1nico</option>
+                      <option value="ORGANIC">Orgánico</option>
                     </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Direcci\u00f3n / Obra</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Dirección / Obra</label>
                     <input type="text" className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black focus:border-black outline-none" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                   </div>
                   {editingClient && (
@@ -312,8 +312,8 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
                 {user.role === 'administrador' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Valor Hist\u00f3rico (USD)
-                      <span className="ml-2 text-xs text-gray-400 font-normal">\u2014 Total facturado acumulado en d\u00f3lares</span>
+                      Valor Histórico (USD)
+                      <span className="ml-2 text-xs text-gray-400 font-normal">— Total facturado acumulado en dólares</span>
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">USD</span>
