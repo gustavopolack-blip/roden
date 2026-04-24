@@ -75,6 +75,20 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // ── PWA Install prompt ─────────────────────────────────────────────
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+  const handleInstallApp = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstallPrompt(null);
+  };
+
   // ── Dark mode ──────────────────────────────────────────────────────
   const [isDark, setIsDark] = useState<boolean>(() => {
     try { return localStorage.getItem('roden-theme') === 'dark'; } catch { return false; }
@@ -313,23 +327,23 @@ const App: React.FC = () => {
 
       const { data: userData, error: profileError } = await Promise.race([profilePromise, timeoutPromise]) as any;
 
-      console.log("[fetchUserProfile] Query finished. Data:", userData, "Error:", profileError);
+      if (import.meta.env.DEV) console.log("[fetchUserProfile] Query finished. Data:", userData, "Error:", profileError);
 
       if (profileError) throw profileError;
 
       if (userData) {
         const resolvedUser = userFromDB(userData);
-        console.log("[fetchUserProfile] User found in DB:", resolvedUser.email, resolvedUser.role);
+        if (import.meta.env.DEV) console.log("[fetchUserProfile] User found in DB:", resolvedUser.email, resolvedUser.role);
         currentUserRef.current = resolvedUser;
         setCurrentUser(resolvedUser);
         fetchData();
       } else {
-        console.warn("[fetchUserProfile] User not found in profiles table. Using session-based admin fallback.");
+        if (import.meta.env.DEV) console.warn("[fetchUserProfile] User not found in profiles table. Using session-based fallback.");
         const fallback: User = {
           id: session.user.id,
           email: session.user.email,
           name: session.user.email.split('@')[0].toUpperCase(),
-          role: 'administrador',
+          role: 'operario_taller',
           status: 'ACTIVE',
           joinedDate: new Date().toISOString(),
           avatarInitials: (session.user.email[0] || 'U').toUpperCase()
@@ -341,12 +355,12 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error('[fetchUserProfile] Error or Timeout:', err);
       // FALLBACK DE EMERGENCIA: Si la DB falla, entramos con los datos de la sesión
-      console.log("[fetchUserProfile] Entering emergency mode due to DB failure.");
+      if (import.meta.env.DEV) console.log("[fetchUserProfile] Entering emergency mode due to DB failure.");
       const emergencyUser: User = {
         id: session.user.id,
         email: session.user.email,
         name: session.user.email.split('@')[0].toUpperCase(),
-        role: 'administrador',
+        role: 'operario_taller',
         status: 'ACTIVE',
         joinedDate: new Date().toISOString(),
         avatarInitials: (session.user.email[0] || 'E').toUpperCase()
@@ -1227,6 +1241,7 @@ const App: React.FC = () => {
             onToggleRole={() => {}}
             isDark={isDark}
             onToggleDark={toggleDark}
+            onInstallApp={installPrompt ? handleInstallApp : undefined}
             onLogout={async () => {
               localStorage.clear();
               sessionStorage.clear();

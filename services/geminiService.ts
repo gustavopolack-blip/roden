@@ -1,26 +1,36 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { BusinessData } from '../types';
 
-const getApiKey = () => {
-  const key = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-  if (!key || key === 'undefined') {
-    console.error("🚨 Error Crítico: VITE_GEMINI_API_KEY no configurada en las variables de entorno.");
-    return null;
+// All Gemini calls are proxied through /api/gemini (Vercel serverless function).
+// The API key is stored server-side in process.env.GEMINI_API_KEY and is
+// never exposed in the frontend bundle.
+
+const callGemini = async (payload: {
+  systemInstruction: string;
+  userMessage: string;
+  temperature?: number;
+  model?: string;
+  responseMimeType?: string;
+}): Promise<string> => {
+  const response = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error ?? `HTTP ${response.status}`);
   }
-  return key;
+
+  const data = await response.json();
+  return data.text ?? '';
 };
-
-const apiKey = getApiKey();
-
-// Solo inicializamos si la llave existe
-export const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const runContextualAnalysis = async (
   mode: string,
   data: any
 ): Promise<string> => {
-  if (!genAI) return "Error en la conexión con rødën AI: API Key no configurada.";
   try {
     const today = new Date().toISOString().split('T')[0];
     const dataString = JSON.stringify(data, null, 2);
@@ -157,7 +167,7 @@ export const runContextualAnalysis = async (
 
     const systemInstruction = `
       Eres rødën AI, el Sistema de Inteligencia Operativa de 'rødën'.
-      
+
       TONO Y REGLAS:
       - Español rioplatense (vos).
       - Profesional, conciso, directo. Sin relleno.
@@ -167,87 +177,71 @@ export const runContextualAnalysis = async (
       - Sos un analista de solo lectura. Output: información, alertas y recomendaciones.
       - Nunca modificás datos. Nunca ejecutás acciones.
       - Cuando el análisis implique una acción, cerrás con: "→ Para implementar, dirigite a [módulo]."
-      
+
       MISIÓN ESPECÍFICA:
       ${modePrompts[mode] || 'Analizá los datos proporcionados.'}
-      
+
       DATOS PARA EL ANÁLISIS:
       ${dataString}
     `;
 
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Ejecutá el análisis para el modo: ${mode}`,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.1,
-      }
+    return await callGemini({
+      systemInstruction,
+      userMessage: `Ejecutá el análisis para el modo: ${mode}`,
+      temperature: 0.1,
     });
-
-    return response.text || "No pude generar el análisis en este momento.";
   } catch (error) {
-    console.error("Contextual Analysis Error:", error);
-    return "Error en la conexión con rødën AI. Reintentá en unos momentos.";
+    console.error('Contextual Analysis Error:', error);
+    return 'Error en la conexión con rødën AI. Reintentá en unos momentos.';
   }
 };
 
 export const askRodenAI = async (query: string, data: BusinessData): Promise<string> => {
-  if (!genAI) return "Error en la conexión con rødën AI: API Key no configurada.";
   try {
     const today = new Date().toISOString().split('T')[0];
     const dataString = JSON.stringify(data, null, 2);
 
     const systemInstruction = `
       Eres rødën AI, el Sistema de Inteligencia Operativa de 'rødën'.
-      
+
       TONO Y REGLAS:
       - Español rioplatense (vos).
       - Profesional, conciso, directo. Sin relleno.
       - Números exactos. Montos en $XX.XXX (ARS).
       - Si un campo es null, escribí "sin datos". Nunca lo inventes.
       - La fecha actual es ${today}.
-      
+
       CONTEXTO DEL NEGOCIO:
       rødën es un taller de producción de muebles a medida de alta gama.
       Módulos: Clientes, Proyectos, Taller, Finanzas, Informes.
-      
+
       DATOS OPERATIVOS EN TIEMPO REAL:
       ${dataString}
-      
+
       Responde a la consulta del usuario basándote en estos datos.
     `;
 
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: query,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.2,
-      }
+    return await callGemini({
+      systemInstruction,
+      userMessage: query,
+      temperature: 0.2,
     });
-
-    return response.text || "No pude procesar tu consulta en este momento.";
   } catch (error) {
-    console.error("Roden AI Error:", error);
-    return "Error en la conexión con rødën AI. Reintentá en unos momentos.";
+    console.error('Roden AI Error:', error);
+    return 'Error en la conexión con rødën AI. Reintentá en unos momentos.';
   }
 };
 
 export const generateChecklist = async (projectType: string): Promise<string[]> => {
-  if (!genAI) return ["Medición en obra", "Pedido de materiales", "Corte de placas", "Ensamblaje", "Control de Calidad"];
   try {
-    const response = await genAI.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
-      config: {
-        responseMimeType: "application/json"
-      }
+    const text = await callGemini({
+      systemInstruction: '',
+      userMessage: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
+      responseMimeType: 'application/json',
     });
-
-    const text = response.text || "[]";
     return JSON.parse(text);
   } catch (error) {
-    console.error("Checklist Gen Error:", error);
-    return ["Medición en obra", "Pedido de materiales", "Corte de placas", "Ensamblaje", "Control de Calidad"];
+    console.error('Checklist Gen Error:', error);
+    return ['Medición en obra', 'Pedido de materiales', 'Corte de placas', 'Ensamblaje', 'Control de Calidad'];
   }
 };

@@ -184,7 +184,7 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
               };
               
               onAddUser(newUserProfile);
-              alert(`Usuario creado exitosamente.\n\nEmail: ${formData.email}\nPassword: ${formData.password}\n\nTu sesión se ha cerrado automáticamente por seguridad. Por favor, vuelve a ingresar con tu cuenta de administrador.`);
+              alert(`Usuario creado exitosamente.\n\nEmail: ${formData.email}\n\nTu sesión se ha cerrado automáticamente por seguridad. Por favor, vuelve a ingresar con tu cuenta de administrador.`);
               window.location.reload(); // Recargar para forzar login de nuevo o manejar el estado
               setIsModalOpen(false);
           }
