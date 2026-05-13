@@ -68,6 +68,7 @@ export function projectFromDB(row: any): Project {
     archiveReason:        row.archive_reason,
     dossier:              row.dossier,
     linkedTechnicalEstimateId: row.linked_technical_estimate_id,
+    clientSatisfaction:   row.client_satisfaction ?? undefined,
   };
 }
 
@@ -89,6 +90,7 @@ export function projectToDB(p: Omit<Project, 'id'> & { id?: string }): any {
     production_notes:       p.productionNotes ?? null,
     archive_reason:         p.archiveReason || null,
     dossier:                p.dossier ?? null,
+    client_satisfaction:    p.clientSatisfaction ?? null,
   };
   if (p.id) row.id = p.id;
   return row;
@@ -278,7 +280,7 @@ export function reportToDB(r: Omit<Report, 'id'> & { id?: string }): any {
     project_id:           r.projectId,
     observations:         r.observations,
     generated_date:       r.generatedDate,
-    project_name_snapshot: r.projectNameSnapshot,
+   project_name_snapshot: r.projectNameSnapshot,
   };
   if (r.id && !r.id.startsWith('rep')) row.id = r.id;
   return row;

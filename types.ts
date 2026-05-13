@@ -174,6 +174,23 @@ export interface Client {
   totalValue?: number;
 }
 
+export interface DossierIncomeItem {
+  id: string;
+  title: string;
+  totalAmount: number;
+  downPayment?: number;
+  balance?: number;
+  status: string;
+}
+
+export interface DossierExpenseItem {
+  id: string;
+  providerName?: string;
+  concept?: string;
+  totalAmount: number;
+  date?: string;
+}
+
 export interface ProjectDossier {
   generatedAt: string;
   summary: string;
@@ -182,6 +199,15 @@ export interface ProjectDossier {
   profitability: number;
   keyDates: { start: string; end: string };
   clientSnapshot: { name: string };
+  // Resumen de gestión
+  tiempoPropuestaAProduccion?: number | null; // días entre startDate y productionStartDate
+  tiempoFabricacion?: number | null;          // días entre productionStartDate y cierre
+  totalIngresos?: number;
+  totalEgresos?: number;
+  margen?: number;                            // porcentaje (0–100)
+  clientSatisfaction?: number;               // 1–5
+  incomeSnapshot?: DossierIncomeItem[];
+  expensesSnapshot?: DossierExpenseItem[];
 }
 
 export interface Project {
@@ -203,6 +229,7 @@ export interface Project {
   tasksTotal?: number;
   tasksCompleted?: number;
   productionStartDate?: string;
+  clientSatisfaction?: number; // 1–5, se persiste en DB column
 }
 
 export interface Budget {
@@ -308,40 +335,19 @@ export interface Estimate {
   downPaymentDate?: string;
   balance?: number;
   balanceDate?: string;
+  expirationDate?: string;
+  status: EstimateStatus;
   totalAmount: number;
   version?: number;
-  status: EstimateStatus;
-  type?: string;
-  items?: any;
-  costSummary?: any;
-  legacyId?: string;
-  migrationSource?: string;
-  expirationDate?: string;
-  createdAt: string;
-  updatedAt?: string;
+  createdAt?: string;
   createdBy?: string;
-}
-
-export interface ProductionOrder {
-  id: string;
-  projectId: string;
-  status: ProductionOrderStatus;
-  details: string;
-  createdAt: string;
-  updatedAt?: string;
-  orderNumber?: string;
-  clientName?: string;
-  itemDescription?: string;
-  estimatedDeliveryDate?: string;
-  assignedOperators?: string[];
-  technicalDetails?: string;
-  startDate?: string;
+  currency?: string;
 }
 
 export interface BusinessData {
   clients: Client[];
   projects: Project[];
-  budgets: Budget[];
+  budgets: any[];
   suppliers: Supplier[];
   supplierPayments: SupplierPayment[];
   tasks: Task[];

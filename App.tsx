@@ -592,18 +592,52 @@ const App: React.FC = () => {
         const old = projects.find(p => p.id === project.id);
         if (old?.status !== 'COMPLETED') {
           const client = clients.find(c => c.id === project.clientId);
-          const costs = supplierPayments
-            .filter(sp => sp.projectId === project.id)
-            .reduce((sum, sp) => sum + (sp.totalAmount || 0), 0);
+          const today = new Date().toISOString().split('T')[0];
+
+          // ── Cálculo de tiempos ──
+          const calcDays = (from?: string, to?: string): number | null => {
+            if (!from || !to) return null;
+            const d1 = new Date(from);
+            const d2 = new Date(to);
+            if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return null;
+            return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+          };
+          const tiempoPropuestaAProduccion = calcDays(project.startDate, project.productionStartDate);
+          const tiempoFabricacion          = calcDays(project.productionStartDate, today);
+
+          // ── Snapshot financiero ──
+          const projectEstimates   = estimates.filter(e => e.projectId === project.id);
+          const projectSupplierPay = supplierPayments.filter(sp => sp.projectId === project.id);
+
+          const totalIngresos = projectEstimates.reduce((s, e) => s + (e.totalAmount || 0), 0);
+          const totalEgresos  = projectSupplierPay.reduce((s, sp) => s + (sp.totalAmount || 0), 0);
+          const margen        = totalIngresos > 0 ? ((totalIngresos - totalEgresos) / totalIngresos) * 100 : 0;
+
+          const incomeSnapshot = projectEstimates.map(e => ({
+            id: e.id, title: e.title, totalAmount: e.totalAmount,
+            downPayment: e.downPayment, balance: e.balance, status: e.status,
+          }));
+          const expensesSnapshot = projectSupplierPay.map(sp => ({
+            id: sp.id, providerName: sp.providerName, concept: sp.concept,
+            totalAmount: sp.totalAmount || 0, date: sp.date,
+          }));
 
           const dossier: ProjectDossier = {
             generatedAt: new Date().toISOString(),
             summary: `Obra finalizada: ${project.title}`,
             totalBudget: project.budget || 0,
-            totalCost: costs,
-            profitability: (project.budget || 0) - costs,
-            keyDates: { start: project.startDate || '', end: new Date().toISOString().split('T')[0] },
-            clientSnapshot: { name: client?.name || 'Desconocido' }
+            totalCost: totalEgresos,
+            profitability: totalIngresos - totalEgresos,
+            keyDates: { start: project.startDate || '', end: today },
+            clientSnapshot: { name: client?.name || 'Desconocido' },
+            tiempoPropuestaAProduccion,
+            tiempoFabricacion,
+            totalIngresos,
+            totalEgresos,
+            margen: Math.round(margen * 10) / 10,
+            clientSatisfaction: project.clientSatisfaction,
+            incomeSnapshot,
+            expensesSnapshot,
           };
           project.dossier = dossier;
         }
@@ -1258,51 +1292,27 @@ const App: React.FC = () => {
           <div className="lg:pl-64">
             {/* Mobile Header */}
             <header className="lg:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tighter text-roden-black">rødën</h1>
-                <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold border-l border-gray-200 pl-2">OS</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {currentUser.role === 'administrador' && <NotificationBell currentUser={currentUser} />}
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  aria-label="Abrir menu"
-                >
-                  <Menu size={24} className="text-roden-black" />
-                </button>
-              </div>
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Menu size={24} />
+              </button>
+              <span className="font-bold text-roden-black tracking-tight">rødën OS</span>
+              <NotificationBell currentUser={currentUser} />
             </header>
 
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-6 pb-24 lg:pb-6">
+            {/* Main content */}
+            <main className="p-4 md:p-8 min-h-screen">
               {renderProtectedRoutes()}
             </main>
           </div>
 
-          {/* Bottom Navigation — mobile only */}
-          <BottomNav
-            onOpenSidebar={() => setIsSidebarOpen(true)}
-            isDark={isDark}
-          />
+          <BottomNav onOpenSidebar={() => setIsSidebarOpen(true)} isDark={isDark} />
         </>
       )}
     </div>
   );
-};
-
-// ── Wrapper para ruta /estimator/:projectId ──
-interface EstimatorWithParamProps {
-  projects: import('./types').Project[];
-  clients: import('./types').Client[];
-  savedEstimates: import('./types').SavedEstimate[];
-  userRole: import('./types').UserRole;
-  onSaveEstimate: (est: import('./types').SavedEstimate) => void;
-  onDeleteEstimate: (id: string) => void;
 }
-
-const EstimatorWithParam: React.FC<EstimatorWithParamProps> = (props) => {
-  const { projectId } = useParams<{ projectId: string }>();
-  return <CostEstimator {...props} initialProjectId={projectId} />;
-};
 
 export default App;

@@ -3,22 +3,28 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, Client, SavedEstimate, ProductionOrder, Report, Estimate } from '../types';
 import { translateProjectStatus, getProjectStatusColor, translateEstimateStatus, translateProductionOrderStatus } from '../translations';
-import { 
-  Archive as ArchiveIcon, 
-  CheckCircle, 
-  XCircle, 
-  Search, 
-  Calendar, 
-  FolderOpen, 
-  DollarSign, 
-  FileText, 
+import {
+  Archive as ArchiveIcon,
+  CheckCircle,
+  XCircle,
+  Search,
+  Calendar,
+  FolderOpen,
+  DollarSign,
+  FileText,
   Hammer,
   Activity,
   X,
   Download,
   Eye,
   ClipboardList,
-  TrendingUp
+  TrendingUp,
+  Star,
+  Clock,
+  BarChart2,
+  ArrowUpRight,
+  ArrowDownRight,
+  Percent
 } from 'lucide-react';
 
 interface ArchiveProps {
@@ -372,6 +378,186 @@ const Archive: React.FC<ArchiveProps> = ({
                 </div>
               </div>
 
+              {/* ── RESUMEN DE GESTIÓN (solo obras COMPLETED con dossier) ── */}
+              {selectedProject.status === 'COMPLETED' && selectedProject.dossier && (() => {
+                const d = selectedProject.dossier;
+                const hasMgmt = d.totalIngresos !== undefined;
+                if (!hasMgmt) return null;
+
+                const margenColor = (d.margen ?? 0) >= 30
+                  ? 'text-emerald-600' : (d.margen ?? 0) >= 10
+                  ? 'text-amber-600' : 'text-red-600';
+
+                const satisfactionLabels = ['', 'Muy insatisfecho', 'Insatisfecho', 'Neutro', 'Satisfecho', 'Muy satisfecho'];
+
+                return (
+                  <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 overflow-hidden">
+                    {/* Header de la card */}
+                    <div className="px-5 py-3 bg-emerald-600 flex items-center gap-2">
+                      <BarChart2 size={16} className="text-white" />
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">Resumen de Gestión</h3>
+                      <span className="ml-auto text-[11px] text-emerald-200">
+                        Cerrado {d.generatedAt ? new Date(d.generatedAt).toLocaleDateString('es-AR') : '—'}
+                      </span>
+                    </div>
+
+                    {/* KPIs principales */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-emerald-200">
+
+                      {/* Tiempo propuesta → producción */}
+                      <div className="bg-white px-4 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Clock size={13} className="text-gray-400" />
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Propuesta → Producción</span>
+                        </div>
+                        <p className="text-xl font-bold text-roden-black">
+                          {d.tiempoPropuestaAProduccion != null ? `${d.tiempoPropuestaAProduccion} días` : '—'}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {d.keyDates?.start ? `Desde ${d.keyDates.start}` : ''}
+                        </p>
+                      </div>
+
+                      {/* Tiempo de fabricación */}
+                      <div className="bg-white px-4 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Hammer size={13} className="text-gray-400" />
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Tiempo Fabricación</span>
+                        </div>
+                        <p className="text-xl font-bold text-roden-black">
+                          {d.tiempoFabricacion != null ? `${d.tiempoFabricacion} días` : '—'}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {d.keyDates?.end ? `Hasta ${d.keyDates.end}` : ''}
+                        </p>
+                      </div>
+
+                      {/* Margen */}
+                      <div className="bg-white px-4 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Percent size={13} className="text-gray-400" />
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Margen</span>
+                        </div>
+                        <p className={`text-xl font-bold ${margenColor}`}>
+                          {d.margen != null ? `${d.margen.toFixed(1)}%` : '—'}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {d.profitability != null ? `$${(d.profitability).toLocaleString()} utilidad` : ''}
+                        </p>
+                      </div>
+
+                      {/* Ingresos */}
+                      <div className="bg-white px-4 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ArrowUpRight size={13} className="text-emerald-500" />
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Cobrado</span>
+                        </div>
+                        <p className="text-xl font-bold text-emerald-700">
+                          ${(d.totalIngresos ?? 0).toLocaleString()}
+                        </p>
+                        {d.incomeSnapshot && d.incomeSnapshot.length > 0 && (
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {d.incomeSnapshot.length} {d.incomeSnapshot.length === 1 ? 'presupuesto' : 'presupuestos'}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Egresos */}
+                      <div className="bg-white px-4 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ArrowDownRight size={13} className="text-red-400" />
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Gastado</span>
+                        </div>
+                        <p className="text-xl font-bold text-red-600">
+                          ${(d.totalEgresos ?? 0).toLocaleString()}
+                        </p>
+                        {d.expensesSnapshot && d.expensesSnapshot.length > 0 && (
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {d.expensesSnapshot.length} {d.expensesSnapshot.length === 1 ? 'pago a proveedor' : 'pagos a proveedores'}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Satisfacción del cliente */}
+                      <div className="bg-white px-4 py-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Star size={13} className="text-amber-400" />
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Satisfacción</span>
+                        </div>
+                        {d.clientSatisfaction ? (
+                          <>
+                            <div className="flex gap-0.5 mt-1">
+                              {[1,2,3,4,5].map(s => (
+                                <Star
+                                  key={s}
+                                  size={18}
+                                  className={s <= d.clientSatisfaction! ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-200'}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-gray-500 mt-1">
+                              {satisfactionLabels[d.clientSatisfaction]}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-400 mt-1">Sin registrar</p>
+                        )}
+                      </div>
+                    </div>
+
+
+                    {/* Detalle de ingresos y egresos archivados */}
+                    {((d.incomeSnapshot && d.incomeSnapshot.length > 0) || (d.expensesSnapshot && d.expensesSnapshot.length > 0)) && (
+                      <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* Ingresos detalle */}
+                        {d.incomeSnapshot && d.incomeSnapshot.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide mb-2">Ingresos archivados</p>
+                            <div className="space-y-1.5">
+                              {d.incomeSnapshot.map(item => (
+                                <div key={item.id} className="bg-white rounded-lg px-3 py-2 flex justify-between items-center border border-emerald-100">
+                                  <div>
+                                    <p className="text-xs font-medium text-roden-black">{item.title}</p>
+                                    {(item.downPayment || item.balance) && (
+                                      <p className="text-[11px] text-gray-400">
+                                        Anticipo ${(item.downPayment || 0).toLocaleString()} · Saldo ${(item.balance || 0).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-bold text-emerald-700">${item.totalAmount.toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Egresos detalle */}
+                        {d.expensesSnapshot && d.expensesSnapshot.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-bold text-red-600 uppercase tracking-wide mb-2">Egresos archivados</p>
+                            <div className="space-y-1.5">
+                              {d.expensesSnapshot.map(item => (
+                                <div key={item.id} className="bg-white rounded-lg px-3 py-2 flex justify-between items-center border border-red-100">
+                                  <div>
+                                    <p className="text-xs font-medium text-roden-black">{item.providerName || 'Proveedor'}</p>
+                                    {item.concept && (
+                                      <p className="text-[11px] text-gray-400">{item.concept}</p>
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-bold text-red-600">${item.totalAmount.toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* PRESUPUESTOS/ESTIMATES */}
               {(() => {
                 const projectEstimates = estimates.filter(e => e.projectId === selectedProject.id);
@@ -495,7 +681,7 @@ const Archive: React.FC<ArchiveProps> = ({
               {/* EMPTY STATE */}
               {(() => {
                 const dossier = getProjectDossier(selectedProject.id);
-                return dossier.totalDocs === 0 && (
+                return dossier.totalDocs === 0 && !selectedProject.dossier && (
                   <div className="text-center py-12 bg-gray-50 rounded-xl">
                     <FolderOpen size={48} className="mx-auto mb-4 text-gray-300" />
                     <p className="text-gray-500">No hay documentos en este legajo todavía</p>

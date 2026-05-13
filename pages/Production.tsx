@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, ProductionStep, Client, ProjectStatus, User, ProductionNote, SavedEstimate, ProductionOrder, ProductionOrderStatus, Task, TaskPriority } from '../types';
-import { Hammer, Clock, ArrowRight, ArrowLeft, Check, Package, Palette, FileText, ShoppingCart, Truck, X, Info, Plus, HardDrive, Archive, Calendar, MessageSquare, Save, Lock, Printer, List, LayoutGrid, AlertTriangle, Zap, Link2, ClipboardList, CheckSquare } from 'lucide-react';
+import { Hammer, Clock, ArrowRight, ArrowLeft, Check, Package, Palette, FileText, ShoppingCart, Truck, X, Info, Plus, HardDrive, Archive, Calendar, MessageSquare, Save, Lock, Printer, List, LayoutGrid, AlertTriangle, Zap, Link2, ClipboardList, CheckSquare, Star } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { translateProductionOrderStatus, translateProjectStatus } from '../translations';
 
@@ -57,6 +57,11 @@ const Production: React.FC<ProductionProps> = ({
   // State for Technical View Modal
   const [viewingTechnicalEstimate, setViewingTechnicalEstimate] = useState<SavedEstimate | null>(null);
 
+  // State for closure modal (shown when marking a project LISTO)
+  const [closureProject, setClosureProject] = useState<Project | null>(null);
+  const [closureSatisfaction, setClosureSatisfaction] = useState<number>(0);
+  const [closureHoveredStar, setClosureHoveredStar] = useState<number>(0);
+
   // Drive link editing state (admin only)
   const [editingDriveProjectId, setEditingDriveProjectId] = useState<string | null>(null);
   const [driveInputValue, setDriveInputValue] = useState('');
@@ -93,8 +98,10 @@ const Production: React.FC<ProductionProps> = ({
 
   // PERMISSION CHECK:
   // Manage = Move columns, Create projects (Admin/Manager)
+  // CloseProject = Dar por finalizada una obra — SOLO administrador
   // Collaborate = Add notes (Everyone including 'USER')
   const canManageProduction = user.role === 'administrador' || user.role === 'gerente_taller';
+  const canCloseProject = user.role === 'administrador';
   const canAddNotes = true; // All authenticated users can add notes/collaborate
 
   // Filter active production projects. 
@@ -120,36 +127,63 @@ const Production: React.FC<ProductionProps> = ({
      const stepsOrder = PRODUCTION_STEPS.map(s => s.id);
      const currentStep = project.productionStep || 'ANTICIPO_PLANOS';
      const currentIndex = stepsOrder.indexOf(currentStep);
-     
+
      if (currentIndex < stepsOrder.length - 1) {
          const nextStep = stepsOrder[currentIndex + 1];
+
+         if (nextStep === 'LISTO') {
+             // Solo administrador puede cerrar una obra
+             if (!canCloseProject) {
+                 alert('Solo el administrador puede dar por finalizada una obra.');
+                 return;
+             }
+             // Interceptar: mostrar modal de cierre para pedir satisfacción
+             setClosureProject(project);
+             setClosureSatisfaction(0);
+             setClosureHoveredStar(0);
+             return;
+         }
+
          // Increase progress by 15% roughly per step, max 100
          const newProgress = Math.min(100, project.progress + 15);
-         
-         // Update dates
+
+         // Update dates — ISO format para cálculos futuros
          const now = new Date();
-         const dateString = `${now.getDate()}/${now.getMonth() + 1}`;
+         const dateString = now.toISOString().split('T')[0];
          const updatedDates = { ...(project.stepDates || {}), [nextStep]: dateString };
 
          // Determine Project Status based on Production Step
          let newStatus: ProjectStatus = 'PRODUCTION';
-         
          if (nextStep === 'PREPARACION') {
-             // Logic: 'PREPARACION' -> Project is READY for delivery (Shows in Listo column)
              newStatus = 'READY';
-         } else if (nextStep === 'LISTO') {
-             // Logic: 'LISTO' -> Project is COMPLETED/ARCHIVED
-             newStatus = 'COMPLETED';
          }
 
          onUpdateProject({
              ...project,
              productionStep: nextStep,
-             progress: nextStep === 'LISTO' ? 100 : newProgress,
+             progress: newProgress,
              stepDates: updatedDates,
              status: newStatus
          });
      }
+  };
+
+  // Confirmar cierre de obra desde el modal
+  const handleConfirmClosure = () => {
+     if (!closureProject) return;
+     const now = new Date();
+     const dateString = now.toISOString().split('T')[0];
+     const updatedDates = { ...(closureProject.stepDates || {}), LISTO: dateString };
+
+     onUpdateProject({
+         ...closureProject,
+         productionStep: 'LISTO',
+         progress: 100,
+         stepDates: updatedDates,
+         status: 'COMPLETED',
+         clientSatisfaction: closureSatisfaction > 0 ? closureSatisfaction : undefined,
+     });
+     setClosureProject(null);
   };
 
   const handleRegressStep = (project: Project) => {
@@ -1076,20 +1110,18 @@ const Production: React.FC<ProductionProps> = ({
                     if (!onAddTask || !newTaskForm.title || !newTaskForm.assignee || !newTaskForm.dueDate) return;
                     const task: Task = {
                       id: `t${Date.now()}`,
+                      projectId: taskModalProject!.id,
                       title: newTaskForm.title,
-                      assignee: newTaskForm.assignee,
+                      assigneeId: newTaskForm.assignee,
                       dueDate: newTaskForm.dueDate,
                       priority: newTaskForm.priority,
-                      projectId: taskModalProject.id,
-                      completed: false,
                       status: 'TODO',
-                      createdBy: user.name,
                     };
                     onAddTask(task);
                     setTaskModalProject(null);
                     setNewTaskForm({ title: '', assignee: '', dueDate: '', priority: 'MEDIUM' });
                   }}
-                  className="flex-1 px-4 py-2 text-sm font-bold bg-roden-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 text-sm font-bold text-white bg-roden-black rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Crear Tarea
                 </button>
@@ -1099,8 +1131,89 @@ const Production: React.FC<ProductionProps> = ({
         </div>,
         document.body
       )}
+
+      {/* ── MODAL: CIERRE DE OBRA ── */}
+      {closureProject && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200">
+
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-white rounded-t-2xl">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Cierre de Obra</p>
+                  <h3 className="text-xl font-bold text-roden-black">{closureProject.title}</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    La obra pasará a Archivo con un resumen de gestión completo.
+                  </p>
+                </div>
+                <button onClick={() => setClosureProject(null)} className="text-gray-400 hover:text-black p-1">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              <div>
+                <p className="text-sm font-semibold text-roden-black mb-4 text-center">
+                  ¿Cómo calificarías la satisfacción del cliente?
+                </p>
+                <div className="flex gap-3 justify-center">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      onMouseEnter={() => setClosureHoveredStar(star)}
+                      onMouseLeave={() => setClosureHoveredStar(0)}
+                      onClick={() => setClosureSatisfaction(prev => prev === star ? 0 : star)}
+                      className="p-1 transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <Star
+                        size={38}
+                        className={`transition-colors duration-100 ${
+                          star <= (closureHoveredStar || closureSatisfaction)
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-gray-200 fill-gray-200'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {closureSatisfaction > 0 && (
+                  <p className="text-center text-sm font-medium text-amber-600 mt-3">
+                    {['', 'Muy insatisfecho', 'Insatisfecho', 'Neutro', 'Satisfecho', 'Muy satisfecho'][closureSatisfaction]}
+                  </p>
+                )}
+                {closureSatisfaction === 0 && (
+                  <p className="text-center text-xs text-gray-400 mt-3">
+                    Opcional — podés completarlo después desde el Legajo
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => setClosureProject(null)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmClosure}
+                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Check size={16} /> Cerrar Obra
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
-};
+}
 
 export default Production;
