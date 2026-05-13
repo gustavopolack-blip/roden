@@ -63,6 +63,17 @@ import BottomNav from './components/BottomNav';
 import { emitNotification } from './utils/notificationHelpers';
 import { Session } from '@supabase/supabase-js';
 
+
+// Wrapper para /estimator/:projectId que extrae el param de la URL
+const EstimatorWithParam: React.FC<any> = (props) => {
+  const { projectId } = useParams<{ projectId: string }>();
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin" /></div>}>
+      <CostEstimator {...props} initialProjectId={projectId} />
+    </Suspense>
+  );
+};
+
 const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
