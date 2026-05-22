@@ -317,6 +317,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   const [newListName, setNewListName] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [showClosedHistory, setShowClosedHistory] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [filterStatus, setFilterStatus] = useState<BudgetStatus | 'ALL'>('ALL'); // New: Filter for budget status
   
@@ -3616,8 +3617,17 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       );
   }
 
+  const closedProjectIdsHistory = new Set(
+    projects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED').map(p => p.id)
+  );
+  const closedHistoryCount = savedEstimates.filter(est =>
+    !est.isArchived && est.projectId && closedProjectIdsHistory.has(est.projectId)
+  ).length;
+
   const groupedHistory = savedEstimates.reduce((acc, est) => {
       if (!!est.isArchived !== showArchived) return acc;
+      // Ocultar estimaciones de obras cerradas (a menos que toggle activo)
+      if (!showClosedHistory && est.projectId && closedProjectIdsHistory.has(est.projectId)) return acc;
       const projectTitle = est.projectId ? getProjectTitleById(est.projectId) : est.customProjectName || 'Sin Nombre';
       if (historySearch && !projectTitle.toLowerCase().includes(historySearch.toLowerCase())) return acc;
       
@@ -4352,7 +4362,18 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 {showArchived ? 'Volver al Historial' : 'Ver Archivo'}
                             </button>
                         </div>
-                        <div className="flex gap-4 items-center">
+                        <div className="flex gap-4 items-center flex-wrap">
+                            {!showArchived && closedHistoryCount > 0 && (
+                              <button
+                                onClick={() => setShowClosedHistory(v => !v)}
+                                className="text-xs text-gray-400 hover:text-gray-600 font-medium flex items-center gap-1"
+                              >
+                                <Archive size={13}/>
+                                {showClosedHistory
+                                  ? 'Ocultar obras cerradas'
+                                  : `Ver obras cerradas (${closedHistoryCount})`}
+                              </button>
+                            )}
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14}/>
                                 <input
@@ -4363,7 +4384,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     onChange={(e) => setHistorySearch(e.target.value)}
                                 />
                             </div>
-                            <select 
+                            <select
                                 className="border p-2 rounded-xl text-sm w-48 bg-gray-50 focus:ring-2 focus:ring-black outline-none"
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value as BudgetStatus | 'ALL')}
@@ -5246,7 +5267,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <button
                                                 onClick={() => handleLoadTemplate(tpl, true)}
                                                 className="flex-1 border border-gray-300 text-gray-700 text-xs font-bold py-1.5 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1"
-                                            >
+      >
                                                 <Pencil size={12}/> Usar como base
                                             </button>
                                         </div>

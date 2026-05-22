@@ -30,9 +30,15 @@ const PRODUCTION_STEP_LABELS: Record<ProductionStep, string> = {
 const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments, savedEstimates = [], priceLists = [], user, userRole, onAddEstimate, onUpdateEstimate, onDeleteEstimate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+
   const [filterStatus, setFilterStatus] = useState<EstimateStatus | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showClosedProjects, setShowClosedProjects] = useState(false);
+
+  // IDs de proyectos cerrados (COMPLETED o CANCELLED)
+  const closedProjectIds = new Set(
+    projects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED').map(p => p.id)
+  );
   
   const [estimateForm, setEstimateForm] = useState({
       projectId: '',
@@ -50,11 +56,17 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
   const getProject = (id: string) => projects.find(p => p.id === id);
   const getProjectName = (id: string) => getProject(id)?.title || 'Proyecto Desconocido';
 
+  const closedEstimatesCount = estimates.filter(est =>
+    est.projectId && closedProjectIds.has(est.projectId)
+  ).length;
+
   const filteredEstimates = estimates.filter(est => {
+    // Ocultar presupuestos de obras cerradas (a menos que el toggle esté activo)
+    if (!showClosedProjects && est.projectId && closedProjectIds.has(est.projectId)) return false;
     const matchesStatus = filterStatus === 'ALL' || est.status === filterStatus;
     const projectName = getProjectName(est.projectId || '').toLowerCase();
     const title = (est.title || '').toLowerCase();
-    const matchesSearch = projectName.includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = projectName.includes(searchTerm.toLowerCase()) ||
                           title.includes(searchTerm.toLowerCase()) ||
                           (est.id || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
@@ -71,14 +83,16 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
         return ['APPROVED', 'PRODUCTION', 'SENT'].includes(e.status) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     }).reduce((acc, e) => acc + e.totalAmount, 0);
 
-  // Profitability Analysis
-  const profitabilityData = projects.map(project => {
+  // Profitability Analysis (excluye proyectos cerrados a menos que el toggle esté activo)
+  const profitabilityData = projects
+    .filter(p => showClosedProjects || !closedProjectIds.has(p.id))
+    .map(project => {
       const income = estimates.filter(e => e.projectId === project.id && ['APPROVED', 'PRODUCTION', 'SENT'].includes(e.status)).reduce((sum, e) => sum + e.totalAmount, 0);
       const expenses = supplierPayments.filter(sp => sp.projectId === project.id).reduce((sum, sp) => sum + sp.totalAmount, 0);
       const profit = income - expenses;
       const margin = income > 0 ? (profit / income) * 100 : 0;
       return { id: project.id, title: project.title, status: project.status, income, expenses, profit, margin };
-  }).filter(d => d.income > 0 || d.expenses > 0).sort((a, b) => b.profit - a.profit); 
+    }).filter(d => d.income > 0 || d.expenses > 0).sort((a, b) => b.profit - a.profit);
 
   const handleOpenCreate = () => {
     setEditingId(null);
@@ -253,9 +267,20 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                  <input type="text" placeholder="Buscar presupuestos..." className="w-full bg-white border border-gray-200 pl-9 pr-4 py-2 rounded-lg text-sm focus:outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                  {closedEstimatesCount > 0 && (
+                    <button
+                      onClick={() => setShowClosedProjects(v => !v)}
+                      className="text-xs text-gray-400 hover:text-gray-600 font-medium flex items-center gap-1"
+                    >
+                      <Archive size={13} />
+                      {showClosedProjects
+                        ? 'Ocultar obras cerradas'
+                        : `Ver obras cerradas (${closedEstimatesCount})`}
+                    </button>
+                  )}
                   <Filter size={16} className="text-gray-400" />
-                  <select 
+                  <select
                     className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value as any)}

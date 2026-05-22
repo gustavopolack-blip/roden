@@ -577,7 +577,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                                 {observations || "Sin observaciones adicionales."}
                             </div>
                         ) : (
-                            <textarea 
+                    <textarea 
                                 value={observations}
                                 onChange={(e) => setObservations(e.target.value)}
                                 placeholder="Ingrese detalles técnicos de entrega, faltantes de herrajes o instrucciones específicas de instalación..."
