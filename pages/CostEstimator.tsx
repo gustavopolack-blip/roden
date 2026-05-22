@@ -607,7 +607,21 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           if (mod.hasGasPistons) {
               modPistons += (mod.cntFlaps || 0);
               if (modPistons > 0) detailedHardware['Pistones a Gas'] = (detailedHardware['Pistones a Gas'] || 0) + (modPistons * qty);
-          } 
+          }
+          // Herrajes de módulos especiales (templates)
+          if ((mod as any).isSpecialModule && (mod as any).specialHardware) {
+              const sh = (mod as any).specialHardware;
+              if (sh.slides && sh.slides > 0) {
+                  const slideLen  = sh.slideLength || 500;
+                  const slideType = sh.slideType   || 'TELESCOPIC';
+                  const slideName = `${SLIDE_LABELS[slideType] || 'Guías'} (${slideLen}mm)`;
+                  detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (sh.slides * qty);
+              }
+              if (sh.hinges && sh.hinges > 0) {
+                  const hingeName = HINGE_LABELS[sh.hingeType || 'COMMON'] || 'Bisagras Estándar';
+                  detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (sh.hinges * qty);
+              }
+          }
           if (mod.calculateSlides) {
               modSlides += (mod.cntDrawers || 0);
               const slideLen = getStandardSlideLength(d);
@@ -942,6 +956,25 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           }
           if (mod.hasGasPistons) {
               costHW += (mod.cntFlaps || 0) * (S.priceGasPiston || 0) * qty;
+          }
+          // Herrajes de módulos especiales (templates): guías y bisagras
+          if ((mod as any).isSpecialModule && (mod as any).specialHardware) {
+              const sh = (mod as any).specialHardware;
+              if (sh.slides && sh.slides > 0) {
+                  const depth = mod.depth || 0;
+                  const slideType = sh.slideType || 'TELESCOPIC';
+                  let priceSlide = S.priceSlide500Std || 0;
+                  if (depth < 400)      priceSlide = slideType === 'TELESCOPIC_SOFT' ? (S.priceSlide300Soft || 0) : (S.priceSlide300Std || 0);
+                  else if (depth < 500) priceSlide = slideType === 'TELESCOPIC_SOFT' ? (S.priceSlide400Soft || 0) : (S.priceSlide400Std || 0);
+                  else                  priceSlide = slideType === 'TELESCOPIC_SOFT' ? (S.priceSlide500Soft || 0) : (S.priceSlide500Std || 0);
+                  costHW += sh.slides * priceSlide * qty;
+              }
+              if (sh.hinges && sh.hinges > 0) {
+                  const priceHinge = sh.hingeType === 'SOFT_CLOSE' ? (S.priceHingeSoftClose || 0)
+                                   : sh.hingeType === 'PUSH'       ? (S.priceHingePush      || 0)
+                                   :                                  (S.priceHingeStandard  || 0);
+                  costHW += sh.hinges * priceHinge * qty;
+              }
           }
           // Extras del módulo
           (mod.extras || []).forEach((ex: any) => {

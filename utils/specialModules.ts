@@ -14,6 +14,8 @@ export interface SpecialHardware {
   slides?: number;
   slideLength?: number;
   slideType?: string;
+  hinges?: number;
+  hingeType?: string;  // 'COMMON' | 'SOFT_CLOSE' | 'PUSH'
 }
 
 export interface SpecialModuleResult {
@@ -913,7 +915,84 @@ const ZOCALO_ESTRUCTURAL: SpecialModuleTemplate = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// TEMPLATE 18 — ESPECIAL MANUAL
+// TEMPLATE 18 — PUERTA 18MM
+// Puerta simple de melamina 18mm. Espesor fijo.
+// Solo requiere ancho y alto. Lleva bisagras automáticas.
+// ≤900mm → 2 bisagras | ≤1500mm → 3 | >1500mm → 4
+// ─────────────────────────────────────────────────────────────
+
+const PUERTA_18MM: SpecialModuleTemplate = {
+  id: 'PUERTA_18MM',
+  name: 'Puerta 18mm',
+  description: 'Puerta melamina 18mm. Bisagras automáticas: ≤900mm→2, ≤1500mm→3, >1500mm→4.',
+  params: ['width', 'height'],
+  extraOptions: [
+    {
+      key: 'hingeType',
+      label: 'Tipo de bisagra',
+      type: 'select',
+      options: [
+        { label: 'Estándar',     value: 'COMMON'     },
+        { label: 'Cierre Suave', value: 'SOFT_CLOSE' },
+        { label: 'Push-Open',    value: 'PUSH'       },
+      ]
+    }
+  ],
+  calculate: ({ width: W, height: H }, options = {}) => {
+    const hingeType = options.hingeType || 'COMMON';
+    const hinges    = H > 1500 ? 4 : H > 900 ? 3 : 2;
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     'Puerta 18mm',
+      width:    W,
+      height:   H,
+      material: '18mm_Front',
+      quantity: 1,
+      grain:    'vertical'
+    });
+
+    return {
+      parts,
+      hardware: { hinges, hingeType },
+      laborDays: 0.1
+    };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 19 — ESTANTE 18MM
+// Estante simple melamina 18mm. Espesor fijo.
+// Solo requiere ancho y profundidad.
+// ─────────────────────────────────────────────────────────────
+
+const ESTANTE_18MM: SpecialModuleTemplate = {
+  id: 'ESTANTE_18MM',
+  name: 'Estante 18mm',
+  description: 'Estante melamina 18mm. Espesor fijo. Solo ancho y profundidad.',
+  params: ['width', 'depth'],
+  calculate: ({ width: W, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+
+    parts.push({
+      name:     'Estante 18mm',
+      width:    W,
+      height:   D,
+      material: '18mm_Carcass',
+      quantity: 1,
+      grain:    'horizontal'
+    });
+
+    return {
+      parts,
+      hardware: {},
+      laborDays: 0.05
+    };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// TEMPLATE 20 — ESPECIAL MANUAL
 // Sin geometría calculada — el usuario ingresa piezas y costos libres
 // ─────────────────────────────────────────────────────────────
 
@@ -947,6 +1026,9 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   BIBLIOTECA,
   PANEL_LISO,
   PANEL_ENLISTONADO,
+  // ── Piezas individuales con espesor fijo ──
+  PUERTA_18MM,
+  ESTANTE_18MM,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>
@@ -1015,8 +1097,19 @@ export const calculateSpecialModuleCost = (
   });
   costMaterials += (perimeterMM / 1000) * snapshot.priceEdge45Color045;
 
-  // Herrajes: guías si tiene
+  // Herrajes: guías y bisagras
   let costHardware = 0;
+
+  // Bisagras
+  if (result.hardware.hinges && result.hardware.hinges > 0) {
+    const hType = result.hardware.hingeType || 'COMMON';
+    const priceHinge = hType === 'SOFT_CLOSE' ? (snapshot.priceHingeSoftClose || 0)
+                     : hType === 'PUSH'       ? (snapshot.priceHingePush      || 0)
+                     :                          (snapshot.priceHingeStandard  || 0);
+    costHardware += result.hardware.hinges * priceHinge;
+  }
+
+  // Guías telescópicas
   if (result.hardware.slides && result.hardware.slides > 0) {
     const len = result.hardware.slideLength || 500;
     let priceSlide = snapshot.priceSlide500Std;
