@@ -57,11 +57,18 @@ import {
   reportFromDB, reportToDB,
   budgetFromDB, budgetToDB
 } from './utils/dataMapper';
-import { Loader2, Menu, ShieldAlert, RefreshCw, X, ShieldCheck } from 'lucide-react';
+import { Loader2, Menu, ShieldAlert, RefreshCw, X, ShieldCheck, Fingerprint } from 'lucide-react';
 import NotificationBell from './components/NotificationBell';
 import BottomNav from './components/BottomNav';
 import { emitNotification } from './utils/notificationHelpers';
 import { Session } from '@supabase/supabase-js';
+import {
+  isBiometricAvailable,
+  hasBiometricCredential,
+  hasBiometricDeclined,
+  setBiometricDeclined,
+  registerBiometric,
+} from './utils/webauthn';
 
 
 // Wrapper para /estimator/:projectId que extrae el param de la URL
@@ -140,6 +147,11 @@ const App: React.FC = () => {
 
   const [showEmergencyButton, setShowEmergencyButton] = useState(false);
 
+  // ── Biometric enrollment offer ─────────────────────────────────────────────
+  const [showBiometricOffer, setShowBiometricOffer] = useState(false);
+  const [biometricEnrolling, setBiometricEnrolling] = useState(false);
+  const [biometricSuccess, setBiometricSuccess] = useState(false);
+
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isProfileLoading) {
@@ -149,6 +161,43 @@ const App: React.FC = () => {
     }
     return () => clearTimeout(timer);
   }, [isProfileLoading]);
+
+  // ── Biometric enrollment: offer once after a new login ────────────────────
+  useEffect(() => {
+    if (!session || !currentUser) return;
+    // Only once per browser session (tab)
+    if (sessionStorage.getItem('roden_biometric_checked')) return;
+    sessionStorage.setItem('roden_biometric_checked', '1');
+    // Don't offer if already enrolled or previously declined
+    if (hasBiometricCredential() || hasBiometricDeclined()) return;
+    isBiometricAvailable().then(available => {
+      if (available) setShowBiometricOffer(true);
+    });
+  }, [session, currentUser]);
+
+  const handleBiometricEnroll = async () => {
+    setBiometricEnrolling(true);
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession || !currentUser) return;
+      const ok = await registerBiometric(
+        currentUser.id,
+        currentUser.email,
+        currentSession.refresh_token,
+      );
+      if (ok) {
+        setBiometricSuccess(true);
+        setTimeout(() => {
+          setShowBiometricOffer(false);
+          setBiometricSuccess(false);
+        }, 2000);
+      } else {
+        setShowBiometricOffer(false);
+      }
+    } finally {
+      setBiometricEnrolling(false);
+    }
+  };
 
   const loadMockData = () => {
     console.log("[loadMockData] Loading static mock data...");
@@ -1311,6 +1360,7 @@ const App: React.FC = () => {
               >
                 Cerrar sesión y reintentar
               </button>
+    
             </div>
           </div>
         </div>
@@ -1360,10 +1410,65 @@ const App: React.FC = () => {
           <BottomNav onOpenSidebar={() => setIsSidebarOpen(true)} isDark={isDark} />
         </>
       )}
+
+      {/* Biometric Enrollment Modal */}
+      {showBiometricOffer && (
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+            {biometricSuccess ? (
+              <div className="p-8 flex flex-col items-center gap-3 text-center">
+                <div className="p-4 bg-emerald-100 rounded-full">
+                  <ShieldCheck size={36} className="text-emerald-600" />
+                </div>
+                <p className="text-lg font-bold text-roden-black">¡Huella registrada!</p>
+                <p className="text-sm text-gray-500">La próxima vez podés ingresar sin contraseña.</p>
+              </div>
+            ) : (
+              <>
+                <div className="p-6 pb-2 flex flex-col items-center gap-4 text-center">
+                  <div className="p-4 bg-gray-100 rounded-full mt-2">
+                    <Fingerprint size={40} className="text-roden-black" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-roden-black mb-1">Activar acceso con huella</h3>
+                    <p className="text-sm text-gray-500 leading-relaxed">
+                      Ingresá más rápido la próxima vez usando tu huella o Face ID.
+                      Tu contraseña no cambia.
+                    </p>
+                  </div>
+                </div>
+                <div className="p-6 pt-4 space-y-3">
+                  <button
+                    onClick={handleBiometricEnroll}
+                    disabled={biometricEnrolling}
+                    className="w-full py-3.5 bg-roden-black text-white font-bold rounded-xl hover:bg-gray-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {biometricEnrolling
+                      ? <><Loader2 size={18} className="animate-spin" /> Registrando...</>
+                      : <><Fingerprint size={18} /> Activar huella</>
+                    }
+                  </button>
+                  <button
+                    onClick={() => { setShowBiometricOffer(false); setBiometricDeclined(); }}
+                    className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    No gracias
+                  </button>
+                  <button
+                    onClick={() => setShowBiometricOffer(false)}
+                    className="w-full py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Recordarme después
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-
-export default App;
 
 export default App;
