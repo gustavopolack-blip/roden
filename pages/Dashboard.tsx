@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { BusinessData } from '../types';
+import { BusinessData, Estimate, SupplierPayment } from '../types';
 import MetricCard from '../components/MetricCard';
-import { DollarSign, Clock, CheckCircle, AlertTriangle, ArrowRight, FileText, Send, Hammer, Truck, Zap } from 'lucide-react';
+import { DollarSign, Clock, CheckCircle, AlertTriangle, ArrowRight, FileText, Send, Hammer, Truck, Zap, TrendingUp, TrendingDown, Scale } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import RodenAIButton from '../components/RodenAIButton';
 import NotasGestion from '../components/NotasGestion';
@@ -10,11 +10,27 @@ import NotasGestion from '../components/NotasGestion';
 interface DashboardProps {
   data: BusinessData;
   userRole: string;
+  estimates?: Estimate[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, userRole, estimates = [] }) => {
   const [mostrarNotas, setMostrarNotas] = React.useState(false);
-  
+
+  // ── POSICIÓN FINANCIERA PENDIENTE ──────────────────────────────────────────
+  // Saldos a pagar: balance pendiente de pagos a proveedores (status PENDING)
+  const saldosAPagar = (data.supplierPayments || [])
+    .filter(sp => sp.status === 'PENDING')
+    .reduce((sum, sp) => sum + (sp.balance || sp.totalAmount || 0), 0);
+
+  // Saldos a cobrar: balance pendiente de estimaciones activas
+  const COBRAR_STATUSES = ['APPROVED', 'PRODUCTION', 'SENT'];
+  const saldosACobrar = estimates
+    .filter(e => COBRAR_STATUSES.includes(e.status))
+    .reduce((sum, e) => sum + (e.balance || 0), 0);
+
+  // Beneficio pendiente neto
+  const beneficioPendiente = saldosACobrar - saldosAPagar;
+
   // 1. Propuestas en curso (Status: PROPOSAL)
   const proposalsCount = (data.projects || []).filter(p => p && p.status === 'PROPOSAL').length;
 
@@ -118,6 +134,51 @@ const Dashboard: React.FC<DashboardProps> = ({ data, userRole }) => {
               color="gray"
             />
          </div>
+      </div>
+
+      {/* Posición Financiera Pendiente */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+        {/* Saldos a Cobrar */}
+        <div className="bg-white border border-roden-border rounded-xl p-5 shadow-sm flex items-center gap-4 hover:border-emerald-300 transition-colors">
+          <div className="p-3 bg-emerald-50 rounded-xl shrink-0">
+            <TrendingUp size={22} className="text-emerald-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Saldos a Cobrar</p>
+            <p className="text-2xl font-bold text-roden-black truncate">${saldosACobrar.toLocaleString('es-AR')}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Balances pendientes de clientes</p>
+          </div>
+        </div>
+
+        {/* Saldos a Pagar */}
+        <div className="bg-white border border-roden-border rounded-xl p-5 shadow-sm flex items-center gap-4 hover:border-rose-300 transition-colors">
+          <div className="p-3 bg-rose-50 rounded-xl shrink-0">
+            <TrendingDown size={22} className="text-rose-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Saldos a Pagar</p>
+            <p className="text-2xl font-bold text-roden-black truncate">${saldosAPagar.toLocaleString('es-AR')}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">Balances pendientes a proveedores</p>
+          </div>
+        </div>
+
+        {/* Beneficio Pendiente Neto */}
+        <div className={`border rounded-xl p-5 shadow-sm flex items-center gap-4 transition-colors ${
+          beneficioPendiente >= 0
+            ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400'
+            : 'bg-rose-50 border-rose-200 hover:border-rose-400'
+        }`}>
+          <div className={`p-3 rounded-xl shrink-0 ${beneficioPendiente >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            <Scale size={22} className={beneficioPendiente >= 0 ? 'text-emerald-700' : 'text-rose-700'} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-0.5">Beneficio Neto Pendiente</p>
+            <p className={`text-2xl font-bold truncate ${beneficioPendiente >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {beneficioPendiente >= 0 ? '+' : ''}${beneficioPendiente.toLocaleString('es-AR')}
+            </p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Cobrar − Pagar</p>
+          </div>
+        </div>
       </div>
 
       {/* Charts & Activity */}

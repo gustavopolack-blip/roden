@@ -1071,7 +1071,7 @@ const App: React.FC = () => {
         </div>
       }>
         <Routes>
-          <Route path="/" element={<Dashboard data={data} userRole={role} />} />
+          <Route path="/" element={<Dashboard data={data} userRole={role} estimates={estimates} />} />
 
           <Route path="/projects" element={
             <Projects
@@ -1363,5 +1363,7 @@ const App: React.FC = () => {
     </div>
   );
 }
+
+export default App;
 
 export default App;
