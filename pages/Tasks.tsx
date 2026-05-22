@@ -19,6 +19,12 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterProjectId, setFilterProjectId] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
+  const [showClosedProjects, setShowClosedProjects] = useState(false);
+
+  // IDs de proyectos cerrados (COMPLETED o CANCELLED)
+  const closedProjectIds = new Set(
+    projects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED').map(p => p.id)
+  );
   
   const [newTask, setNewTask] = useState({
       title: '',
@@ -43,10 +49,16 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
   const filteredTasks = tasks.filter(task => {
       // No mostrar tareas archivadas por defecto
       if ((task as any).status === 'ARCHIVED') return false;
+      // Ocultar tareas de obras cerradas (a menos que el toggle esté activo)
+      if (!showClosedProjects && task.projectId && closedProjectIds.has(task.projectId)) return false;
       const matchesProject = filterProjectId ? task.projectId === filterProjectId : true;
       const matchesAssignee = filterAssignee ? task.assignee === filterAssignee : true;
       return matchesProject && matchesAssignee;
   });
+
+  const closedTasksCount = tasks.filter(t =>
+    t.projectId && closedProjectIds.has(t.projectId) && (t as any).status !== 'ARCHIVED'
+  ).length;
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -117,6 +129,18 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, users, currentUser, onAd
                 >
                     Limpiar
                 </button>
+            )}
+            {/* Toggle obras cerradas */}
+            {closedTasksCount > 0 && (
+              <button
+                onClick={() => setShowClosedProjects(v => !v)}
+                className="text-xs text-gray-400 hover:text-gray-600 font-medium flex items-center gap-1 ml-auto"
+              >
+                <Archive size={13} />
+                {showClosedProjects
+                  ? 'Ocultar obras cerradas'
+                  : `Ver obras cerradas (${closedTasksCount})`}
+              </button>
             )}
         </div>
       </header>

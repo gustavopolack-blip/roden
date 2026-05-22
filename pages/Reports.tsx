@@ -33,6 +33,12 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   // Search / Filters for History List
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [historyDateFilter, setHistoryDateFilter] = useState('');
+  const [showClosedReports, setShowClosedReports] = useState(false);
+
+  // IDs de proyectos cerrados
+  const closedProjectIds = new Set(
+    projects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED').map(p => p.id)
+  );
 
   // Search for New Report Modal
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
@@ -136,11 +142,17 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
   // Filter Logic for List View
   const filteredReports = reports.filter(r => {
       const dateMatch = historyDateFilter ? r.generatedDate.startsWith(historyDateFilter) : true;
-      const projectMatch = historySearchTerm 
-          ? (r.projectNameSnapshot || '').toLowerCase().includes(historySearchTerm.toLowerCase()) 
+      const projectMatch = historySearchTerm
+          ? (r.projectNameSnapshot || '').toLowerCase().includes(historySearchTerm.toLowerCase())
           : true;
+      // Ocultar informes de obras cerradas salvo toggle activo
+      if (!showClosedReports && r.projectId && closedProjectIds.has(r.projectId)) return false;
       return dateMatch && projectMatch;
   });
+
+  const closedReportsCount = reports.filter(r =>
+    r.projectId && closedProjectIds.has(r.projectId)
+  ).length;
 
   // Filter Logic for Modal (RESTRICTED TO PRODUCTION/READY ONLY)
   const allowedStatusesForReport = ['PRODUCTION', 'READY'];
@@ -204,12 +216,24 @@ const Reports: React.FC<ReportsProps> = ({ projects, clients, tasks, reports, us
                     />
                 </div>
                 {(historySearchTerm || historyDateFilter) && (
-                    <button 
+                    <button
                         onClick={() => { setHistorySearchTerm(''); setHistoryDateFilter(''); }}
                         className="text-xs text-red-500 underline font-medium"
                     >
                         Limpiar
                     </button>
+                )}
+                {/* Toggle obras cerradas */}
+                {closedReportsCount > 0 && (
+                  <button
+                    onClick={() => setShowClosedReports(v => !v)}
+                    className="text-xs text-gray-400 hover:text-gray-600 font-medium flex items-center gap-1 ml-auto"
+                  >
+                    <Archive size={13} />
+                    {showClosedReports
+                      ? 'Ocultar obras cerradas'
+                      : `Obras cerradas (${closedReportsCount})`}
+                  </button>
                 )}
             </div>
 

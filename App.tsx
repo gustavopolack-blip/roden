@@ -599,9 +599,12 @@ const App: React.FC = () => {
 
   const handleUpdateProject = async (project: Project) => {
     try {
-      if (project.status === 'COMPLETED') {
-        const old = projects.find(p => p.id === project.id);
-        if (old?.status !== 'COMPLETED') {
+      const isClosing =
+        (project.status === 'COMPLETED' || project.status === 'CANCELLED');
+      const old = projects.find(p => p.id === project.id);
+      const wasAlreadyClosed = old?.status === 'COMPLETED' || old?.status === 'CANCELLED';
+
+      if (isClosing && !wasAlreadyClosed) {
           const client = clients.find(c => c.id === project.clientId);
           const today = new Date().toISOString().split('T')[0];
 
@@ -633,9 +636,31 @@ const App: React.FC = () => {
             totalAmount: sp.totalAmount || 0, date: sp.date,
           }));
 
+          // ── Snapshot de tareas ──
+          const tasksSnapshot = tasks
+            .filter(t => t.projectId === project.id)
+            .map(t => ({
+              title:     t.title,
+              status:    t.status,
+              assignee:  t.assignee,
+              completed: !!t.completed,
+              priority:  t.priority,
+            }));
+
+          // ── Snapshot de informes ──
+          const reportsSnapshot = reports
+            .filter(r => r.projectId === project.id)
+            .map(r => ({
+              title:   r.title,
+              date:    r.date,
+              content: r.content,
+            }));
+
           const dossier: ProjectDossier = {
             generatedAt: new Date().toISOString(),
-            summary: `Obra finalizada: ${project.title}`,
+            summary: project.status === 'CANCELLED'
+              ? `Obra cancelada: ${project.title}`
+              : `Obra finalizada: ${project.title}`,
             totalBudget: project.budget || 0,
             totalCost: totalEgresos,
             profitability: totalIngresos - totalEgresos,
@@ -649,9 +674,10 @@ const App: React.FC = () => {
             clientSatisfaction: project.clientSatisfaction,
             incomeSnapshot,
             expensesSnapshot,
+            tasksSnapshot,
+            reportsSnapshot,
           };
           project.dossier = dossier;
-        }
       }
 
       const { error } = await supabase.from('projects').update(projectToDB(project)).eq('id', project.id);
@@ -842,6 +868,18 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error('Error eliminando tarea:', err);
       alert('No se pudo eliminar');
+    }
+  };
+
+  const handleDeletePriceList = async (id: string, name: string) => {
+    if (!window.confirm(`¿Eliminar la lista de precios "${name}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      const { error } = await supabase.from('price_lists').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      console.error('Error eliminando lista de precios:', err);
+      alert(`Error al eliminar lista: ${err.message}`);
     }
   };
 
@@ -1164,7 +1202,7 @@ const App: React.FC = () => {
 
           <Route path="/ai" element={<AIAssistant data={data} user={currentUser!} />} />
 
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings" element={<Settings priceLists={priceLists} onDeletePriceList={handleDeletePriceList} />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

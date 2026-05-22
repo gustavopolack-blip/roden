@@ -378,8 +378,8 @@ const Archive: React.FC<ArchiveProps> = ({
                 </div>
               </div>
 
-              {/* ── RESUMEN DE GESTIÓN (solo obras COMPLETED con dossier) ── */}
-              {selectedProject.status === 'COMPLETED' && selectedProject.dossier && (() => {
+              {/* ── RESUMEN DE GESTIÓN (obras COMPLETED o CANCELLED con dossier) ── */}
+              {(selectedProject.status === 'COMPLETED' || selectedProject.status === 'CANCELLED') && selectedProject.dossier && (() => {
                 const d = selectedProject.dossier;
                 const hasMgmt = d.totalIngresos !== undefined;
                 if (!hasMgmt) return null;
@@ -546,6 +546,59 @@ const Archive: React.FC<ArchiveProps> = ({
                                     )}
                                   </div>
                                   <span className="text-sm font-bold text-red-600">${item.totalAmount.toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Tareas al cierre ── */}
+                        {d.tasksSnapshot && d.tasksSnapshot.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wide mb-2">
+                              Tareas al cierre ({d.tasksSnapshot.length})
+                            </p>
+                            <div className="space-y-1.5">
+                              {d.tasksSnapshot.map((t, i) => (
+                                <div key={i} className="bg-white rounded-lg px-3 py-2 flex justify-between items-center border border-indigo-100">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${t.completed ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                                    <div>
+                                      <p className="text-xs font-medium text-roden-black">{t.title}</p>
+                                      {t.assignee && <p className="text-[11px] text-gray-400">{t.assignee}</p>}
+                                    </div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    t.completed
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : t.status === 'IN_PROGRESS'
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {t.completed ? 'Completada' : t.status === 'IN_PROGRESS' ? 'En curso' : 'Pendiente'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Informes al cierre ── */}
+                        {d.reportsSnapshot && d.reportsSnapshot.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-bold text-violet-600 uppercase tracking-wide mb-2">
+                              Informes al cierre ({d.reportsSnapshot.length})
+                            </p>
+                            <div className="space-y-1.5">
+                              {d.reportsSnapshot.map((r, i) => (
+                                <div key={i} className="bg-white rounded-lg px-3 py-2 border border-violet-100">
+                                  <div className="flex justify-between items-center">
+                                    <p className="text-xs font-medium text-roden-black">{r.title}</p>
+                                    <p className="text-[11px] text-gray-400">{r.date}</p>
+                                  </div>
+                                  {r.content && (
+                                    <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{r.content}</p>
+                                  )}
                                 </div>
                               ))}
                             </div>

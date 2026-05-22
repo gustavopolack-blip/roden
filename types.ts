@@ -174,6 +174,20 @@ export interface Client {
   totalValue?: number;
 }
 
+export interface DossierTaskItem {
+  title: string;
+  status: string;        // 'TODO' | 'IN_PROGRESS' | 'DONE'
+  assignee?: string;
+  completed: boolean;
+  priority?: string;
+}
+
+export interface DossierReportItem {
+  title: string;
+  date: string;
+  content?: string;
+}
+
 export interface DossierIncomeItem {
   id: string;
   title: string;
@@ -208,6 +222,8 @@ export interface ProjectDossier {
   clientSatisfaction?: number;               // 1–5
   incomeSnapshot?: DossierIncomeItem[];
   expensesSnapshot?: DossierExpenseItem[];
+  tasksSnapshot?: DossierTaskItem[];         // foto de tareas al cerrar
+  reportsSnapshot?: DossierReportItem[];     // foto de informes al cerrar
 }
 
 export interface Project {
@@ -347,7 +363,7 @@ export interface Estimate {
 export interface BusinessData {
   clients: Client[];
   projects: Project[];
-  budgets: any[];
+  budgets: Budget[];
   suppliers: Supplier[];
   supplierPayments: SupplierPayment[];
   tasks: Task[];

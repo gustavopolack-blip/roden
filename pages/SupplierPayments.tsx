@@ -25,6 +25,12 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProjectId, setFilterProjectId] = useState('');
+  const [showClosedProjects, setShowClosedProjects] = useState(false);
+
+  // IDs de proyectos cerrados
+  const closedProjectIds = new Set(
+    projects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED').map(p => p.id)
+  );
   
   // State for Editing
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
@@ -60,20 +66,27 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
 
   const filteredPayments = payments.filter(p => {
     // 1. Global Filter: Hide Archived
-    if (p.status === 'ARCHIVED') return false; 
+    if (p.status === 'ARCHIVED') return false;
 
-    // 2. Role Restriction: Manager only sees "Taller"
+    // 2. Ocultar pagos de obras cerradas (salvo toggle activo)
+    if (!showClosedProjects && p.projectId && closedProjectIds.has(p.projectId)) return false;
+
+    // 3. Role Restriction: Manager only sees "Taller"
     if (isManager && (p.providerName?.toLowerCase() || '') !== 'taller') {
         return false;
     }
 
-    // 3. User Filters (Search & Project)
+    // 4. User Filters (Search & Project)
     const matchesSearch = (p.providerName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                           (p.concept?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesProject = filterProjectId ? p.projectId === filterProjectId : true;
-    
+
     return matchesSearch && matchesProject;
   });
+
+  const closedPaymentsCount = payments.filter(p =>
+    p.status !== 'ARCHIVED' && p.projectId && closedProjectIds.has(p.projectId)
+  ).length;
 
   const filteredSuppliers = suppliers.filter(s => 
     (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -273,6 +286,18 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
                   <button onClick={() => { setSearchTerm(''); setFilterProjectId(''); }} className="text-gray-400 hover:text-red-500 p-1 shrink-0">
                       <X size={14} />
                   </button>
+              )}
+              {/* Toggle obras cerradas */}
+              {closedPaymentsCount > 0 && activeTab === 'PAYMENTS' && (
+                <button
+                  onClick={() => setShowClosedProjects(v => !v)}
+                  className="text-xs text-gray-400 hover:text-gray-600 font-medium flex items-center gap-1 shrink-0"
+                >
+                  <Archive size={13} />
+                  {showClosedProjects
+                    ? 'Ocultar obras cerradas'
+                    : `Obras cerradas (${closedPaymentsCount})`}
+                </button>
               )}
           </div>
 
