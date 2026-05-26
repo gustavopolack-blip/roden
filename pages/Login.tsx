@@ -79,6 +79,7 @@ const Login: React.FC = () => {
       const credential = await authenticateWithBiometric();
       if (!credential) {
         setError('No se pudo verificar la huella. Intentá con usuario y contraseña.');
+        setBiometricLoading(false);
         return;
       }
 
@@ -92,6 +93,7 @@ const Login: React.FC = () => {
         removeBiometricCredential();
         setBiometricReady(false);
         setError('La sesión expiró. Por favor ingresá con tu contraseña para renovar la huella.');
+        setBiometricLoading(false);
         return;
       }
 
@@ -104,10 +106,13 @@ const Login: React.FC = () => {
       // ask again immediately after this login (user just verified their identity)
       sessionStorage.setItem('roden_biometric_unlocked', '1');
 
-      // Session restored — App.tsx onAuthStateChange fires automatically
+      // ⚠️ NO llamamos setBiometricLoading(false) aquí.
+      // El overlay permanece activo hasta que onAuthStateChange detecta la sesión
+      // y desmonta este componente. Evita el flash de la pantalla de login entre
+      // el éxito biométrico y la carga del perfil.
+
     } catch (err: any) {
       setError('Error al autenticar con huella. Intentá de nuevo.');
-    } finally {
       setBiometricLoading(false);
     }
   };
