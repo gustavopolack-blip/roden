@@ -62,6 +62,20 @@ export const removeBiometricCredential = (): void => {
   } catch {}
 };
 
+/**
+ * Update the stored refresh token after a successful biometric login.
+ * Supabase rotates refresh tokens on each use — must update or the next login fails.
+ */
+export const updateBiometricToken = (newRefreshToken: string): void => {
+  try {
+    const raw = localStorage.getItem(CREDENTIAL_KEY);
+    if (!raw) return;
+    const stored = JSON.parse(raw) as BiometricCredential;
+    stored.refreshToken = newRefreshToken;
+    localStorage.setItem(CREDENTIAL_KEY, JSON.stringify(stored));
+  } catch {}
+};
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 /**
