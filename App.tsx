@@ -59,7 +59,6 @@ import {
 } from './utils/dataMapper';
 import { Loader2, Menu, ShieldAlert, RefreshCw, X, ShieldCheck, Fingerprint } from 'lucide-react';
 import NotificationBell from './components/NotificationBell';
-import BottomNav from './components/BottomNav';
 import { emitNotification } from './utils/notificationHelpers';
 import { Session } from '@supabase/supabase-js';
 import {
@@ -1555,7 +1554,6 @@ const App: React.FC = () => {
             </main>
           </div>
 
-          <BottomNav onOpenSidebar={() => setIsSidebarOpen(true)} isDark={isDark} />
         </>
       )}
 

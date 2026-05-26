@@ -288,7 +288,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
       </header>
 
       {/* ── Vista Mobile: Lista apilada por estado ──────────────────── */}
-      <div className="sm:hidden space-y-4 pb-20 overflow-y-auto">
+      <div className="sm:hidden space-y-4 overflow-y-auto">
         {PROJECT_GROUPS.map((group) => {
           if (group.id === 'FINALIZADO' && !showCompleted) return null;
           if (isWorkshopRole && (group.id === 'PROPUESTA' || group.id === 'PRESUPUESTO')) return null;
