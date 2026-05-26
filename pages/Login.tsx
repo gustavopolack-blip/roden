@@ -103,6 +103,10 @@ const Login: React.FC = () => {
         updateBiometricToken(data.session.refresh_token);
       }
 
+      // Mark this session as biometric-unlocked so the lock screen doesn't
+      // ask again immediately after this login (user just verified their identity)
+      sessionStorage.setItem('roden_biometric_unlocked', '1');
+
       // Session restored — App.tsx onAuthStateChange fires automatically
     } catch (err: any) {
       setError('Error al autenticar con huella. Intentá de nuevo.');

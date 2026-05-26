@@ -68,6 +68,7 @@ import {
   hasBiometricDeclined,
   setBiometricDeclined,
   registerBiometric,
+  authenticateWithBiometric,
 } from './utils/webauthn';
 
 
@@ -78,6 +79,68 @@ const EstimatorWithParam: React.FC<any> = (props) => {
     <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin" /></div>}>
       <CostEstimator {...props} initialProjectId={projectId} />
     </Suspense>
+  );
+};
+
+// ── Pantalla de bloqueo biométrico ──────────────────────────────────────────
+interface BiometricLockScreenProps {
+  loading: boolean;
+  error: string | null;
+  onUnlock: () => void;
+  onForceLogout: () => void;
+}
+
+const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({
+  loading, error, onUnlock, onForceLogout,
+}) => {
+  const autoTriggeredRef = React.useRef(false);
+
+  // Auto-trigger the native biometric prompt on mount
+  React.useEffect(() => {
+    if (!autoTriggeredRef.current) {
+      autoTriggeredRef.current = true;
+      setTimeout(() => onUnlock(), 350);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-roden-black flex flex-col items-center justify-center gap-6 p-8">
+      <div className="relative">
+        <Fingerprint
+          size={96}
+          strokeWidth={0.75}
+          className={loading ? 'text-white animate-pulse' : error ? 'text-red-400' : 'text-white'}
+        />
+      </div>
+
+      <div className="text-center">
+        <p className="text-white font-bold text-xl tracking-wide">rødën</p>
+        <p className="text-gray-400 text-sm mt-1">
+          {loading ? 'Verificando identidad...' : error ? error : 'Verificá tu identidad para continuar'}
+        </p>
+      </div>
+
+      {loading && <Loader2 size={20} className="text-gray-500 animate-spin" />}
+
+      {!loading && (
+        <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+          <button
+            onClick={onUnlock}
+            className="w-full py-3.5 bg-white text-roden-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <Fingerprint size={18} />
+            {error ? 'Intentar de nuevo' : 'Desbloquear'}
+          </button>
+          <button
+            onClick={onForceLogout}
+            className="text-[11px] text-gray-500 hover:text-gray-300 transition-colors mt-1 underline"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -151,6 +214,11 @@ const App: React.FC = () => {
 
   const [showEmergencyButton, setShowEmergencyButton] = useState(false);
 
+  // ── Biometric lock screen (required on every app open) ───────────────────
+  const [biometricLocked, setBiometricLocked] = useState(false);
+  const [biometricLockLoading, setBiometricLockLoading] = useState(false);
+  const [biometricLockError, setBiometricLockError] = useState<string | null>(null);
+
   // ── Biometric enrollment offer ─────────────────────────────────────────────
   const [showBiometricOffer, setShowBiometricOffer] = useState(false);
   const [biometricEnrolling, setBiometricEnrolling] = useState(false);
@@ -165,6 +233,34 @@ const App: React.FC = () => {
     }
     return () => clearTimeout(timer);
   }, [isProfileLoading]);
+
+  // ── Biometric lock: require verification on every PWA open ──────────────────
+  // Fires when session becomes available. sessionStorage clears on PWA close,
+  // so this re-locks on every fresh open.
+  useEffect(() => {
+    if (!session) return;
+    if (hasBiometricCredential() && !sessionStorage.getItem('roden_biometric_unlocked')) {
+      setBiometricLocked(true);
+    }
+  }, [session]);
+
+  const handleBiometricUnlock = async () => {
+    setBiometricLockLoading(true);
+    setBiometricLockError(null);
+    try {
+      const result = await authenticateWithBiometric();
+      if (result) {
+        sessionStorage.setItem('roden_biometric_unlocked', '1');
+        setBiometricLocked(false);
+      } else {
+        setBiometricLockError('No se pudo verificar. Intentá de nuevo.');
+      }
+    } catch {
+      setBiometricLockError('Error al autenticar. Intentá de nuevo.');
+    } finally {
+      setBiometricLockLoading(false);
+    }
+  };
 
   // ── Biometric enrollment: offer once after a new login ────────────────────
   useEffect(() => {
@@ -1349,7 +1445,15 @@ const App: React.FC = () => {
       )}
 
       {/* 2. Lógica de Pantallas */}
-      {!session ? (
+      {biometricLocked ? (
+        /* ── Pantalla de bloqueo biométrico ─────────────────────────────── */
+        <BiometricLockScreen
+          loading={biometricLockLoading}
+          error={biometricLockError}
+          onUnlock={handleBiometricUnlock}
+          onForceLogout={handleForceReset}
+        />
+      ) : !session ? (
         <Login />
       ) : !currentUser ? (
         /* Sesión activa pero perfil cargando */
