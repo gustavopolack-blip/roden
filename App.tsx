@@ -129,6 +129,10 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const currentUserRef = useRef<User | null>(null);
   const isFetchingProfileRef = useRef<boolean>(false);
+  // True when currentUser was loaded from the emergency fallback (DB timeout / not found)
+  // Used to bypass the "already loaded" guard in onAuthStateChange so the real profile
+  // is fetched once the DB wakes up.
+  const isEmergencyProfileRef = useRef<boolean>(false);
 
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -382,7 +386,7 @@ const App: React.FC = () => {
         .maybeSingle();
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 10000)
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 20000)
       );
 
       const { data: userData, error: profileError } = await Promise.race([profilePromise, timeoutPromise]) as any;
@@ -394,11 +398,13 @@ const App: React.FC = () => {
       if (userData) {
         const resolvedUser = userFromDB(userData);
         if (import.meta.env.DEV) console.log("[fetchUserProfile] User found in DB:", resolvedUser.email, resolvedUser.role);
+        isEmergencyProfileRef.current = false;
         currentUserRef.current = resolvedUser;
         setCurrentUser(resolvedUser);
         fetchData();
       } else {
         if (import.meta.env.DEV) console.warn("[fetchUserProfile] User not found in profiles table. Using session-based fallback.");
+        isEmergencyProfileRef.current = true;
         const fallback: User = {
           id: session.user.id,
           email: session.user.email,
@@ -414,8 +420,10 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       console.error('[fetchUserProfile] Error or Timeout:', err);
-      // FALLBACK DE EMERGENCIA: Si la DB falla, entramos con los datos de la sesión
-      if (import.meta.env.DEV) console.log("[fetchUserProfile] Entering emergency mode due to DB failure.");
+      // FALLBACK DE EMERGENCIA: Si la DB falla (cold start Supabase), entramos con datos de sesión
+      // y programamos un reintento automático a los 6 segundos para recuperar el rol correcto.
+      if (import.meta.env.DEV) console.log("[fetchUserProfile] Entering emergency mode — will retry in 15s.");
+      isEmergencyProfileRef.current = true;
       const emergencyUser: User = {
         id: session.user.id,
         email: session.user.email,
@@ -428,6 +436,29 @@ const App: React.FC = () => {
       currentUserRef.current = emergencyUser;
       setCurrentUser(emergencyUser);
       fetchData();
+
+      // Retry: reload the real profile once the DB wakes up (free tier takes ~20-25s)
+      setTimeout(async () => {
+        try {
+          console.log("[fetchUserProfile] Retrying after DB wake-up...");
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (!retrySession) return;
+          const { data: retryData, error: retryError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', retrySession.user.email)
+            .maybeSingle();
+          if (!retryError && retryData) {
+            const realUser = userFromDB(retryData);
+            console.log("[fetchUserProfile] Retry SUCCESS — role:", realUser.role);
+            isEmergencyProfileRef.current = false;
+            currentUserRef.current = realUser;
+            setCurrentUser(realUser);
+          }
+        } catch (retryErr) {
+          console.warn("[fetchUserProfile] Retry also failed:", retryErr);
+        }
+      }, 15000);
     } finally {
       console.log("[fetchUserProfile] Finally block reached.");
       setIsAuthLoading(false);
@@ -438,8 +469,14 @@ const App: React.FC = () => {
 
   const handleForceReset = async () => {
     console.log("[Force Reset] Starting instant reset...");
-    // 1. Limpiar todo localmente
+    // 1. Limpiar estado local, preservando credential biométrico y tema
+    const biometricCred    = localStorage.getItem('roden_biometric_v1');
+    const biometricDeclined = localStorage.getItem('roden_biometric_declined');
+    const theme            = localStorage.getItem('roden-theme');
     localStorage.clear();
+    if (biometricCred)     localStorage.setItem('roden_biometric_v1', biometricCred);
+    if (biometricDeclined) localStorage.setItem('roden_biometric_declined', biometricDeclined);
+    if (theme)             localStorage.setItem('roden-theme', theme);
     sessionStorage.clear();
     setSession(null);
     setCurrentUser(null);
@@ -528,8 +565,8 @@ const App: React.FC = () => {
             sessionStorage.setItem('google_provider_token', (newSession as any).provider_token);
           }
 
-          // Si ya tenemos este usuario cargado en el ref, solo nos aseguramos de que el estado coincida
-          if (currentUserRef.current?.email === newSession.user.email) {
+          // Skip re-fetch only if we have a REAL profile (not the emergency fallback)
+          if (currentUserRef.current?.email === newSession.user.email && !isEmergencyProfileRef.current) {
             console.log("[onAuthStateChange] User already loaded, ensuring state sync.");
             if (!currentUser) {
                 setCurrentUser(currentUserRef.current);
@@ -1376,7 +1413,14 @@ const App: React.FC = () => {
             onToggleDark={toggleDark}
             onInstallApp={installPrompt ? handleInstallApp : undefined}
             onLogout={async () => {
+              // Preserve biometric credential and theme across logout
+              const biometricCred    = localStorage.getItem('roden_biometric_v1');
+              const biometricDeclined = localStorage.getItem('roden_biometric_declined');
+              const theme            = localStorage.getItem('roden-theme');
               localStorage.clear();
+              if (biometricCred)     localStorage.setItem('roden_biometric_v1', biometricCred);
+              if (biometricDeclined) localStorage.setItem('roden_biometric_declined', biometricDeclined);
+              if (theme)             localStorage.setItem('roden-theme', theme);
               sessionStorage.clear();
               setSession(null);
               setCurrentUser(null);
