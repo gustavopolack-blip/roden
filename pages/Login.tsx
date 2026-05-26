@@ -5,7 +5,6 @@ import { Loader2, Lock, ArrowRight, ShieldCheck, AlertTriangle, Fingerprint } fr
 import {
   isBiometricAvailable,
   hasBiometricCredential,
-  getBiometricEmail,
   authenticateWithBiometric,
   updateBiometricToken,
   removeBiometricCredential,
@@ -20,7 +19,6 @@ const Login: React.FC = () => {
 
   // Biometric state
   const [biometricReady, setBiometricReady] = useState(false);
-  const [biometricEmail, setBiometricEmail] = useState<string | null>(null);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const autoTriggeredRef = useRef(false);
 
@@ -31,7 +29,6 @@ const Login: React.FC = () => {
       const credential = hasBiometricCredential();
       if (available && credential) {
         setBiometricReady(true);
-        setBiometricEmail(getBiometricEmail());
       }
     };
     check();
@@ -172,9 +169,6 @@ const Login: React.FC = () => {
               >
                 <Fingerprint size={36} strokeWidth={1.5} />
                 <span className="text-sm font-bold tracking-wide">Ingresar con huella</span>
-                {biometricEmail && (
-                  <span className="text-[11px] text-gray-400 font-normal">{biometricEmail}</span>
-                )}
               </button>
 
               <div className="flex items-center gap-3 mt-5 mb-1">
