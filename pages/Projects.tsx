@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { Project, ProjectStatus, Client, User, ProductionStep, ProductionOrder } from '../types';
+import { Project, ProjectStatus, QuotingColor, Client, User, ProductionStep, ProductionOrder } from '../types';
 import { generateChecklist } from '../services/geminiService';
-import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator, Zap, FileText, Link2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator, Zap, FileText, Link2, Bell } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { translateProductionStep } from '../translations';
 
@@ -78,7 +78,11 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
       status: 'PROPOSAL' as ProjectStatus,
       budget: 0,
       driveFolderUrl: '',
-      archiveReason: ''
+      archiveReason: '',
+      proposalNotes: '',
+      quotingColor: '' as QuotingColor | '',
+      quotingNotes: '',
+      followUpDate: '',
   });
 
   const handleGenerateChecklist = async (projectId: string, title: string) => {
@@ -98,7 +102,11 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
         status: 'PROPOSAL',
         budget: 0,
         driveFolderUrl: '',
-        archiveReason: ''
+        archiveReason: '',
+        proposalNotes: '',
+        quotingColor: '',
+        quotingNotes: '',
+        followUpDate: '',
       });
       setIsEditMode(false);
       setIsModalOpen(true);
@@ -118,7 +126,11 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
           status: project.status,
           budget: project.budget,
           driveFolderUrl: project.driveFolderUrl || '',
-          archiveReason: project.archiveReason || ''
+          archiveReason: project.archiveReason || '',
+          proposalNotes: project.proposalNotes || '',
+          quotingColor: project.quotingColor || '',
+          quotingNotes: project.quotingNotes || '',
+          followUpDate: project.followUpDate || '',
       });
       setIsEditMode(true);
       setIsModalOpen(true);
@@ -143,7 +155,11 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
             // Budget kept from original or 0 as input is removed
             budget: original.budget,
             driveFolderUrl: formData.driveFolderUrl,
-            archiveReason: formData.archiveReason
+            archiveReason: formData.archiveReason,
+            proposalNotes: formData.proposalNotes || undefined,
+            quotingColor: (formData.quotingColor as QuotingColor) || undefined,
+            quotingNotes: formData.quotingNotes || undefined,
+            followUpDate: formData.followUpDate || undefined,
         };
         onUpdateProject(updated);
     } else {
@@ -332,6 +348,35 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
                       {clientName && (
                         <p className="text-xs text-gray-400 mb-2 truncate">{clientName}</p>
                       )}
+                      {/* Quoting color badge + notes indicators */}
+                      {(project.quotingColor || project.proposalNotes || project.followUpDate) && (
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          {project.quotingColor && (
+                            <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              project.quotingColor === 'GREEN'  ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              project.quotingColor === 'YELLOW' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                                   'bg-red-50 text-red-600 border-red-200'
+                            }`}>
+                              <span className={`w-2 h-2 rounded-full ${
+                                project.quotingColor === 'GREEN'  ? 'bg-emerald-500' :
+                                project.quotingColor === 'YELLOW' ? 'bg-amber-400' :
+                                                                     'bg-red-500'
+                              }`}/>
+                              {project.quotingColor === 'GREEN' ? 'Alta' : project.quotingColor === 'YELLOW' ? 'Media' : 'Baja'}
+                            </span>
+                          )}
+                          {project.proposalNotes && (
+                            <span className="flex items-center gap-1 text-[10px] text-violet-500 font-medium">
+                              <FileText size={10}/> Nota
+                            </span>
+                          )}
+                          {project.followUpDate && (
+                            <span className="flex items-center gap-1 text-[10px] text-blue-500 font-medium">
+                              <Bell size={10}/> {project.followUpDate}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {/* Footer: deadline + tasks */}
                       <div className="flex items-center gap-3 text-xs text-gray-400 pt-2 border-t border-gray-50">
                         {project.deadline && (
@@ -491,11 +536,41 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
                       </div>
                       
                       {/* 2. Project Name (Prominent) */}
-                      <h4 
-                        className={`text-roden-black font-extrabold text-base mb-3 leading-snug transition-colors ${user.role === 'administrador' ? 'group-hover:text-indigo-600' : ''}`}
+                      <h4
+                        className={`text-roden-black font-extrabold text-base leading-snug transition-colors ${user.role === 'administrador' ? 'group-hover:text-indigo-600' : ''} ${(project.quotingColor || project.proposalNotes || project.followUpDate) ? 'mb-2' : 'mb-3'}`}
                       >
                           {project.title}
                       </h4>
+
+                      {/* 2b. Commercial tracking indicators */}
+                      {(project.quotingColor || project.proposalNotes || project.followUpDate) && (
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                          {project.quotingColor && (
+                            <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              project.quotingColor === 'GREEN'  ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              project.quotingColor === 'YELLOW' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                                   'bg-red-50 text-red-600 border-red-200'
+                            }`}>
+                              <span className={`w-2 h-2 rounded-full ${
+                                project.quotingColor === 'GREEN'  ? 'bg-emerald-500' :
+                                project.quotingColor === 'YELLOW' ? 'bg-amber-400' :
+                                                                     'bg-red-500'
+                              }`}/>
+                              {project.quotingColor === 'GREEN' ? 'Chances altas' : project.quotingColor === 'YELLOW' ? 'Chances medias' : 'Chances bajas'}
+                            </span>
+                          )}
+                          {project.proposalNotes && (
+                            <span className="flex items-center gap-1 text-[10px] text-violet-500 font-medium">
+                              <FileText size={10}/> Nota
+                            </span>
+                          )}
+                          {project.followUpDate && (
+                            <span className="flex items-center gap-1 text-[10px] text-blue-500 font-medium">
+                              <Bell size={10}/> Seguimiento {project.followUpDate}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* 3. Highlighted Dates (Yellow & Red Boxes) */}
                       {!isArchived && (
@@ -611,6 +686,79 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, user, production
                                  <option value="CANCELLED">Cancelado / No Prosperó</option>
                              </select>
                           </div>
+
+                          {/* PROPOSAL NOTES - Visible ONLY when status is PROPOSAL */}
+                          {formData.status === 'PROPOSAL' && (
+                            <div className="animate-fade-in bg-violet-50 p-4 rounded-lg border border-violet-200">
+                              <label className="block text-xs font-bold uppercase text-violet-500 mb-2">
+                                Notas de Propuesta
+                              </label>
+                              <textarea
+                                className="w-full p-3 border border-violet-200 rounded-lg focus:ring-1 focus:ring-violet-400 outline-none text-sm min-h-[80px] bg-white"
+                                placeholder="Ej: Cliente interesado en terminación laqueada, espera planos para el 15/06."
+                                value={formData.proposalNotes}
+                                onChange={e => setFormData({...formData, proposalNotes: e.target.value})}
+                              />
+                            </div>
+                          )}
+
+                          {/* QUOTING FIELDS - Visible ONLY when status is QUOTING */}
+                          {formData.status === 'QUOTING' && (
+                            <div className="animate-fade-in bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-3">
+                              <div>
+                                <label className="block text-xs font-bold uppercase text-blue-500 mb-2">
+                                  Chances de cierre
+                                </label>
+                                <div className="flex gap-2">
+                                  {([
+                                    { value: 'GREEN',  label: 'Alta',  bg: 'bg-emerald-500', ring: 'ring-emerald-400' },
+                                    { value: 'YELLOW', label: 'Media', bg: 'bg-amber-400',   ring: 'ring-amber-400'   },
+                                    { value: 'RED',    label: 'Baja',  bg: 'bg-red-500',     ring: 'ring-red-400'     },
+                                  ] as { value: QuotingColor; label: string; bg: string; ring: string }[]).map(opt => (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      onClick={() => setFormData({...formData, quotingColor: formData.quotingColor === opt.value ? '' : opt.value})}
+                                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                                        ${formData.quotingColor === opt.value
+                                          ? `${opt.bg} text-white border-transparent ring-2 ${opt.ring}`
+                                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                                    >
+                                      <span className={`w-3 h-3 rounded-full ${opt.bg}`}/>
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold uppercase text-blue-500 mb-2">
+                                  Análisis de situación
+                                </label>
+                                <textarea
+                                  className="w-full p-3 border border-blue-200 rounded-lg focus:ring-1 focus:ring-blue-400 outline-none text-sm min-h-[80px] bg-white"
+                                  placeholder="Ej: Cliente pidió reducir módulos. Competidor cotizó $15k menos. Esperamos respuesta el viernes."
+                                  value={formData.quotingNotes}
+                                  onChange={e => setFormData({...formData, quotingNotes: e.target.value})}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold uppercase text-blue-500 mb-2 flex items-center gap-1.5">
+                                  <Bell size={12}/> Seguimiento programado
+                                </label>
+                                <input
+                                  type="date"
+                                  className="w-full p-2.5 border border-blue-200 rounded-lg focus:ring-1 focus:ring-blue-400 outline-none bg-white text-sm"
+                                  value={formData.followUpDate}
+                                  onChange={e => setFormData({...formData, followUpDate: e.target.value})}
+                                />
+                                {formData.followUpDate && (
+                                  <p className="text-xs text-blue-400 mt-1">
+                                    Se enviará una notificación el día del seguimiento.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
                           {/* REASON FIELD - Visible ONLY when archiving */}
                           {showReasonField && (

@@ -133,6 +133,7 @@ export type UserStatus = 'ACTIVE' | 'INACTIVE';
 export type ClientType = 'INDIVIDUAL' | 'COMPANY';
 export type ClientOrigin = 'REFERRAL' | 'SOCIAL_MEDIA' | 'ORGANIC' | 'WEBSITE' | 'OTHER';
 export type ProjectStatus = 'LEAD' | 'PROPOSAL' | 'QUOTING' | 'READY' | 'IN_PROGRESS' | 'PRODUCTION' | 'COMPLETED' | 'CANCELLED';
+export type QuotingColor = 'GREEN' | 'YELLOW' | 'RED';
 export type ProductionStep = 'ANTICIPO_PLANOS' | 'COMPRA_MATERIALES' | 'FABRICACION' | 'LUSTRE' | 'PREPARACION' | 'LISTO';
 export enum ProductionOrderStatus {
   PENDING = 'PENDING',
@@ -246,6 +247,12 @@ export interface Project {
   tasksCompleted?: number;
   productionStartDate?: string;
   clientSatisfaction?: number; // 1–5, se persiste en DB column
+  // Seguimiento comercial
+  proposalNotes?: string;
+  quotingColor?: QuotingColor;
+  quotingNotes?: string;
+  followUpDate?: string;
+  followUpNotifiedAt?: string;
 }
 
 export interface Budget {

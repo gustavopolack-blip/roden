@@ -12,6 +12,7 @@ export type NotificationType =
   | 'project.status_changed'
   | 'project.step_changed'
   | 'project.note_added'
+  | 'project.follow_up'
   | 'production_order.created'
   | 'production_order.updated'
   | 'workshop.project_added';

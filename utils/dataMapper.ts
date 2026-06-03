@@ -17,7 +17,7 @@
  *   await supabase.from('projects').insert(projectToDB(newProject));
  */
 
-import { Project, User, Task, Client, SupplierPayment, Report, Supplier, Budget } from '../types';
+import { Project, QuotingColor, User, Task, Client, SupplierPayment, Report, Supplier, Budget } from '../types';
 
 // ============================================================
 // BUDGETS
@@ -69,6 +69,12 @@ export function projectFromDB(row: any): Project {
     dossier:              row.dossier,
     linkedTechnicalEstimateId: row.linked_technical_estimate_id,
     clientSatisfaction:   row.client_satisfaction ?? undefined,
+    // Seguimiento comercial
+    proposalNotes:        row.proposal_notes ?? undefined,
+    quotingColor:         (row.quoting_color as QuotingColor) ?? undefined,
+    quotingNotes:         row.quoting_notes ?? undefined,
+    followUpDate:         row.follow_up_date ?? undefined,
+    followUpNotifiedAt:   row.follow_up_notified_at ?? undefined,
   };
 }
 
@@ -91,6 +97,12 @@ export function projectToDB(p: Omit<Project, 'id'> & { id?: string }): any {
     archive_reason:         p.archiveReason || null,
     dossier:                p.dossier ?? null,
     client_satisfaction:    p.clientSatisfaction ?? null,
+    // Seguimiento comercial
+    proposal_notes:         p.proposalNotes ?? null,
+    quoting_color:          p.quotingColor ?? null,
+    quoting_notes:          p.quotingNotes ?? null,
+    follow_up_date:         p.followUpDate ?? null,
+    follow_up_notified_at:  p.followUpNotifiedAt ?? null,
   };
   if (p.id) row.id = p.id;
   return row;

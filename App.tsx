@@ -389,7 +389,35 @@ const App: React.FC = () => {
       }
 
       if (cRes.status === 'fulfilled' && cRes.value.data) setClients(cRes.value.data.map(clientFromDB));
-      if (pRes.status === 'fulfilled' && pRes.value.data) setProjects(pRes.value.data.map(projectFromDB));
+      if (pRes.status === 'fulfilled' && pRes.value.data) {
+        const mappedProjects = pRes.value.data.map(projectFromDB);
+        setProjects(mappedProjects);
+
+        // ── Chequeo de follow-ups vencidos ──
+        const today = new Date().toISOString().split('T')[0];
+        const dueFollowUps = mappedProjects.filter(
+          p => p.followUpDate && p.followUpDate <= today && !p.followUpNotifiedAt
+        );
+        for (const p of dueFollowUps) {
+          // Marcar como notificado en DB primero para evitar duplicados
+          supabase
+            .from('projects')
+            .update({ follow_up_notified_at: new Date().toISOString() })
+            .eq('id', p.id)
+            .then(() => {});
+          // Emitir notificación
+          await emitNotification({
+            type: 'project.follow_up',
+            title: `Seguimiento: ${p.title}`,
+            body: `El seguimiento programado para este proyecto venció el ${p.followUpDate}.`,
+            entityId: p.id,
+            entityType: 'project',
+            entityPage: 'projects',
+            toRole: 'administrador',
+            fromUser: currentUserRef.current,
+          });
+        }
+      }
       // if (bRes.status === 'fulfilled' && bRes.value.data) setBudgets(bRes.value.data.map(budgetFromDB)); // Budgets ahora es Estimador
       if (sRes.status === 'fulfilled' && sRes.value.data) setSuppliers(sRes.value.data.map(supplierFromDB));
       if (spRes.status === 'fulfilled' && spRes.value.data) setSupplierPayments(spRes.value.data.map(supplierPaymentFromDB));
