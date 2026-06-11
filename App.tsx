@@ -612,7 +612,7 @@ const App: React.FC = () => {
     
     // 3. Recargar inmediatamente
     console.log("[Force Reset] Local state cleared, reloading page...");
-    window.location.href = window.location.origin;
+    window.location.href = import.meta.env.BASE_URL;
   };
 
   // ────────────────────────────────────────────────
@@ -1559,7 +1559,7 @@ const App: React.FC = () => {
               setIsAuthLoading(false);
               setIsProfileLoading(false);
               supabase.auth.signOut().catch(err => console.warn("Supabase signOut error (ignored):", err));
-              window.location.href = window.location.origin;
+              window.location.href = import.meta.env.BASE_URL;
             }}
           />
 

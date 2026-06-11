@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FolderKanban, Calculator, Hammer, Sparkles,
   Settings, CheckSquare, ShieldCheck, LogOut, Truck, FileText,
-  Maximize2, Minimize2, X, Archive, ClipboardList, Moon, Sun,
+  Maximize2, Minimize2, X, Archive, ClipboardList, Moon, Sun, Download,
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import NotificationBell from './NotificationBell';
@@ -18,11 +18,12 @@ interface SidebarProps {
   onClose?: () => void;
   isDark?: boolean;
   onToggleDark?: () => void;
+  onInstallApp?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   user, onToggleRole, onLogout, isOpen = false, onClose,
-  isDark = false, onToggleDark,
+  isDark = false, onToggleDark, onInstallApp,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -191,6 +192,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
               <Settings size={15} />
               <span>Configuraci&#243;n</span>
+            </button>
+          )}
+
+          {onInstallApp && (
+            <button
+              onClick={onInstallApp}
+              className={'w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors rounded-lg ' + settingsCls}
+            >
+              <Download size={15} />
+              <span>Instalar App</span>
             </button>
           )}
 

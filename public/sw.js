@@ -1,9 +1,9 @@
-const CACHE_NAME = 'roden-os-v1';
+const CACHE_NAME = 'roden-os-v2';
 
-// Archivos esenciales para carga offline
+// Archivos esenciales para carga offline (servidos bajo /os/)
 const PRECACHE = [
-  '/',
-  '/index.html',
+  '/os/',
+  '/os/index.html',
 ];
 
 self.addEventListener('install', (event) => {
@@ -40,7 +40,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('/os/index.html'))
     );
     return;
   }

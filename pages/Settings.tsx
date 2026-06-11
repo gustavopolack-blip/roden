@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
-import { Save, Bell, Lock, Globe, Database, Building2, RefreshCw } from 'lucide-react';
+import { Save, Bell, Lock, Globe, Database, Building2, RefreshCw, Tag, Trash2, CheckCircle, Circle } from 'lucide-react';
 
 interface SettingsProps {
     onLoadDemoData?: () => void;
+    priceLists?: any[];
+    onDeletePriceList?: (id: string, name: string) => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ onLoadDemoData }) => {
+const Settings: React.FC<SettingsProps> = ({ onLoadDemoData, priceLists = [], onDeletePriceList }) => {
   const [activeTab, setActiveTab] = useState('general');
 
   return (
@@ -37,11 +39,17 @@ const Settings: React.FC<SettingsProps> = ({ onLoadDemoData }) => {
           >
             <Lock size={18} /> Seguridad
           </button>
-          <button 
+          <button
              onClick={() => setActiveTab('data')}
              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === 'data' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
           >
             <Database size={18} /> Datos & Demo
+          </button>
+          <button
+             onClick={() => setActiveTab('pricelists')}
+             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === 'pricelists' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            <Tag size={18} /> Listas de Precios
           </button>
         </div>
 
@@ -133,6 +141,55 @@ const Settings: React.FC<SettingsProps> = ({ onLoadDemoData }) => {
                         <div className="flex items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
                             <p className="text-sm text-gray-400">La conexión con la base de datos es gestionada externamente.</p>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Price Lists Section */}
+            {activeTab === 'pricelists' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm space-y-6 animate-fade-in">
+                    <div>
+                        <h3 className="text-lg font-bold text-roden-black mb-1">Listas de Precios</h3>
+                        <p className="text-sm text-gray-500 mb-6">
+                            Listas cargadas desde los PDFs del proveedor. La lista activa es la seleccionada manualmente en el sistema.
+                            Podés eliminar listas cargadas con errores.
+                        </p>
+
+                        {priceLists.length === 0 ? (
+                            <div className="flex items-center justify-center p-10 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
+                                <p className="text-sm text-gray-400">No hay listas de precios cargadas.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {[...priceLists]
+                                    .sort((a, b) => new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime())
+                                    .map(pl => (
+                                    <div key={pl.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            {pl.is_active
+                                                ? <CheckCircle size={18} className="text-green-500 shrink-0" />
+                                                : <Circle size={18} className="text-gray-300 shrink-0" />
+                                            }
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-800">{pl.name}</p>
+                                                <p className="text-xs text-gray-400">
+                                                    Vigencia: {pl.valid_from}
+                                                    {pl.is_active && <span className="ml-2 text-green-600 font-medium">· Activa</span>}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => onDeletePriceList?.(pl.id, pl.name)}
+                                            disabled={pl.is_active}
+                                            title={pl.is_active ? 'No se puede eliminar la lista activa' : 'Eliminar lista'}
+                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

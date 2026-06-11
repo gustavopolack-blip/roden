@@ -28,6 +28,10 @@
   ],
   "rewrites": [
     {
+      "source": "/os/:path*",
+      "destination": "/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
