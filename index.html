@@ -676,4 +676,12 @@
     window.addEventListener('afterprint', function() {
       document.documentElement.style.removeProperty('background');
       document.body.style.removeProperty('background');
-      var root = document.getElem
+      var root = document.getElementById('root');
+      if (root) root.style.removeProperty('background');
+      document.querySelectorAll('.animate-fade-in, .min-h-screen').forEach(function(el) {
+        el.style.removeProperty('background');
+      });
+    });
+  </script>
+</body>
+</html>
