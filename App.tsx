@@ -17,6 +17,7 @@ import Login from './pages/Login';
 
 // Code splitting: CostEstimator es el componente mas pesado (5000+ lineas)
 const CostEstimator = lazy(() => import('./pages/CostEstimator'));
+const Marketing = lazy(() => import('./pages/Marketing'));
 
 import {
   MOCK_USER_ADMIN,
@@ -1408,6 +1409,8 @@ const App: React.FC = () => {
           } />
 
           <Route path="/staff" element={<Staff users={users} onAddUser={handleAddUser} />} />
+
+          <Route path="/marketing" element={<Marketing />} />
 
           <Route path="/ai" element={<AIAssistant data={data} user={currentUser!} />} />
 

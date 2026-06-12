@@ -30,5 +30,6 @@ export const PAGE_PERMISSIONS: Record<string, string[]> = {
   settings: ['administrador'],
   archive: ['administrador'],
   estimator: ['administrador'],
-  ai: ['administrador']
+  ai: ['administrador'],
+  marketing: ['administrador']  // Solo admin: leads, recompra y piezas de difusión
 };

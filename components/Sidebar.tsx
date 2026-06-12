@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Users, FolderKanban, Calculator, Hammer, Sparkles,
   Settings, CheckSquare, ShieldCheck, LogOut, Truck, FileText,
   Maximize2, Minimize2, X, Archive, ClipboardList, Moon, Sun, Download,
+  Megaphone,
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 import NotificationBell from './NotificationBell';
@@ -51,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { path: '/budgets',    label: 'Finanzas',           icon: Calculator,      allowed: PAGE_PERMISSIONS.budgets    },
     { path: '/suppliers',  label: 'Proveedores',        icon: Truck,           allowed: PAGE_PERMISSIONS.suppliers  },
     { path: '/ai',         label: 'Inteligencia roden', icon: Sparkles,        allowed: PAGE_PERMISSIONS.ai         },
+    { path: '/marketing',  label: 'Marketing',          icon: Megaphone,       allowed: PAGE_PERMISSIONS.marketing  },
     { path: '/staff',      label: 'Personal',           icon: ShieldCheck,     allowed: PAGE_PERMISSIONS.staff      },
   ];
 
