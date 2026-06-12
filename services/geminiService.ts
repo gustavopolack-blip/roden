@@ -1,9 +1,14 @@
 
 import { BusinessData } from '../types';
 
-// All Gemini calls are proxied through /api/gemini (Vercel serverless function).
+// All Gemini calls are proxied through the Vercel serverless function.
 // The API key is stored server-side in process.env.GEMINI_API_KEY and is
 // never exposed in the frontend bundle.
+// IMPORTANT: the app is served under /os/ (rodenmobel.com/os). Calling
+// '/api/gemini' from there hits the PUBLIC WEBSITE project, not this one.
+// BASE_URL ('/os/') + the vercel.json rewrite (/os/* -> /*) routes it here.
+
+const GEMINI_ENDPOINT = `${import.meta.env.BASE_URL}api/gemini`;
 
 const callGemini = async (payload: {
   systemInstruction: string;
@@ -12,7 +17,7 @@ const callGemini = async (payload: {
   model?: string;
   responseMimeType?: string;
 }): Promise<string> => {
-  const response = await fetch('/api/gemini', {
+  const response = await fetch(GEMINI_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
