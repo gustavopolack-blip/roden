@@ -782,10 +782,87 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   };
 
   // ─────────────────────────────────────────────────────────────
-  // ENGINE ÚNICO — calcula costo directo y precio taller
-  // para un conjunto de módulos con override de escenario.
-  // Usa calculateModuleParts (Engine A) como única fuente de verdad
-  // geométrica. La MO siempre viene del parámetro laborCost (workers×days×rate).
+  // MOTOR ÚNICO DE COSTOS — fuente de verdad financiera
+  // ─────────────────────────────────────────────────────────────
+  // boardPriceFor / hwPriceFor: lookups únicos de precio por nombre.
+  // computeItemFinancials: construye costo directo / precio taller / precio final
+  // para una config. override=null => CONFIG REAL del módulo (cores reales, mezcla
+  // MDP+MDF, etc.). override={...} => escenario forzado (las 14 terminaciones).
+  // SIEMPRE incluye extras y fijos, de forma idéntica en planilla, comparativa y
+  // presupuesto, para que las tres rutas no puedan divergir.
+  // ─────────────────────────────────────────────────────────────
+
+  const boardPriceFor = (name: string, count: number, S: any): number => {
+      const n = name.toLowerCase();
+      let p = S.priceBoard18WhiteAglo || 0;
+      if      (n.includes('trupan') || n.includes('5.5'))        p = S.priceBacking55Color       || 0;
+      else if (n.includes('fondo') && n.includes('3'))           p = S.priceBacking3White         || 0;
+      else if (n.includes('15mm'))                               p = S.priceBoard15WhiteAglo      || 0;
+      else if (n.includes('laquear') || n.includes('crudo'))     p = S.priceBoard18MDFCrudo1Face  || 0;
+      else if (n.includes('kiri') || n.includes('veneer'))       p = S.priceBoard18VeneerMDF      || 0;
+      else if (n.includes('color') && n.includes('mdf'))         p = S.priceBoard18ColorMDF       || 0;
+      else if (n.includes('color'))                              p = S.priceBoard18ColorAglo      || 0;
+      else if (n.includes('blanca') && n.includes('mdf'))        p = S.priceBoard18WhiteMDF       || 0;
+      return p * count;
+  };
+
+  const hwPriceFor = (name: string, qty: number, S: any): number => {
+      const n = name.toLowerCase();
+      let unitPrice = 0;
+      if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard || 0;
+      else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose || 0;
+      else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
+      else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
+      else if (n.includes('guías') || n.includes('guia')) {
+          const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
+          const isS = n.includes('suave'); const isP = n.includes('push');
+          if      (len <= 300) unitPrice = isS ? (S.priceSlide300Soft || 0) : isP ? (S.priceSlide300Push || 0) : (S.priceSlide300Std || 0);
+          else if (len <= 400) unitPrice = isS ? (S.priceSlide400Soft || 0) : isP ? (S.priceSlide400Push || 0) : (S.priceSlide400Std || 0);
+          else                 unitPrice = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
+      }
+      return unitPrice * qty;
+  };
+
+  // Devuelve el desglose completo y los precios de una config.
+  // override === null  → config REAL (technical mode, sin forzar cores)
+  // override === {...}  → escenario forzado
+  const computeItemFinancials = (item: any, snapshot: any, override: Partial<CabinetModule> | null) => {
+      const S: any = snapshot;
+      const modules = item?.modules || [];
+      const margins = item?.margins || { workshop: 35, roden: 0 };
+      const laborCost  = (item?.labor?.workers || 1) * (item?.labor?.days || 1) * (S.costLaborDay || 0);
+      const fixedCosts = (S.priceScrews || 0) + (S.priceGlueTin || 0);
+      const extrasCost = (modules as any[]).flatMap((m: any) => m.extras || [])
+          .reduce((a: number, e: any) => a + (e.unitPrice || 0) * (e.quantity || 0), 0);
+
+      // Cantidades: override=null → sin override (config real); si no, escenario forzado.
+      const q = override ? calculateItemQuantities(modules, override) : calculateItemQuantities(modules);
+
+      // Terminación: derivada del despiece real (lacquer/veneer ya resueltos por calculateItemQuantities).
+      const finArea  = q.lacquerAreaM2 > 0 ? q.lacquerAreaM2 : q.veneerAreaM2 > 0 ? q.veneerAreaM2 : 0;
+      const finPrice = q.lacquerAreaM2 > 0 ? (S.priceFinishLacquerSemi || 0)
+                     : q.veneerAreaM2  > 0 ? (S.priceFinishLustreSemi  || 0) : 0;
+
+      const tPlacas  = Object.entries(q.detailedBoards).filter(([, v]) => (v as number) > 0)
+          .reduce((a, [n, c]) => a + boardPriceFor(n, c as number, S), 0);
+      const tTapac   = (q.linearWhite22 * (S.priceEdge22White045 || 0)) + (q.linearWhite45 * (S.priceEdge45White045 || 0))
+                     + (q.linearColor22 * (S.priceEdge22Color045 || 0)) + (q.linearColor45 * (S.priceEdge45Color045 || 0))
+                     + (q.linear2mm * (S.priceEdge2mm || 0));
+      const tHerrajes = Object.entries(q.detailedHardware)
+          .reduce((a, [n, hqty]) => a + hwPriceFor(n, hqty as number, S), 0);
+      const tFinish  = finArea * finPrice;
+
+      const costoDirecto = tPlacas + tTapac + tHerrajes + extrasCost + fixedCosts + tFinish + laborCost;
+      const precioTaller = costoDirecto * (1 + (margins.workshop ?? 35) / 100);
+      const precioFinal  = precioTaller * (1 + (margins.roden ?? 0) / 100);
+
+      return { q, laborCost, fixedCosts, extrasCost, tPlacas, tTapac, tHerrajes, tFinish,
+               finArea, finPrice, costoDirecto, precioTaller, precioFinal };
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // [DEPRECADO] calculateFinancialsForScenario — sin llamadas activas.
+  // Reemplazado por computeItemFinancials. Se conserva temporalmente.
   // ─────────────────────────────────────────────────────────────
   const calculateFinancialsForScenario = (
       currentModules: ExtendedCabinetModule[],
@@ -2187,7 +2264,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   const getRecalculatedItemPrices = (item: EstimatorItem, snapshot: CostSettings) => {
       // Guard: item puede venir de Supabase con estructura incompleta
       if (!item?.labor || !item?.margins || !item?.modules) {
-          return { whiteAglo: 0, whiteMDF: 0, colorAglo: 0, colorMDF: 0, whiteLacqAglo: 0, whiteLacqMDF: 0, colorLacqAglo: 0, colorLacqMDF: 0, whiteVenrAglo: 0, whiteVenrMDF: 0, colorVenrAglo: 0, colorVenrMDF: 0, baseConfig: 0, totalDirectCost: 0 };
+          return { whiteAglo: 0, whiteMDF: 0, colorAglo: 0, colorMDF: 0, whiteLacqAglo: 0, whiteLacqMDF: 0, colorLacqAglo: 0, colorLacqMDF: 0, whiteVenrAglo: 0, whiteVenrMDF: 0, colorVenrAglo: 0, colorVenrMDF: 0, baseConfig: 0, totalDirectCost: 0, realConfig: 0, realConfigTaller: 0, realConfigDirect: 0, lacquer: 0, veneer: 0 };
       }
 
       // Ítem manual: devolver precios originales sin recalcular con escenarios de materiales
@@ -2200,97 +2277,52 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           return { whiteAglo: p, whiteMDF: p, colorAglo: p, colorMDF: p,
                    whiteLacqAglo: p, whiteLacqMDF: p, colorLacqAglo: p, colorLacqMDF: p,
                    whiteVenrAglo: p, whiteVenrMDF: p, colorVenrAglo: p, colorVenrMDF: p,
-                   baseConfig: taller, totalDirectCost: directCost };
+                   baseConfig: taller, totalDirectCost: directCost,
+                   realConfig: p, realConfigTaller: taller, realConfigDirect: directCost,
+                   lacquer: p, veneer: p };
       }
 
-      const S: any = snapshot;
-      const laborCost  = (item.labor.workers || 1) * (item.labor.days || 1) * snapshot.costLaborDay;
-      const margins    = item.margins;
-      const fixedCosts = (S.priceScrews || 0) + (S.priceGlueTin || 0);
-      // Extras del módulo: costo fijo independiente del escenario de material
-      const extrasCost = (item.modules as any[]).flatMap((m: any) => m.extras || [])
-          .reduce((a: number, e: any) => a + (e.unitPrice || 0) * (e.quantity || 0), 0);
+      // ── Motor único: computeItemFinancials para cada escenario ──
+      // Cada escenario fuerza cores; realConfig usa los cores reales del módulo (override=null).
+      const scen = (override: Partial<CabinetModule>) => computeItemFinancials(item, snapshot, override);
+      const real = computeItemFinancials(item, snapshot, null);
 
-      // ── Mismo lookup de precios que usa la planilla de costos ──
-      const boardPrice = (name: string, count: number): number => {
-          const n = name.toLowerCase();
-          let p = S.priceBoard18WhiteAglo || 0;
-          if      (n.includes('trupan') || n.includes('5.5'))        p = S.priceBacking55Color       || 0;
-          else if (n.includes('fondo') && n.includes('3'))           p = S.priceBacking3White         || 0;
-          else if (n.includes('15mm'))                               p = S.priceBoard15WhiteAglo      || 0;
-          else if (n.includes('laquear') || n.includes('crudo'))     p = S.priceBoard18MDFCrudo1Face  || 0;
-          else if (n.includes('kiri') || n.includes('veneer'))       p = S.priceBoard18VeneerMDF      || 0;
-          else if (n.includes('color') && n.includes('mdf'))         p = S.priceBoard18ColorMDF       || 0;
-          else if (n.includes('color'))                              p = S.priceBoard18ColorAglo      || 0;
-          else if (n.includes('blanca') && n.includes('mdf'))        p = S.priceBoard18WhiteMDF       || 0;
-          return p * count;
-      };
-
-      const hwPrice = (name: string, qty: number): number => {
-          const n = name.toLowerCase();
-          let unitPrice = 0;
-          if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard || 0;
-          else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose || 0;
-          else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
-          else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
-          else if (n.includes('guías') || n.includes('guia')) {
-              const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
-              const isS = n.includes('suave'); const isP = n.includes('push');
-              if      (len <= 300) unitPrice = isS ? (S.priceSlide300Soft || 0) : isP ? (S.priceSlide300Push || 0) : (S.priceSlide300Std || 0);
-              else if (len <= 400) unitPrice = isS ? (S.priceSlide400Soft || 0) : isP ? (S.priceSlide400Push || 0) : (S.priceSlide400Std || 0);
-              else                 unitPrice = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
-          }
-          return unitPrice * qty;
-      };
-
-      // ── Engine unificado: mismo pipeline que planilla de costos ──
-      // calculateItemQuantities → precios por placa entera → margen
-      const calc = (override: Partial<CabinetModule>) => {
-          const q = calculateItemQuantities(item.modules, override);
-          const mType    = (override.moduleType as string) || 'MELAMINE_FULL';
-          const finArea  = mType.includes('LACQUER') ? q.lacquerAreaM2 : mType.includes('VENEER') ? q.veneerAreaM2 : 0;
-          const finPrice = mType.includes('LACQUER') ? (S.priceFinishLacquerSemi || 0) : mType.includes('VENEER') ? (S.priceFinishLustreSemi || 0) : 0;
-          const tPlacas  = Object.entries(q.detailedBoards).filter(([, v]) => (v as number) > 0).reduce((a, [n, c]) => a + boardPrice(n, c as number), 0);
-          const tTapac   = (q.linearWhite22 * (S.priceEdge22White045 || 0)) + (q.linearWhite45 * (S.priceEdge45White045 || 0))
-                         + (q.linearColor22 * (S.priceEdge22Color045 || 0)) + (q.linearColor45 * (S.priceEdge45Color045 || 0))
-                         + (q.linear2mm * (S.priceEdge2mm || 0));
-          const tHerrajes = Object.entries(q.detailedHardware).reduce((a, [n, qty]) => a + hwPrice(n, qty as number), 0) + extrasCost;
-          const d = tPlacas + tTapac + tHerrajes + fixedCosts + finArea * finPrice + laborCost;
-          const w = d * (1 + (margins.workshop ?? 35) / 100);
-          return { d, finalPrice: w * (1 + (margins.roden ?? 0) / 100) };
-      };
-
-      const whiteAglo     = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
-      const whiteMDF      = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
-      const colorAglo     = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
-      const colorMDF      = calc({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
-      const whiteLacqAglo = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const whiteLacqMDF  = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-      const colorLacqAglo = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const colorLacqMDF  = calc({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-      const whiteVenrAglo = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const whiteVenrMDF  = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-      const colorVenrAglo = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const colorVenrMDF  = calc({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const whiteAglo     = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
+      const whiteMDF      = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
+      const colorAglo     = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
+      const colorMDF      = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
+      const whiteLacqAglo = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const whiteLacqMDF  = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const colorLacqAglo = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const colorLacqMDF  = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const whiteVenrAglo = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const whiteVenrMDF  = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
+      const colorVenrAglo = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
+      const colorVenrMDF  = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
 
       return {
-          whiteAglo:     whiteAglo.finalPrice,
-          whiteMDF:      whiteMDF.finalPrice,
-          colorAglo:     colorAglo.finalPrice,
-          colorMDF:      colorMDF.finalPrice,
-          whiteLacqAglo: whiteLacqAglo.finalPrice,
-          whiteLacqMDF:  whiteLacqMDF.finalPrice,
-          colorLacqAglo: colorLacqAglo.finalPrice,
-          colorLacqMDF:  colorLacqMDF.finalPrice,
-          whiteVenrAglo: whiteVenrAglo.finalPrice,
-          whiteVenrMDF:  whiteVenrMDF.finalPrice,
-          colorVenrAglo: colorVenrAglo.finalPrice,
-          colorVenrMDF:  colorVenrMDF.finalPrice,
-          baseConfig:    colorAglo.finalPrice,
-          totalDirectCost: colorAglo.d,
+          whiteAglo:     whiteAglo.precioFinal,
+          whiteMDF:      whiteMDF.precioFinal,
+          colorAglo:     colorAglo.precioFinal,
+          colorMDF:      colorMDF.precioFinal,
+          whiteLacqAglo: whiteLacqAglo.precioFinal,
+          whiteLacqMDF:  whiteLacqMDF.precioFinal,
+          colorLacqAglo: colorLacqAglo.precioFinal,
+          colorLacqMDF:  colorLacqMDF.precioFinal,
+          whiteVenrAglo: whiteVenrAglo.precioFinal,
+          whiteVenrMDF:  whiteVenrMDF.precioFinal,
+          colorVenrAglo: colorVenrAglo.precioFinal,
+          colorVenrMDF:  colorVenrMDF.precioFinal,
+          baseConfig:    colorAglo.precioFinal,
+          totalDirectCost: colorAglo.costoDirecto,
+          // ── Config REAL del módulo (cores reales, mezcla MDP+MDF, etc.) ──
+          // El presupuesto y el recuadro principal de la planilla usan esto.
+          realConfig:        real.precioFinal,
+          realConfigTaller:  real.precioTaller,
+          realConfigDirect:  real.costoDirecto,
           // Aliases para compatibilidad con render del presupuesto
-          lacquer: whiteLacqAglo.finalPrice,
-          veneer:  whiteVenrAglo.finalPrice,
+          lacquer: whiteLacqAglo.precioFinal,
+          veneer:  whiteVenrAglo.precioFinal,
       };
   };
 
@@ -2945,33 +2977,24 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             return p * count;
                         };
 
-                        // ── Subtotales de la configuración real ──
-                        const totalPlacas   = Object.entries(q.detailedBoards).filter(([,v])=>v>0).reduce((a,[n,c])=>a+boardPrice(n,c),0);
-                        const totalTapac    = (q.linearWhite22*S.priceEdge22White045)+(q.linearWhite45*S.priceEdge45White045)+(q.linearColor22*S.priceEdge22Color045)+(q.linearColor45*S.priceEdge45Color045)+(q.linear2mm*S.priceEdge2mm);
-                        const totalHerrajes = Object.entries(q.detailedHardware).reduce((a,[n,qty])=>a+hwPrice(n,qty),0) + (item.modules?.flatMap((m:any)=>m.extras||[]).reduce((a:number,e:any)=>a+e.unitPrice*e.quantity,0));
-                        const totalFijos    = fixedCosts;
-                        const totalFinish   = finishAreaM2 * finishPriceM2;
+                        // ── Subtotales de la configuración REAL (motor único) ──
+                        // computeItemFinancials(null) usa los cores reales del módulo (mezcla MDP+MDF, etc.)
+                        // e incluye extras y fijos. Es la misma fuente que el presupuesto (prices.realConfig).
+                        const realFin = computeItemFinancials(item, S, null);
+                        const totalPlacas    = realFin.tPlacas;
+                        const totalTapac     = realFin.tTapac;
+                        const totalHerrajes  = realFin.tHerrajes + realFin.extrasCost;
+                        const totalFijos     = realFin.fixedCosts;
+                        const totalFinish    = realFin.tFinish;
                         const totalMaterials = totalPlacas + totalTapac + totalHerrajes + totalFijos + totalFinish;
-                        const totalDirectCost = totalMaterials + laborCost;
-                        const totalWorkshop   = totalDirectCost * (1 + (margins.workshop ?? 35) / 100);
+                        const totalDirectCost = realFin.costoDirecto;
+                        const totalWorkshop   = realFin.precioTaller;
 
-                        // ── 14 terminaciones — mismo engine que la planilla (placas enteras) ──
+                        // ── 14 terminaciones — motor único (incluye extras y fijos) ──
                         const calc = (override: any) => {
                             if (!item?.modules?.length) return { d: 0, w: 0 };
-                            const qOver = calculateItemQuantities(item.modules, override);
-
-                            // Calcular acabado según override
-                            const mType = override.moduleType || realMT;
-                            const finArea = mType.includes('LACQUER') ? qOver.lacquerAreaM2
-                                          : mType.includes('VENEER')  ? qOver.veneerAreaM2 : 0;
-                            const finPrice = mType.includes('LACQUER') ? (S.priceFinishLacquerSemi || 0)
-                                           : mType.includes('VENEER')  ? (S.priceFinishLustreSemi || 0) : 0;
-                            const tPlacas  = Object.entries(qOver.detailedBoards).filter(([,v])=>v>0).reduce((a,[n,c])=>a+boardPrice(n,c as number),0);
-                            const tTapac   = (qOver.linearWhite22*S.priceEdge22White045)+(qOver.linearWhite45*S.priceEdge45White045)+(qOver.linearColor22*S.priceEdge22Color045)+(qOver.linearColor45*S.priceEdge45Color045)+(qOver.linear2mm*S.priceEdge2mm);
-                            const tHerrajes= Object.entries(qOver.detailedHardware).reduce((a,[n,qty])=>a+hwPrice(n,qty as number),0);
-                            const tFinish  = finArea * finPrice;
-                            const d = tPlacas + tTapac + tHerrajes + fixedCosts + tFinish + laborCost;
-                            return { d, w: d * (1 + (margins.workshop ?? 35) / 100) };
+                            const f = computeItemFinancials(item, S, override);
+                            return { d: f.costoDirecto, w: f.precioTaller };
                         };
                                         const terminaciones = [
                                             { k:'wa',  label:'Melamina Blanca MDP',           isReal: realMT==='MELAMINE_FULL' && realWhite && !realMDF,  r: calc({ moduleType:'MELAMINE_FULL',          isWhiteStructure:true,  isMDFCore:false, structureCore:'AGLO', frontsCore:'AGLO' }) },
@@ -2990,6 +3013,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             { k:'vf',  label:'Todo Enchapado Kiri',            isReal: realMT==='VENEER_FULL',   r: calc({ moduleType:'VENEER_FULL',   isWhiteStructure:false, isMDFCore:true,  structureCore:'MDF',  frontsCore:'MDF' }) },
                                         ];
                         const realTerm = terminaciones.find(t => t.isReal);
+                        // La fila ✓ real refleja la CONFIG REAL del módulo (mezcla MDP+MDF, etc.),
+                        // no el escenario uniforme. Así la fila destacada == recuadro PRECIO TALLER == presupuesto.
+                        if (realTerm) realTerm.r = { d: realFin.costoDirecto, w: realFin.precioTaller };
 
                         // Planilla de cortes de este ítem
                         const itemCutList = (() => {
@@ -3528,12 +3554,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                                 configDescLocal = 'Melamina Color MDP';
                                                             }
 
-                                                            let configPrice = prices.colorAglo;
-                                                            if (hasLacquer) configPrice = prices.lacquer;
-                                                            else if (hasVeneer) configPrice = prices.veneer;
-                                                            else if (isWhite && isMDF) configPrice = prices.whiteMDF;
-                                                            else if (isWhite) configPrice = prices.whiteAglo;
-                                                            else if (isMDF) configPrice = prices.colorMDF;
+                                                            // Precio principal = CONFIG REAL del módulo (cores reales, mezcla MDP+MDF).
+                                                            // Coincide con el recuadro PRECIO TALLER y la fila ✓ de la planilla.
+                                                            // Las alternativas (abajo) siguen siendo escenarios uniformes.
+                                                            const configPrice = (prices as any).realConfig || prices.colorAglo;
 
                                                             return (
                                                                 // Configuración original: negrita, sin fondo
