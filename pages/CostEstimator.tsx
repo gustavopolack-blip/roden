@@ -431,6 +431,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   // --- CALCULATIONS ---
 
     const calculateModuleParts = (mod: ExtendedCabinetModule): CalculatedPart[] => {
+        // Módulo manual (ej. "Base hierro cromado"): NO genera placas ni tapacanto.
+        // Solo aporta su costo via extras (se cuentan aparte). Sin este guard, un item
+        // manual con medidas generaba un cajón de melamina fantasma (placa entera espuria).
+        if ((mod as any).specialTemplateId === SPECIAL_MANUAL_ID || mod.moduleType === 'MANUAL') {
+            return [];
+        }
         // Módulo especial: usar las piezas pre-calculadas por el template
         if ((mod as any).isSpecialModule && (mod as any).specialParts?.length > 0) {
             return (mod as any).specialParts as CalculatedPart[];
@@ -736,7 +742,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               } else if (p.material === '18mm_Kiri') {
                   reportKey = `Enchapado Kiri 18mm MDF`;
               } else if (p.material.includes('18mm') || (p.material.includes('MDF') && !p.material.includes('3mm'))) {
-                  const isWhitePiece = p.material.includes('White') || p.material === '18mm_White';
+                  // El material '18mm_MDF' no codifica blanco/color: se infiere del contexto
+                  // (currentMatName) para no cobrar siempre Color MDF a una estructura blanca.
+                  const ctxIsWhite = (currentMatName || '').toLowerCase().includes('blanc')
+                                  || (currentMatName || '').toLowerCase().includes('white');
+                  const isWhitePiece = p.material.includes('White') || p.material === '18mm_White'
+                                  || (p.material === '18mm_MDF' && ctxIsWhite);
                   const matLabel = isWhitePiece ? 'Melamina Blanca' : 'Melamina Color';
                   const displayCore = currentCore === 'AGLO' ? 'MDP' : 'MDF';
                   reportKey = `${matLabel} 18mm ${displayCore}`;
@@ -2917,8 +2928,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             );
                         }
 
-                        // ── Configuración real del ítem (primer módulo como referencia) ──
-                        const m0 = item.modules[0] || {} as any;
+                        // ── Configuración real del ítem (primer módulo REAL como referencia) ──
+                        // Se excluyen los módulos manuales (ej. "Base hierro cromado"): no representan
+                        // la melamina del mueble y antes hacían que un mueble MDF se etiquetara como MDP.
+                        const m0 = (item.modules.find((m: any) => m.specialTemplateId !== SPECIAL_MANUAL_ID && m.moduleType !== 'MANUAL')) || item.modules[0] || {} as any;
                         const realMT   = m0.moduleType || 'MELAMINE_FULL';
                         const realWhite = !!m0.isWhiteStructure;
                         const realMDF   = (m0.structureCore || 'AGLO') === 'MDF';
@@ -3531,10 +3544,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                             }
 
                                                             // Detectar configuración real del item
-                                                            const hasLacquer = item.modules?.some((m: any) => (m.moduleType || '').includes('LACQUER'));
-                                                            const hasVeneer  = item.modules?.some((m: any) => (m.moduleType || '').includes('VENEER'));
-                                                            const isWhite    = item.modules?.every((m: any) => m.isWhiteStructure);
-                                                            const isMDF      = item.modules?.every((m: any) => m.structureCore === 'MDF');
+                                                            // Excluir módulos manuales (base hierro, etc.) para detectar la config real del mueble
+                                                            const baseMods = (() => { const r = (item.modules || []).filter((m: any) => m.specialTemplateId !== SPECIAL_MANUAL_ID && m.moduleType !== 'MANUAL'); return r.length ? r : (item.modules || []); })();
+                                                            const hasLacquer = baseMods.some((m: any) => (m.moduleType || '').includes('LACQUER'));
+                                                            const hasVeneer  = baseMods.some((m: any) => (m.moduleType || '').includes('VENEER'));
+                                                            const isWhite    = baseMods.every((m: any) => m.isWhiteStructure);
+                                                            const isMDF      = baseMods.every((m: any) => m.structureCore === 'MDF');
 
                                                             // Descripción larga de la configuración real
                                                             let configDescLocal = '';
@@ -3573,10 +3588,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                             const isManualItem = (item as any).isManualItem ||
                                                                 item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
                                                             if (isManualItem) return null;
-                                                            const hasLacquer = item.modules?.some((m: any) => (m.moduleType || '').includes('LACQUER'));
-                                                            const hasVeneer  = item.modules?.some((m: any) => (m.moduleType || '').includes('VENEER'));
-                                                            const isWhite    = item.modules?.every((m: any) => m.isWhiteStructure);
-                                                            const isMDF      = item.modules?.every((m: any) => m.structureCore === 'MDF');
+                                                            // Excluir módulos manuales (base hierro, etc.) para detectar la config real del mueble
+                                                            const baseMods = (() => { const r = (item.modules || []).filter((m: any) => m.specialTemplateId !== SPECIAL_MANUAL_ID && m.moduleType !== 'MANUAL'); return r.length ? r : (item.modules || []); })();
+                                                            const hasLacquer = baseMods.some((m: any) => (m.moduleType || '').includes('LACQUER'));
+                                                            const hasVeneer  = baseMods.some((m: any) => (m.moduleType || '').includes('VENEER'));
+                                                            const isWhite    = baseMods.every((m: any) => m.isWhiteStructure);
+                                                            const isMDF      = baseMods.every((m: any) => m.structureCore === 'MDF');
                                                             let configDesc = '';
                                                             if (hasLacquer) configDesc = (isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP')) + ' + Frentes Laca Semi Mate';
                                                             else if (hasVeneer) configDesc = (isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP')) + ' + Frentes Enchapado Kiri';
