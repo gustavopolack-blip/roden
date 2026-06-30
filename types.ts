@@ -140,6 +140,32 @@ export enum ProductionOrderStatus {
   IN_PROCESS = 'IN_PROCESS',
   FINISHED = 'FINISHED'
 }
+
+// Orden de Producción (OP). Se persiste en la tabla `production_orders`.
+// La fila cruda de DB mezcla snake_case y camelCase; App.tsx la normaliza a
+// camelCase en fetchData(). Campos opcionales + index signature porque el
+// mapeo hace spread de la fila completa y distintas rutas (CostEstimator)
+// insertan con claves snake_case.
+export interface ProductionOrder {
+  id: string;
+  orderNumber?: string;
+  status: ProductionOrderStatus;
+  clientName?: string;
+  itemDescription?: string;
+  startDate?: string;
+  estimatedDeliveryDate?: string;
+  deliveryDate?: string;
+  assignedOperators?: string[];
+  linkedProjectId?: string | null;
+  projectId?: string | null;
+  budgetId?: string;
+  items?: any[];
+  observations?: string;
+  technicalDetails?: any;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: any;
+}
 export type EstimateStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'PRODUCTION';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -363,6 +389,7 @@ export interface Estimate {
   totalAmount: number;
   version?: number;
   createdAt?: string;
+  updatedAt?: string;
   createdBy?: string;
   currency?: string;
 }

@@ -15,12 +15,14 @@ export type NotificationType =
   | 'project.follow_up'
   | 'production_order.created'
   | 'production_order.updated'
+  | 'report.deleted'
   | 'workshop.project_added';
 
 export type NotificationEntityType =
   | 'task'
   | 'project'
   | 'production_order'
+  | 'report'
   | 'workshop';
 
 export type NotificationRole =

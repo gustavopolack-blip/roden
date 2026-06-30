@@ -2511,12 +2511,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                  'Planilla de Costos de Producción'}
                             </p>
                         </div>
-                        {printMode === 'COSTS' && (
-                            <div className="text-right">
-                                <span className="text-[10px] font-bold uppercase text-gray-400 block">Lista de precios</span>
-                                <span className="text-sm font-bold text-gray-700">{activeSettings.name || 'Lista Actual'}</span>
-                            </div>
-                        )}
                         {printMode === 'PRODUCTION_ORDER' && (
                             <div className="mt-2 grid grid-cols-3 gap-4 text-xs">
                                 <div><strong>Orden N°:</strong> {productionOrderInfo.orderNumber}</div>
