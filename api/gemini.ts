@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
     systemInstruction,
     userMessage,
     temperature = 0.1,
-    model = 'gemini-2.0-flash',
+    model = 'gemini-2.5-flash',
     responseMimeType,
   } = req.body ?? {};
 
