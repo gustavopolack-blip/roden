@@ -46,13 +46,15 @@ const Clients: React.FC<ClientsProps> = ({ clients, user, onAddClient, onUpdateC
       totalValue: 0
   });
 
-  const filteredClients = (clients || []).filter(client => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    const nameMatch = (client.name || '').toLowerCase().includes(term);
-    const tagsMatch = Array.isArray(client.tags) && client.tags.some(tag => (tag || '').toLowerCase().includes(term));
-    return nameMatch || tagsMatch;
-  });
+  const filteredClients = (clients || [])
+    .filter(client => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      const nameMatch = (client.name || '').toLowerCase().includes(term);
+      const tagsMatch = Array.isArray(client.tags) && client.tags.some(tag => (tag || '').toLowerCase().includes(term));
+      return nameMatch || tagsMatch;
+    })
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base' }));
 
   const handleOpenAddModal = () => {
     setEditingClient(null);
