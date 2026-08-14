@@ -697,10 +697,11 @@ const LATERAL_APLICADO: SpecialModuleTemplate = {
 const AJUSTE: SpecialModuleTemplate = {
   id: 'AJUSTE',
   name: 'Ajuste',
-  description: 'Placa 18mm × 100mm (ancho fijo). Solo se ingresa el largo.',
+  description: 'Placa 18mm de espesor × 100mm de profundidad. Solo se ingresa el largo.',
   params: ['width'],
-  // Placa 18mm de espesor × 100mm de ancho; solo el largo es variable.
-  fixedDims: () => ({ height: 100, depth: 18 }),
+  // Se coloca acostada: 18mm de espesor (alto) y 100mm de profundidad.
+  // Solo el largo lo carga el usuario.
+  fixedDims: () => ({ height: 18, depth: 100 }),
   calculate: ({ width: W }) => {
     const parts: CalculatedPart[] = [];
 
