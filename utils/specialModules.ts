@@ -36,12 +36,20 @@ export type SpecialModuleExtraOption =
   | { key: string; label: string; type: 'select';  options: { label: string; value: string }[] }
   | { key: string; label: string; type: 'number';  min?: number; max?: number; defaultValue?: number };
 
+// Dimensiones que el template fija por su propia geometría y que el usuario NO carga.
+// Toda dimensión que no esté en `params` debería estar acá: si no, el módulo hereda el
+// default del formulario (600 × 720 × 580) y se guarda una medida falsa.
+export type FixedDims = Partial<Record<'width' | 'height' | 'depth', number>>;
+
 export interface SpecialModuleTemplate {
   id: string;
   name: string;
   description: string;
   params: Array<'width' | 'height' | 'depth'>;
   extraOptions?: SpecialModuleExtraOption[];
+  // Es función porque algunos templates cambian su espesor según una extraOption
+  // (Tapa Horizontal: 18 o 36mm; Zócalo Aplicado: 18 o 5.5mm).
+  fixedDims?: (options?: Record<string, string>) => FixedDims;
   calculate: (params: SpecialModuleParams, options?: Record<string, string>) => SpecialModuleResult;
 }
 
@@ -197,6 +205,8 @@ const PANEL_LISO: SpecialModuleTemplate = {
   name: 'Panel de Revestimiento Liso',
   description: 'Placa 18mm con bastidor trasero de 5cm retirado del perímetro',
   params: ['width', 'height'],
+  // Espesor total: panel frontal 18mm + bastidor trasero 18mm.
+  fixedDims: () => ({ depth: 36 }),
   calculate: ({ width: W, height: H }) => {
     const parts: CalculatedPart[] = [];
     const RET = 50; // retiro del perímetro en mm
@@ -263,6 +273,8 @@ const PANEL_ENLISTONADO: SpecialModuleTemplate = {
       ]
     }
   ],
+  // Espesor total: panel base 18mm + listón 18mm superpuesto.
+  fixedDims: () => ({ depth: 36 }),
   calculate: ({ width: W, height: H }, options = {}) => {
     const parts: CalculatedPart[] = [];
     const orientation = options.orientation || 'vertical';
@@ -384,6 +396,8 @@ const ESTANTE_FLOTANTE: SpecialModuleTemplate = {
   name: 'Estante Flotante',
   description: 'Estante mural 36mm — dos placas 18mm superpuestas. Solo ancho y profundidad.',
   params: ['width', 'depth'],   // height no aplica: espesor fijo 36mm
+  // Espesor fijo: dos placas de 18mm superpuestas.
+  fixedDims: () => ({ height: 36 }),
   calculate: ({ width: W, depth: D }) => {
     const parts: CalculatedPart[] = [];
 
@@ -575,6 +589,8 @@ const TAPA_HORIZONTAL: SpecialModuleTemplate = {
       ]
     }
   ],
+  // 18mm simple, o 36mm cuando se elige regrueso con faja perimetral.
+  fixedDims: (o = {}) => ({ height: (o.espesor || '18mm') === '36mm' ? 36 : 18 }),
   calculate: ({ width: W, depth: D }, options = {}) => {
     const espesor = options.espesor || '18mm';
     const parts: CalculatedPart[] = [];
@@ -626,6 +642,8 @@ const DIVISOR_VERTICAL: SpecialModuleTemplate = {
   name: 'Divisor Vertical',
   description: 'Placa vertical 18mm interior — solo alto y profundidad.',
   params: ['height', 'depth'],
+  // El ancho del módulo es el espesor de la placa.
+  fixedDims: () => ({ width: 18 }),
   calculate: ({ height: H, depth: D }) => {
     const parts: CalculatedPart[] = [];
 
@@ -652,6 +670,8 @@ const LATERAL_APLICADO: SpecialModuleTemplate = {
   name: 'Lateral Aplicado',
   description: 'Lateral 18mm aplicado sobre el costado de un módulo existente.',
   params: ['height', 'depth'],
+  // El ancho del módulo es el espesor de la placa.
+  fixedDims: () => ({ width: 18 }),
   calculate: ({ height: H, depth: D }) => {
     const parts: CalculatedPart[] = [];
 
@@ -679,6 +699,8 @@ const AJUSTE: SpecialModuleTemplate = {
   name: 'Ajuste',
   description: 'Placa 18mm × 100mm (ancho fijo). Solo se ingresa el largo.',
   params: ['width'],
+  // Placa 18mm de espesor × 100mm de ancho; solo el largo es variable.
+  fixedDims: () => ({ height: 100, depth: 18 }),
   calculate: ({ width: W }) => {
     const parts: CalculatedPart[] = [];
 
@@ -859,6 +881,8 @@ const ZOCALO_APLICADO: SpecialModuleTemplate = {
       ]
     }
   ],
+  // La profundidad del módulo es el espesor elegido.
+  fixedDims: (o = {}) => ({ depth: (o.espesor || '18mm') === '5.5mm' ? 5.5 : 18 }),
   calculate: ({ width: W, height: H }, options = {}) => {
     const espesor = options.espesor || '18mm';
     const parts: CalculatedPart[] = [];
@@ -938,6 +962,8 @@ const PUERTA_18MM: SpecialModuleTemplate = {
       ]
     }
   ],
+  // La profundidad del módulo es el espesor de la puerta.
+  fixedDims: () => ({ depth: 18 }),
   calculate: ({ width: W, height: H }, options = {}) => {
     const hingeType = options.hingeType || 'COMMON';
     const hinges    = H > 1500 ? 4 : H > 900 ? 3 : 2;
@@ -971,6 +997,8 @@ const ESTANTE_18MM: SpecialModuleTemplate = {
   name: 'Estante 18mm',
   description: 'Estante melamina 18mm. Espesor fijo. Solo ancho y profundidad.',
   params: ['width', 'depth'],
+  // Espesor fijo de la placa: el alto del módulo nunca lo carga el usuario.
+  fixedDims: () => ({ height: 18 }),
   calculate: ({ width: W, depth: D }) => {
     const parts: CalculatedPart[] = [];
 
@@ -1033,6 +1061,13 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>
   SPECIAL_MODULE_TEMPLATES.find(t => t.id === id);
+
+// Dimensiones impuestas por el template (las que el usuario no carga).
+// Devuelve {} para templates que piden las tres dimensiones.
+export const getFixedDims = (
+  template: SpecialModuleTemplate | undefined | null,
+  options?: Record<string, string>
+): FixedDims => (template?.fixedDims ? template.fixedDims(options) : {});
 
 // ─────────────────────────────────────────────────────────────
 // COSTEO DE MÓDULO ESPECIAL

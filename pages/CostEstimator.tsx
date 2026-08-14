@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
-import { SPECIAL_MODULE_TEMPLATES, getTemplate, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem } from '../utils/specialModules';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem } from '../utils/specialModules';
 import { supabase } from '../services/supabaseClient';
 
 interface CostEstimatorProps {
@@ -1906,14 +1906,19 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       if (moduleKind === 'SPECIAL' && specialTemplateId) {
           const template = getTemplate(specialTemplateId);
           if (!template) return;
+          // Dimensiones que impone el template (las que no están en template.params).
+          // Sin esto el módulo hereda el default del formulario (720 de alto en un
+          // estante de 18mm) y queda guardada una medida que nadie cargó.
+          const fixedDims = getFixedDims(template, specialOptions);
           const params: SpecialModuleParams = {
-              width:  moduleForm.width  || 600,
-              height: moduleForm.height || 720,
-              depth:  moduleForm.depth  || 580,
+              width:  fixedDims.width  ?? moduleForm.width  ?? 600,
+              height: fixedDims.height ?? moduleForm.height ?? 720,
+              depth:  fixedDims.depth  ?? moduleForm.depth  ?? 580,
           };
           const result = template.calculate(params, specialOptions);
           const newMod: ExtendedCabinetModule = {
               ...moduleForm,
+              ...fixedDims,   // pisa lo que traiga el formulario
               id:         `m${Date.now()}`,
               name:       moduleForm.name || template.name,
               moduleType: 'SPECIAL' as any,
@@ -3944,31 +3949,35 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     <input placeholder="Ej: Bajo 2 Puertas" className="w-full border p-2 rounded text-sm bg-gray-50 focus:bg-white transition-colors outline-none focus:ring-1 focus:ring-black" required value={moduleForm.name} onChange={e => handleInputChange('name', e.target.value)}/>
                                 </div>
                                 
-                                <div className="w-20">
-                                    <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Ancho</label>
-                                    <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.width} onChange={e => handleInputChange('width', Number(e.target.value))} />
-                                </div>
                                 {(() => {
-                                    // Ocultar "Alto" si el template especial no lo usa (ej: Estante Flotante)
+                                    // Un template especial fija por geometría las dimensiones que no declara
+                                    // en `params` (ej: Estante 18mm fija el alto). Esas no se editan: se
+                                    // muestra el valor real que va a quedar guardado.
                                     const activeTmpl = moduleKind === 'SPECIAL' && specialTemplateId ? getTemplate(specialTemplateId) : null;
-                                    const hideHeight = activeTmpl && !activeTmpl.params.includes('height');
-                                    if (hideHeight) return (
-                                        <div className="w-20">
-                                            <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Alto</label>
-                                            <div className="w-full border border-dashed border-gray-300 p-2 rounded text-xs text-center bg-gray-50 text-gray-400 font-mono">Fijo: 36mm</div>
-                                        </div>
-                                    );
-                                    return (
-                                        <div className="w-20">
-                                            <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Alto</label>
-                                            <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.height} onChange={e => handleInputChange('height', Number(e.target.value))} />
-                                        </div>
-                                    );
+                                    const fixedDims = getFixedDims(activeTmpl, specialOptions);
+                                    const DIMS: { key: 'width' | 'height' | 'depth'; label: string }[] = [
+                                        { key: 'width',  label: 'Ancho' },
+                                        { key: 'height', label: 'Alto'  },
+                                        { key: 'depth',  label: 'Prof.' },
+                                    ];
+                                    return DIMS.map(({ key, label }) => {
+                                        const isFixed = !!activeTmpl && !activeTmpl.params.includes(key);
+                                        return (
+                                            <div className="w-20" key={key}>
+                                                <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">{label}</label>
+                                                {isFixed ? (
+                                                    <div className="w-full border border-dashed border-gray-300 p-2 rounded text-xs text-center bg-gray-50 text-gray-400 font-mono">
+                                                        Fijo: {fixedDims[key] ?? 0}mm
+                                                    </div>
+                                                ) : (
+                                                    <input type="number" className="w-full border p-2 rounded text-sm text-center" required
+                                                           value={moduleForm[key] ?? 0}
+                                                           onChange={e => handleInputChange(key, Number(e.target.value))} />
+                                                )}
+                                            </div>
+                                        );
+                                    });
                                 })()}
-                                <div className="w-20">
-                                    <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Prof.</label>
-                                    <input type="number" className="w-full border p-2 rounded text-sm text-center" required value={moduleForm.depth} onChange={e => handleInputChange('depth', Number(e.target.value))} />
-                                </div>
                                 <div className="w-16">
                                     <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Cant.</label>
                                     <input type="number" className="w-full border p-2 rounded text-sm text-center font-bold bg-indigo-50 text-indigo-700" value={moduleForm.quantity} onChange={e => handleInputChange('quantity', Number(e.target.value))}/>
