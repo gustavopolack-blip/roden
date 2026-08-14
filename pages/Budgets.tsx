@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Estimate, Project, EstimateStatus, ProductionStep, SupplierPayment, SavedEstimate } from '../types';
 import { FileText, CheckCircle, Clock, X, Search, PieChart, TrendingUp, Hammer, BarChart2, TrendingDown, DollarSign, Pencil, Trash2, Download, Archive, Filter } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
+import { ACTIVE_PROJECT_STATUSES } from '../constants';
 
 interface BudgetsProps {
   estimates: Estimate[];
@@ -55,6 +56,20 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
 
   const getProject = (id: string) => projects.find(p => p.id === id);
   const getProjectName = (id: string) => getProject(id)?.title || 'Proyecto Desconocido';
+
+  // Solo se pueden cargar cobranzas sobre obras activas (las que muestra la página Proyectos).
+  // Al editar, se conserva el proyecto ya asignado aunque haya cambiado de estado,
+  // para no perder el vínculo del registro histórico.
+  const selectableProjects = useMemo(() => {
+    const activeProjects = projects.filter(p => ACTIVE_PROJECT_STATUSES.includes(p.status));
+    const current = estimateForm.projectId
+      ? projects.find(p => p.id === estimateForm.projectId)
+      : undefined;
+    if (current && !activeProjects.some(p => p.id === current.id)) {
+      return [...activeProjects, current];
+    }
+    return activeProjects;
+  }, [projects, estimateForm.projectId]);
 
   const closedEstimatesCount = estimates.filter(est =>
     est.projectId && closedProjectIds.has(est.projectId)
@@ -395,8 +410,17 @@ const Budgets: React.FC<BudgetsProps> = ({ estimates, projects, supplierPayments
                                   <select required className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-1 focus:ring-black outline-none bg-white"
                                         value={estimateForm.projectId} onChange={e => setEstimateForm({...estimateForm, projectId: e.target.value})}>
                                         <option value="">Seleccionar Proyecto...</option>
-                                        {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                                        {selectableProjects.map(p => (
+                                          <option key={p.id} value={p.id}>
+                                            {p.title}{!ACTIVE_PROJECT_STATUSES.includes(p.status) ? ' (obra cerrada)' : ''}
+                                          </option>
+                                        ))}
                                     </select>
+                                    {selectableProjects.length === 0 && (
+                                      <p className="mt-1 text-xs text-amber-600">
+                                        No hay obras activas. Solo se listan las obras que aparecen en Proyectos (no las finalizadas ni las canceladas).
+                                      </p>
+                                    )}
                               </div>
                               <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>

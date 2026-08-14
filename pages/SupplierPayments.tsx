@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { SupplierPayment, User, Supplier, Project } from '../types';
 import { Plus, Search, Calendar, DollarSign, X, Truck, Pencil, Archive, Check, Building2, Filter, Users, LayoutList, Lock, Zap } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
+import { ACTIVE_PROJECT_STATUSES } from '../constants';
 
 interface SupplierPaymentsProps {
   payments: SupplierPayment[];
@@ -63,6 +64,20 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
     if(!id) return '- General / Stock -';
     return projects.find(p => p.id === id)?.title || 'Proyecto Desconocido';
   }
+
+  // Solo se pueden imputar pagos a obras activas (las que muestra la página Proyectos).
+  // Al editar, se conserva el proyecto ya asignado aunque haya cambiado de estado,
+  // para no perder el vínculo del registro histórico.
+  const selectableProjects = useMemo(() => {
+    const activeProjects = projects.filter(p => ACTIVE_PROJECT_STATUSES.includes(p.status));
+    const current = paymentForm.projectId
+      ? projects.find(p => p.id === paymentForm.projectId)
+      : undefined;
+    if (current && !activeProjects.some(p => p.id === current.id)) {
+      return [...activeProjects, current];
+    }
+    return activeProjects;
+  }, [projects, paymentForm.projectId]);
 
   const filteredPayments = payments.filter(p => {
     // 1. Global Filter: Hide Archived
@@ -588,11 +603,17 @@ const SupplierPayments: React.FC<SupplierPaymentsProps> = ({ payments, suppliers
                                  onChange={(e) => handleProjectChange(e.target.value)}
                               >
                                   <option value="">Seleccionar Proyecto...</option>
-                                  {projects.map(p => (
-                                      <option key={p.id} value={p.id}>{p.title}</option>
+                                  {selectableProjects.map(p => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.title}{!ACTIVE_PROJECT_STATUSES.includes(p.status) ? ' (obra cerrada)' : ''}
+                                      </option>
                                   ))}
                               </select>
-                              <p className="text-[10px] text-gray-400 mt-1">Seleccionar un proyecto autocompletará las fechas sugeridas.</p>
+                              <p className="text-[10px] text-gray-400 mt-1">
+                                {selectableProjects.length === 0
+                                  ? 'No hay obras activas. Podés dejarlo sin proyecto (General / Stock).'
+                                  : 'Solo se listan obras activas (las que ves en Proyectos). Seleccionar un proyecto autocompletará las fechas sugeridas.'}
+                              </p>
                           </div>
 
                           <div>

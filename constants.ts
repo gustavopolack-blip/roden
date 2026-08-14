@@ -1,4 +1,4 @@
-import { User, Client, Project, Budget, Supplier, SupplierPayment, Task } from './types';
+import { User, Client, Project, Budget, Supplier, SupplierPayment, Task, ProjectStatus } from './types';
 
 export const MOCK_USER_ADMIN: User = {
   id: 'admin-1',
@@ -33,3 +33,13 @@ export const PAGE_PERMISSIONS: Record<string, string[]> = {
   ai: ['administrador'],
   marketing: ['administrador']  // Solo admin: leads, recompra y piezas de difusión
 };
+
+// Obras "activas": las que la página Proyectos muestra por defecto (PROJECT_GROUPS,
+// con showCompleted = false). Sobre estas se pueden imputar movimientos de dinero:
+// cobranzas en Finanzas y pagos a proveedores en Proveedores.
+// Quedan afuera COMPLETED y CANCELLED, que es el grupo "ARCHIVADO / FINALIZADO".
+// QUOTING está incluido a propósito: la seña se cobra con el presupuesto enviado,
+// antes de que la obra pase a PRODUCTION.
+// READY también: Production mueve la obra a READY al completar el último paso,
+// y el saldo final se cobra recién en la entrega.
+export const ACTIVE_PROJECT_STATUSES: ProjectStatus[] = ['PROPOSAL', 'QUOTING', 'PRODUCTION', 'READY'];
