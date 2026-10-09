@@ -1909,6 +1909,32 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       setPrintMode('SUPPLIES'); // Default view
   };
 
+  // Etiqueta de placa para corte: una placa física distinta = una etiqueta distinta.
+  // Única fuente para el optimizador y la planilla de cortes. Antes:
+  // - el optimizador rotulaba TODO 18mm_MDF como "Melamina Blanca MDF" (mezclaba blanco y color)
+  //   y nombraba los frentes con el color de la estructura;
+  // - la planilla juntaba MDP y MDF del mismo color y mandaba el Kiri a "Otros".
+  const getBoardLabel = (mod: any, part: CalculatedPart): string => {
+      const m = part.material || '';
+      if (m === '18mm_MDFCrudo') return 'MDF Crudo 1 Cara 18mm (para laquear)';
+      if (m === '18mm_Kiri')     return 'Enchapado Kiri 18mm MDF';
+      if (m.includes('15mm'))    return 'Melamina Blanca 15mm (cajón)';
+      if (m.includes('5.5mm') || m.includes('55mm')) return 'Fondo Color 5.5mm';
+      if (m.includes('3mm'))     return 'Fondo Blanco 3mm';
+      // Melamina 18mm: color según material (White/Color) o, en MDF, según el nombre / estructura
+      const isFront = isVisibleFrontPiece(part.name);
+      const named = String((isFront ? (mod.materialFrontName || mod.materialColorName) : mod.materialColorName) || '').trim();
+      const namedIsWhite = /blanc|white/i.test(named);
+      const isWhite = m.includes('White') ? true
+                    : m.includes('Color') ? false
+                    : (named ? namedIsWhite : !!mod.isWhiteStructure);
+      // El nombre cargado solo se usa si es coherente con el material y no es genérico
+      const generic = !named || /^melamina (blanca|color)$/i.test(named) || /^(laqueado|enchapado kiri)$/i.test(named);
+      const colorName = (!generic && namedIsWhite === isWhite) ? named : (isWhite ? 'Melamina Blanca' : 'Melamina Color');
+      const core = m === '18mm_MDF' ? 'MDF' : 'MDP';
+      return `${colorName} 18mm ${core}`;
+  };
+
   const handleOptimizeCut = () => {
       const itemsToProcess = technicalItems.length > 0 ? technicalItems : items;
       const groupedByMaterial: Record<string, { id: string, label: string, width: number, height: number, quantity: number, grain: 'horizontal' | 'vertical' | 'free' }[]> = {};
@@ -1917,16 +1943,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           item.modules.forEach(mod => {
               const parts = calculateModuleParts(mod);
               parts.forEach(part => {
-                  // Resolver clave de material legible
-                  let materialKey = part.material as string;
-                  if (materialKey === '18mm_White')    materialKey = mod.materialColorName?.includes('blanc') ? mod.materialColorName : 'Melamina Blanca 18mm';
-                  else if (materialKey === '18mm_Color')    materialKey = mod.materialColorName || 'Melamina Color 18mm';
-                  else if (materialKey === '18mm_MDF')      materialKey = 'Melamina Blanca MDF 18mm';
-                  else if (materialKey === '18mm_MDFCrudo') materialKey = 'MDF Crudo 1 Cara 18mm';
-                  else if (materialKey === '18mm_Kiri')     materialKey = 'Enchapado Kiri 18mm';
-                  else if (materialKey === '15mm_White')    materialKey = 'Melamina Blanca 15mm';
-                  else if (materialKey === '3mm_White')     materialKey = 'Fondo 3mm Blanco';
-                  else if (materialKey === '5.5mm_Color' || materialKey.includes('55mm')) materialKey = 'Fondo 5.5mm Color';
+                  const materialKey = getBoardLabel(mod, part);
 
                   if (!groupedByMaterial[materialKey]) groupedByMaterial[materialKey] = [];
 
@@ -1988,36 +2005,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
               parts.forEach(part => {
                   // Determine Material Name and Thickness based on logic
-                  let matName = "Otros";
-                  let thickness = "18mm";
-                  let allowRotation = true; // Default
-
-                  const isFront = isVisibleFrontPiece(part.name);
-                  const colorName = mod.materialColorName || 'Estándar';
-                  const frontName = mod.materialFrontName || colorName;
-
-                  if (part.material.includes('18mm')) {
-                      thickness = "18mm";
-                      // Determine specific name based on module config
-                      if (part.material.includes('Color')) matName = isFront ? frontName : colorName;
-                      else if (part.material.includes('White')) matName = 'Melamina Blanca';
-                      else if (part.material.includes('MDF')) {
-                          matName = isFront ? frontName : colorName;
-                          if (matName === 'Estándar' || !matName) matName = 'MDF Crudo';
-                      }
-                      
-                      // Check grain for rotation
-                      if (part.grain !== 'free') allowRotation = false; // Usually wood-like patterns
-                  } else if (part.material.includes('15mm')) {
-                      thickness = "15mm";
-                      matName = 'Melamina Blanca (Cajón)';
-                  } else if (part.material.includes('5.5mm')) {
-                      thickness = "5.5mm";
-                      matName = 'Fondo Color';
-                  } else if (part.material.includes('3mm')) {
-                      thickness = "3mm";
-                      matName = 'Fondo Blanco';
-                  }
+                  // Misma etiqueta de placa que el optimizador
+                  const matName = getBoardLabel(mod, part);
+                  const thickness = part.material.includes('18mm') ? '18mm'
+                                  : part.material.includes('15mm') ? '15mm'
+                                  : (part.material.includes('5.5mm') || part.material.includes('55mm')) ? '5.5mm'
+                                  : part.material.includes('3mm') ? '3mm' : '18mm';
+                  // Con veta definida (melamina con dibujo) no se rota
+                  const allowRotation = !(part.material.includes('18mm') && part.grain !== 'free');
 
                   if (!grouped[matName]) grouped[matName] = {};
                   if (!grouped[matName][thickness]) grouped[matName][thickness] = [];
