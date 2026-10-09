@@ -22,6 +22,12 @@ despiece explotado para el taller y exportar la maqueta a **FBX** (3ds Max) u **
 
 En el constructor:
 
+- **Arrastrar con el mouse** (vista Ensamblado): clic sostenido sobre un módulo y mover. El módulo
+  salta al hueco más cercano y los demás de la fila se corren para hacerle lugar (los huecos que
+  había entre otros módulos, p. ej. heladera, se conservan). Arrastrando hacia arriba o abajo pasa a
+  la otra fila (bajos ↔ alacenas). Fila = módulos sin girar apoyados a la misma altura; los girados
+  (alas de una L) se ubican con X/Y/Z. Para crear una fila nueva (primera alacena) se carga su Y.
+  Lógica: `layoutRows` / `planReorder` en `geometry.ts` (pruebas en `tests/reorder3d.test.ts`).
 - Elegí un módulo en la lista para editar medidas, puertas, cajones, abatibles, alto de frentes
   combinados, apertura (bisagra) y posición X/Y/Z (mm) y giro (0/90/180/270°).
 - **Ensamblado / Despiece del mueble / Despiece del módulo** y control de separación.

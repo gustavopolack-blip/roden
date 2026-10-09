@@ -8,13 +8,13 @@
  * El despiece, herrajes y precios salen del motor del estimador (utils/estimatorEngine):
  * acá no se calcula ninguna medida ni costo propio. Se carga bajo demanda (React.lazy).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
-  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY,
+  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Assembly, planReorder, ReorderPlan,
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
@@ -42,6 +42,14 @@ const download = (content: string, fileName: string, mime: string) => {
 };
 
 const fmt = (v: number) => `${Math.round(v * 10) / 10}`;
+
+/** Fija la posición (layout3d) de todos los módulos: la del plan si se mueven, la actual si no. */
+const withLayouts = (modules: any[], assembly: Assembly, plan: ReorderPlan): any[] =>
+  modules.map((m, i) => {
+    if (isManualModule(m)) return m;
+    const l = plan.layouts.get(i) || assembly.modules.find(x => x.moduleIndex === i && x.instance === 0)?.layout;
+    return l ? { ...m, layout3d: { x: l.x, y: l.y, z: l.z, rotY: l.rotY } } : m;
+  });
 
 /** Recalcula las piezas de un módulo especial con sus opciones guardadas (misma plantilla). */
 const recalcSpecial = (mod: any): any => {
@@ -83,8 +91,17 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const [showRules, setShowRules] = useState(false);
 
   const active = furnitures.find(f => f.id === activeId) || furnitures[0];
-  const modules = drafts[active.id] || [];
-  const assembly = useMemo(() => buildAssembly(active.name, modules), [active.name, modules]);
+  const baseModules = drafts[active.id] || [];
+  const baseAssembly = useMemo(() => buildAssembly(active.name, baseModules), [active.name, baseModules]);
+  // Arrastre en curso: los demás módulos se corren en vivo; se guarda al soltar.
+  const [dragPlan, setDragPlan] = useState<ReorderPlan | null>(null);
+  const dragRef = useRef<{ idx: number; offsetX: number; spanW: number } | null>(null);
+  const previewModules = useMemo(
+    () => (dragPlan?.changed ? withLayouts(baseModules, baseAssembly, dragPlan) : null),
+    [dragPlan, baseModules, baseAssembly],
+  );
+  const modules = previewModules || baseModules;
+  const assembly = useMemo(() => (previewModules ? buildAssembly(active.name, previewModules) : baseAssembly), [active.name, previewModules, baseAssembly]);
   const selectedPlaced: PlacedModule | undefined = assembly.modules.find(m => m.key === selModuleKey);
   const viewScene = useMemo(
     () => buildScene(assembly, mode === 'assembled' ? 0 : factor, mode === 'module' ? (selModuleKey || assembly.modules[0]?.key) : undefined),
@@ -139,6 +156,32 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     const prev = assembly.modules.filter(m => m.moduleIndex < idx).pop();
     if (!prev) { updateLayout(idx, { x: 0, y: 0, z: 0 }); return; }
     updateLayout(idx, { x: prev.worldBox.max[0], y: prev.layout.y, z: prev.layout.z, rotY: 0 });
+  };
+
+  const onDrag = (e: { phase: 'start' | 'move' | 'end'; moduleKey: string; point: { x: number; y: number } }) => {
+    if (e.phase === 'start') {
+      const pm = baseAssembly.modules.find(m => m.key === e.moduleKey);
+      if (!pm) return;
+      const mine = baseAssembly.modules.filter(m => m.moduleIndex === pm.moduleIndex);
+      const first = mine.find(m => m.instance === 0)!;
+      if (first.layout.rotY !== 0) return; // los girados (alas de una L) se ubican con X/Y/Z
+      dragRef.current = { idx: pm.moduleIndex, offsetX: first.layout.x - e.point.x, spanW: mine.reduce((a, m) => a + m.dims.w, 0) };
+      setSelModuleKey(first.key); setSelPieceKey(null);
+      return;
+    }
+    const d = dragRef.current;
+    if (!d) return;
+    const plan = planReorder(baseAssembly, d.idx, { x: e.point.x + d.offsetX + d.spanW / 2, y: e.point.y });
+    if (e.phase === 'move') {
+      setDragPlan(prev => (prev && plan && prev.slot === plan.slot && prev.rowY === plan.rowY && prev.changed === plan.changed ? prev : plan));
+      return;
+    }
+    dragRef.current = null;
+    setDragPlan(null);
+    if (plan?.changed) {
+      setDrafts(prev => ({ ...prev, [active.id]: withLayouts(prev[active.id], baseAssembly, plan) }));
+      setDirty(true);
+    }
   };
 
   const doExport = (kind: 'fbx' | 'fbx-exploded' | 'obj') => {
@@ -329,6 +372,9 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                 </label>
               )}
               <button onClick={() => setFitToken(t => t + 1)} className="px-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-gray-100 flex items-center gap-1.5"><Maximize2 size={14} /> Encuadrar</button>
+              {editable && mode === 'assembled' && (
+                <span className="text-[10px] text-gray-500 ml-1">Arrastrá un módulo para cambiarlo de lugar (arriba/abajo: pasa a la otra fila)</span>
+              )}
               <div className="flex-1" />
               <span className="text-[10px] text-gray-400 hidden xl:inline">3ds Max: File → Import → .fbx (unidades del archivo: mm)</span>
               <button onClick={() => doExport('fbx')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"><Download size={14} /> FBX ensamblado</button>
@@ -342,6 +388,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}
+                  dragEnabled={editable && mode === 'assembled'} onDrag={onDrag}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-400 text-sm">Este mueble no tiene módulos con geometría.</div>
