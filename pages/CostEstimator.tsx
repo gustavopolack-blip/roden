@@ -45,6 +45,9 @@ interface ExtendedCabinetModule extends CabinetModule {
     // Technical Definition Fields
     structureCore?: 'AGLO' | 'MDF';
     frontsCore?: 'AGLO' | 'MDF';
+    // Alto de cada frente cuando el módulo combina tipos de frente (vacío = automático)
+    drawerFrontHeight?: number;
+    flapFrontHeight?: number;
 }
 
 // NEW: Item definition (Grouping of Modules)
@@ -431,6 +434,54 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   // --- CALCULATIONS ---
 
+  // Extras de módulos con su cantidad EFECTIVA: los extras se cargan por unidad de
+  // módulo, así que un módulo con Cant. 3 y un extra de 1 un lleva 3. Antes el motor
+  // de costos los contaba una sola vez (calculateItemQuantities sí multiplicaba): un
+  // módulo repetido con extras se cotizaba por debajo. Única fuente para sumar y listar.
+  const expandModuleExtras = (modules: any[] = []): ModuleExtra[] =>
+      modules.flatMap((m: any) => (m?.extras || []).map((ex: ModuleExtra) => ({
+          ...ex,
+          quantity: (ex.quantity || 0) * (m?.quantity || 1),
+      })));
+  const sumModuleExtras = (modules: any[] = []): number =>
+      expandModuleExtras(modules).reduce((sum, ex) => sum + (ex.unitPrice || 0) * (ex.quantity || 0), 0);
+
+    // Distribución vertical de frentes. Cada cajón y cada abatible es una fila; las puertas
+    // (lado a lado) son una fila más; 4mm entre filas, sobre el alto útil H−6.
+    // - Un solo tipo de frente: idéntico a antes (ocupa todo el alto).
+    // - Tipos combinados: los altos cargados (drawerFrontHeight / flapFrontHeight) se
+    //   respetan y el resto del alto se reparte en partes iguales entre los grupos sin alto
+    //   cargado (las puertas siempre toman su parte del resto).
+    // Antes, con cajones, las puertas no se generaban (ni se cobraban), y abatibles +
+    // puertas ocupaban ambos el alto completo (frentes duplicados).
+    const getFrontLayout = (mod: ExtendedCabinetModule) => {
+        const H = mod.height || 0;
+        const nDr = mod.cntDrawers || 0;
+        const nFl = mod.cntFlaps || 0;
+        const nDo = mod.cntDoors || 0;
+        const total = Math.max(0, H - 6);
+        const rows = nDr + nFl + (nDo > 0 ? 1 : 0);
+        const avail = Math.max(0, total - Math.max(0, rows - 1) * 4);
+        const groups = (nDr > 0 ? 1 : 0) + (nFl > 0 ? 1 : 0) + (nDo > 0 ? 1 : 0);
+        if (groups <= 1) {
+            return { combined: false, overflow: false,
+                     drawerH: nDr > 0 ? avail / nDr : 0, flapH: nFl > 0 ? avail / nFl : 0, doorH: nDo > 0 ? avail : 0 };
+        }
+        const userDr = nDr > 0 && (mod.drawerFrontHeight || 0) > 0 ? mod.drawerFrontHeight! : null;
+        const userFl = nFl > 0 && (mod.flapFrontHeight || 0) > 0 ? mod.flapFrontHeight! : null;
+        const remaining = avail - (userDr ? userDr * nDr : 0) - (userFl ? userFl * nFl : 0);
+        const autoGroups = (nDr > 0 && !userDr ? 1 : 0) + (nFl > 0 && !userFl ? 1 : 0) + (nDo > 0 ? 1 : 0);
+        const share = autoGroups > 0 ? Math.max(0, remaining) / autoGroups : 0;
+        return {
+            combined: true,
+            // Los altos cargados no entran en el módulo (o no dejan lugar a las puertas)
+            overflow: remaining < 0 || (nDo > 0 && share <= 0),
+            drawerH: nDr > 0 ? (userDr ?? share / nDr) : 0,
+            flapH:   nFl > 0 ? (userFl ?? share / nFl) : 0,
+            doorH:   nDo > 0 ? share : 0,
+        };
+    };
+
     const calculateModuleParts = (mod: ExtendedCabinetModule): CalculatedPart[] => {
         // Módulo manual (ej. "Base hierro cromado"): NO genera placas ni tapacanto.
         // Solo aporta su costo via extras (se cuentan aparte). Sin este guard, un item
@@ -536,26 +587,19 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         // 5. Frentes (puertas/cajones)
         // Ancho = Ancho_exterior - 6mm, Veta = HORIZONTAL
         const frontWidth = Math.max(0, W - 6);
-        const totalFrontHeight = Math.max(0, H - 6);
+        const layout = getFrontLayout(mod);
 
         if (cntDrawers > 0) {
-            const gaps = (cntDrawers - 1) * 4;
-            const drawerFrontHeight = (totalFrontHeight - gaps) / cntDrawers;
-            parts.push({ name: 'Frente Cajón', width: frontWidth, height: drawerFrontHeight, material: frontMat, quantity: cntDrawers, grain: 'horizontal' });
-        } 
-        
-        if (cntDoors > 0) {
-            if (cntDrawers === 0) {
-               const doorHeight = totalFrontHeight; 
-               const finalDoorWidth = cntDoors >= 2 ? (W - 10) / cntDoors : frontWidth;
-               parts.push({ name: 'Puerta', width: finalDoorWidth, height: doorHeight, material: frontMat, quantity: cntDoors, grain: 'horizontal' });
-            }
+            parts.push({ name: 'Frente Cajón', width: frontWidth, height: layout.drawerH, material: frontMat, quantity: cntDrawers, grain: 'horizontal' });
         }
-        
+
+        if (cntDoors > 0 && layout.doorH > 0) {
+            const finalDoorWidth = cntDoors >= 2 ? (W - 10) / cntDoors : frontWidth;
+            parts.push({ name: 'Puerta', width: finalDoorWidth, height: layout.doorH, material: frontMat, quantity: cntDoors, grain: 'horizontal' });
+        }
+
         if (cntFlaps > 0) {
-            const gaps = (cntFlaps - 1) * 4;
-            const flapHeight = (totalFrontHeight - gaps) / cntFlaps;
-            parts.push({ name: 'Frente Abatible', width: frontWidth, height: flapHeight, material: frontMat, quantity: cntFlaps, grain: 'horizontal' });
+            parts.push({ name: 'Frente Abatible', width: frontWidth, height: layout.flapH, material: frontMat, quantity: cntFlaps, grain: 'horizontal' });
         }
 
         // 6. Interiores de Cajón
@@ -627,8 +671,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           const templateSlides = sh.slides > 0;
 
           if (mod.calculateHinges && !templateHinges) {
-              const hingesPerDoor = h > 1500 ? 4 : h > 900 ? 3 : 2;
-              modHinges += ((mod.cntDoors || 0) * hingesPerDoor);
+              // Con frentes combinados la puerta es más baja que el módulo: se usa su alto real.
+              const fl = getFrontLayout(mod);
+              const doorRefH = fl.combined ? fl.doorH : h;
+              const hingesPerDoor = doorRefH > 1500 ? 4 : doorRefH > 900 ? 3 : 2;
+              const doorsBuilt = (fl.combined && fl.doorH <= 0) ? 0 : (mod.cntDoors || 0); // sin lugar → no hay puertas
+              modHinges += (doorsBuilt * hingesPerDoor);
               modHinges += ((mod.cntFlaps || 0) * 2);
               const hingeName = HINGE_LABELS[mod.hingeType || 'COMMON'];
               if (modHinges > 0) detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (modHinges * qty);
@@ -864,8 +912,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       const margins = item?.margins || { workshop: 35, roden: 0 };
       const laborCost  = (item?.labor?.workers || 1) * (item?.labor?.days || 1) * (S.costLaborDay || 0);
       const fixedCosts = (S.priceScrews || 0) + (S.priceGlueTin || 0);
-      const extrasCost = (modules as any[]).flatMap((m: any) => m.extras || [])
-          .reduce((a: number, e: any) => a + (e.unitPrice || 0) * (e.quantity || 0), 0);
+      const extrasCost = sumModuleExtras(modules);
 
       // Cantidades: override=null → sin override (config real); si no, escenario forzado.
       const q = override ? calculateItemQuantities(modules, override) : calculateItemQuantities(modules);
@@ -1148,9 +1195,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       if (isFullyManual) {
           // Ítem manual: costo directo = suma de ítems del módulo (materiales) + mano de obra
           // Sobre ese costo directo se aplican beneficio taller y beneficio roden
-          const totalExtras = pendingModules.reduce((sum, m) => {
-              return sum + (m.extras || []).reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0);
-          }, 0);
+          const totalExtras = sumModuleExtras(pendingModules);
           const costoDirecto = totalExtras + laborCost;
           const wm = 1 + (margins.workshop / 100);
           const wr = 1 + (margins.roden / 100);
@@ -2739,7 +2784,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     item.modules?.filter((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID) || []
                                 );
                                 if (manualMods.length === 0) return null;
-                                const allExtras = manualMods.flatMap((m: any) => m.extras || []);
+                                const allExtras = expandModuleExtras(manualMods);
                                 if (allExtras.length === 0) return null;
                                 return (
                                 <div className="py-4">
@@ -2852,7 +2897,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <strong className="bg-gray-100 px-2 py-0.5 rounded">{count}</strong>
                                             </li>
                                         ))}
-                                        {itemsToPrint.flatMap(i => i.modules).flatMap(m => m.extras || []).map((ex, i) => (
+                                        {expandModuleExtras(itemsToPrint.flatMap(i => i.modules)).map((ex, i) => (
                                             <li key={i} className="flex justify-between items-center text-sm mb-1 text-indigo-900">
                                                 <span>{ex.description}</span>
                                                 <strong className="bg-indigo-50 px-2 py-0.5 rounded">{ex.quantity} {ex.unit}</strong>
@@ -2943,8 +2988,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
 
                         if (isManualItem) {
-                            const totalExtras = item.modules.reduce((sum: number, m: any) =>
-                                sum + (m.extras || []).reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0), 0);
+                            const totalExtras = sumModuleExtras(item.modules);
                             const costoDirecto = totalExtras + laborCost;
                             const wm = 1 + (margins.workshop / 100);
                             const wr = 1 + ((margins.roden ?? 0) / 100);
@@ -2967,7 +3011,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                     <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Materiales y trabajos</p>
                                                     <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'4mm' }}>
                                                         <tbody>
-                                                            {item.modules?.flatMap((m: any) => m.extras || []).map((ex: any, i: number) => (
+                                                            {expandModuleExtras(item.modules).map((ex: any, i: number) => (
                                                                 <tr key={i} style={{ borderBottom:'1px solid #f3f4f6' }}>
                                                                     <td style={{ padding:'2px 0', color:'#374151' }}>{ex.description}</td>
                                                                     <td style={{ padding:'2px 0', textAlign:'right', color:'#9ca3af', width:'40px' }}>{ex.quantity} {ex.unit}</td>
@@ -3233,7 +3277,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(hwPrice(hw, qty as number))}</td>
                                                         </tr>
                                                     ))}
-                                                    {item.modules?.flatMap((m:any)=>m.extras||[]).map((ex:any, ei:number) => (
+                                                    {expandModuleExtras(item.modules).map((ex:any, ei:number) => (
                                                         <tr key={ei} style={{ borderBottom:'1px solid #f3f4f6' }}>
                                                             <td style={{ padding:'1.5px 0', color:'#374151' }}>{ex.description}</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{ex.quantity} {ex.unit}</td>
@@ -3629,7 +3673,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                                     m.calculateSlides ? SLIDE_LABELS[m.slideType || 'TELESCOPIC'] : null,
                                                                     m.hasGasPistons ? 'Pistones a Gas' : null
                                                                 ].filter(Boolean)))).map((hw, i) => <li key={i}>{cleanHardwareName(hw as string)}</li>)}
-                                                                {item.modules?.flatMap(m => m.extras || []).map((ex, i) => <li key={`ex${i}`}>{ex.description} ({ex.quantity} {ex.unit})</li>)}
+                                                                {expandModuleExtras(item.modules).map((ex, i) => <li key={`ex${i}`}>{ex.description} ({ex.quantity} {ex.unit})</li>)}
                                                             </ul>
                                                         </div>
                                                         )}
@@ -4107,6 +4151,36 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Cajones</label>
                                         <input type="number" min="0" className="w-full border p-2 rounded text-sm text-center" value={moduleForm.cntDrawers} onChange={e => handleInputChange('cntDrawers', Number(e.target.value))}/>
                                     </div>
+                                    {(() => {
+                                        // Frentes combinados: alto de cada frente de cajón / abatible (vacío = automático)
+                                        const f = moduleForm as ExtendedCabinetModule;
+                                        const nDr = f.cntDrawers || 0, nFl = f.cntFlaps || 0, nDo = f.cntDoors || 0;
+                                        const groups = (nDr > 0 ? 1 : 0) + (nFl > 0 ? 1 : 0) + (nDo > 0 ? 1 : 0);
+                                        if (groups <= 1) return null;
+                                        const layout = getFrontLayout(f);
+                                        const fmt = (v: number) => `${Math.round(v)}`;
+                                        return (
+                                            <div className="flex gap-2 items-end">
+                                                {nDr > 0 && (
+                                                    <div className="w-20">
+                                                        <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block" title="Alto de cada frente de cajón">Alto cajón</label>
+                                                        <input type="number" min="0" placeholder={fmt(layout.drawerH)} className="w-full border p-2 rounded text-sm text-center" value={f.drawerFrontHeight || ''} onChange={e => handleInputChange('drawerFrontHeight', Number(e.target.value) || undefined)}/>
+                                                    </div>
+                                                )}
+                                                {nFl > 0 && (
+                                                    <div className="w-20">
+                                                        <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block" title="Alto de cada frente abatible">Alto abatib.</label>
+                                                        <input type="number" min="0" placeholder={fmt(layout.flapH)} className="w-full border p-2 rounded text-sm text-center" value={f.flapFrontHeight || ''} onChange={e => handleInputChange('flapFrontHeight', Number(e.target.value) || undefined)}/>
+                                                    </div>
+                                                )}
+                                                <span className={`text-[10px] pb-2 max-w-[120px] leading-tight ${layout.overflow ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                                                    {layout.overflow
+                                                        ? 'Los altos cargados no entran en el módulo'
+                                                        : nDo > 0 ? `Puertas: ${fmt(layout.doorH)} mm de alto` : 'Vacío = reparto automático'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                                 )}
                             </div>
