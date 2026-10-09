@@ -628,6 +628,23 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   // frente visible y llevaba tapacanto visible 45mm del color de los frentes.
   const isVisibleFrontPiece = (name: string = ''): boolean => /^(Frente|Puerta)/.test(name);
 
+  // Largo de tapacanto por pieza (mm), solo cantos vistos:
+  // - Frentes y puertas: los 4 cantos.
+  // - Caja de cajón 15mm: canto superior (el largo de la pieza).
+  // - Fondo estructural 18mm: canto oculto, sin tapacanto.
+  // - Resto (laterales, tapa, base, estantes, divisores, fajas…): canto frontal, según la
+  //   veta: pieza vertical → su alto; horizontal → su ancho; libre → el lado mayor.
+  // Fondos de 3 / 5.5mm no llevan canto (se excluyen más abajo por material).
+  const visibleEdgeLength = (p: CalculatedPart): number => {
+      const w = p.width || 0, h = p.height || 0;
+      if (isVisibleFrontPiece(p.name)) return (w + h) * 2;
+      if ((p.material || '').includes('15mm')) return w;
+      if (/^Fondo/.test(p.name || '')) return 0;
+      if (p.grain === 'vertical') return h;
+      if (p.grain === 'horizontal') return w;
+      return Math.max(w, h);
+  };
+
   const calculateItemQuantities = (currentModules: ExtendedCabinetModule[], scenarioOverride: Partial<CabinetModule> = {}) => {
       if (!currentModules || currentModules.length === 0) {
           return {
@@ -764,7 +781,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
           parts.forEach(p => {
               const area = p.width * p.height * p.quantity * qty;
-              const perimeter = (p.width + p.height) * 2 * p.quantity * qty;
+              // Tapacanto: solo cantos vistos (criterio del taller). Antes: perímetro completo.
+              const perimeter = visibleEdgeLength(p) * p.quantity * qty;
               const isFront = isVisibleFrontPiece(p.name);
 
               const isTechnicalMode = Object.keys(scenarioOverride).length === 0;
