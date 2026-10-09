@@ -13,8 +13,19 @@ import {
 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
-import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem } from '../utils/specialModules';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET } from '../utils/specialModules';
 import { supabase } from '../services/supabaseClient';
+import {
+    ModuleExtra, ExtendedCabinetModule, EstimatorItem,
+    HINGE_LABELS, SLIDE_LABELS, getSheetSize, getSheetArea, getStandardSlideLength,
+    expandModuleExtras, sumModuleExtras, getFrontLayout, calculateModuleParts, isVisibleFrontPiece,
+    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice,
+    buildFinishLines, finishDescription, computeItemFinancials, getBoardLabel, getRecalculatedItemPrices,
+    scenarioPricesFromRecalc, detailsFromRecalc,
+} from '../utils/estimatorEngine';
+
+// Constructor 3D: se carga bajo demanda (three.js no entra en el bundle principal)
+const Builder3D = React.lazy(() => import('../components/estimator3d/Builder3D'));
 
 interface CostEstimatorProps {
     projects?: Project[];
@@ -27,70 +38,8 @@ interface CostEstimatorProps {
     initialProjectId?: string;
 }
 
-// --- EXTENDED TYPES ---
-interface ModuleExtra {
-    id: string;
-    description: string;
-    quantity: number;
-    unit: string; 
-    unitPrice: number;
-}
-
-interface ExtendedCabinetModule extends CabinetModule {
-    materialFrontName?: string; 
-    extras?: ModuleExtra[];
-    // New computation flags
-    calculateHinges?: boolean;
-    calculateSlides?: boolean;
-    // Technical Definition Fields
-    structureCore?: 'AGLO' | 'MDF';
-    frontsCore?: 'AGLO' | 'MDF';
-}
-
-// NEW: Item definition (Grouping of Modules)
-interface EstimatorItem {
-    id: string;
-    name: string; // e.g. "Mueble de Cocina"
-    modules: ExtendedCabinetModule[];
-    labor: {
-        workers: number;
-        days: number;
-    };
-    margins: {
-        workshop: number;
-        roden: number;
-    };
-    // Pre-calculated totals for different scenarios for this specific item
-    scenarioPrices: {
-        whiteAglo: number;
-        whiteMDF: number;
-        colorAglo: number;
-        colorMDF: number;
-        lacquer: number;
-        veneer: number;
-        baseConfig?: number; // legacy field from old saved estimates
-    };
-    details: {
-        totalHardwareCost: number;
-        totalMaterialCostBase: number;
-    }
-}
-
 // --- CONSTANTS ---
-
-const HINGE_LABELS: Record<string, string> = {
-    'COMMON': 'Bisagras Estándar',
-    'SOFT_CLOSE': 'Bisagras Cierre Suave',
-    'PUSH': 'Bisagras Push-Open'
-};
-
-const SLIDE_LABELS: Record<string, string> = {
-    'TELESCOPIC': 'Guías Telescópicas',
-    'TELESCOPIC_SOFT': 'Guías Telescópicas Cierre Suave',
-    'Z_TYPE': 'Guías Z (Epoxi)',
-    'TELESCOPIC_PUSH': 'Guías Push',
-    'HIDDEN_METAL_SIDE': 'Guías Ocultas'
-};
+// (tipos, etiquetas de herrajes, medidas de placa y motor de cálculo: utils/estimatorEngine.ts)
 
 const DEFAULT_OBSERVATIONS = `Los valores expresados son netos e incluyen envío e instalación.
 Plazo de entrega estimado: 60 días. Coordinación de acuerdo a necesidades.`;
@@ -191,6 +140,13 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
     const [customProjectName, setCustomProjectName] = useState<string>('');
     const [isProjectActive, setIsProjectActive] = useState(false);
   
+  // Constructor 3D abierto: módulos pendientes, un ítem generado o un presupuesto del historial (lectura)
+  const [builder3d, setBuilder3d] = useState<null | {
+      target: 'PENDING' | 'ITEM' | 'READONLY';
+      furnitures: { id: string; name: string; modules: ExtendedCabinetModule[] }[];
+      priceLabel?: string | null;
+  }>(null);
+
   // Pending Modules (Not yet grouped into an Item)
   const [pendingModules, setPendingModules] = useState<ExtendedCabinetModule[]>([]);
   
@@ -414,13 +370,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       return name.replace(/Común|Common/gi, 'Estándar');
   };
 
-  const getStandardSlideLength = (depth: number) => {
-      const target = depth - 30;
-      const available = [250, 300, 350, 400, 450, 500, 600];
-      const size = available.reverse().find(s => s <= target);
-      return size || 250; 
-  };
-
   const getMaterialThickness = (mat: string): number => {
       if (mat.includes('18mm')) return 18;
       if (mat.includes('15mm')) return 15;
@@ -430,447 +379,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   };
 
   // --- CALCULATIONS ---
-
-    const calculateModuleParts = (mod: ExtendedCabinetModule): CalculatedPart[] => {
-        // Módulo manual (ej. "Base hierro cromado"): NO genera placas ni tapacanto.
-        // Solo aporta su costo via extras (se cuentan aparte). Sin este guard, un item
-        // manual con medidas generaba un cajón de melamina fantasma (placa entera espuria).
-        if ((mod as any).specialTemplateId === SPECIAL_MANUAL_ID || mod.moduleType === 'MANUAL') {
-            return [];
-        }
-        // Módulo especial: usar las piezas pre-calculadas por el template
-        if ((mod as any).isSpecialModule && (mod as any).specialParts?.length > 0) {
-            return (mod as any).specialParts as CalculatedPart[];
-        }
-        const parts: CalculatedPart[] = [];
-        const W = mod.width || 0;
-        const H = mod.height || 0;
-        const D = mod.depth || 0;
-        const cntDrawers = mod.cntDrawers || 0;
-        const cntDoors = mod.cntDoors || 0;
-        const cntFlaps = mod.cntFlaps || 0;
-        
-        const backingType = mod.backingType || '3MM_WHITE';
-        
-        const structCore = mod.structureCore || (mod.isMDFCore ? 'MDF' : 'AGLO');
-        const frontsCore = mod.frontsCore || (mod.isMDFCore ? 'MDF' : 'AGLO');
-        const isWhiteStruct = mod.isWhiteStructure;
-
-        let carcassMat: '18mm_White' | '18mm_Color' | '18mm_MDF';
-        if (structCore === 'MDF') {
-            carcassMat = '18mm_MDF'; 
-        } else {
-            carcassMat = isWhiteStruct ? '18mm_White' : '18mm_Color';
-        }
-
-        let frontMat: '18mm_White' | '18mm_Color' | '18mm_MDF' | '18mm_MDFCrudo' | '18mm_Kiri';
-        const mTypeForFront = mod.moduleType || 'MELAMINE_FULL';
-        if (mTypeForFront.includes('LACQUER')) {
-            // Frentes laqueados: MDF crudo 1 cara
-            frontMat = '18mm_MDFCrudo';
-        } else if (mTypeForFront.includes('VENEER')) {
-            // Frentes enchapados: placa Kiri MDF
-            frontMat = '18mm_Kiri';
-        } else if (frontsCore === 'MDF') {
-            frontMat = '18mm_MDF';
-        } else {
-            const frontName = (mod.materialFrontName || '').toLowerCase();
-            const isFrontWhite = frontName
-                ? (frontName.includes('blanc') || frontName.includes('white'))
-                : !!mod.isWhiteStructure;
-            frontMat = isFrontWhite ? '18mm_White' : '18mm_Color';
-        }
-
-        // 1. Tapas y Bases: SIEMPRE pasan completas (sin descuentos)
-        // Ancho = Ancho_exterior, Profundidad = Profundidad_exterior
-        parts.push({ name: 'Tapa superior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
-        parts.push({ name: 'Base inferior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
-        
-        // 2. Laterales: Alto = Alto_exterior
-        // SI fondo = 3mm: Profundidad = Profundidad_exterior
-        // SI fondo = 5.5mm o 18mm: Profundidad = Profundidad_exterior - 18mm
-        let lateralDepth = D;
-        if (backingType === '5.5MM_COLOR' || backingType === '18MM_STRUCTURE') {
-            lateralDepth = D - 18;
-        }
-        parts.push({ name: 'Lateral', width: lateralDepth, height: H, material: carcassMat, quantity: 2, grain: 'vertical' });
-        
-        // 3. Fondos
-        if (backingType === '3MM_WHITE') {
-            // Ancho = Ancho_exterior - 36mm, Alto = Alto_exterior - descuento_ranura (usamos 38mm según ejemplo 850-812)
-            parts.push({ name: 'Fondo 3mm Blanco', width: Math.max(0, W - 36), height: Math.max(0, H - 38), material: '3mm_White', quantity: 1, grain: 'vertical' });
-        } else if (backingType === '18MM_STRUCTURE') {
-            // Ancho = Ancho_exterior - 36mm, Profundidad (Alto) = Profundidad_exterior - 18mm? No, Alto = H - 36?
-            // El prompt dice: Ancho = Ancho_exterior - 36mm, Profundidad = Profundidad_exterior - 18mm para el fondo.
-            // Asumimos que "Profundidad" en el fondo es su altura.
-            parts.push({ name: 'Fondo Estructural 18mm', width: Math.max(0, W - 36), height: Math.max(0, H - 18), material: carcassMat, quantity: 1, grain: 'vertical' });
-        } else {
-            // 5.5mm
-            parts.push({ name: 'Fondo 5.5mm Color', width: Math.max(0, W - 36), height: Math.max(0, H - 18), material: '5.5mm_Color', quantity: 1, grain: 'vertical' });
-        }
-
-        // 4. Estantes (si cantidad > 0)
-        // Ancho = Ancho_exterior - 36mm, Profundidad = Profundidad_exterior - 45mm
-        let extraShelves = 0;
-        if (H > 850) {
-            extraShelves = Math.floor((H - 850) / 350) + 1; 
-        } 
-        if (extraShelves > 0) {
-            parts.push({ name: 'Estante Interno', width: Math.max(0, W - 36), height: Math.max(0, D - 45), material: carcassMat, quantity: extraShelves, grain: 'horizontal' });
-        }
-
-        // 5. Frentes (puertas/cajones)
-        // Ancho = Ancho_exterior - 6mm, Veta = HORIZONTAL
-        const frontWidth = Math.max(0, W - 6);
-        const totalFrontHeight = Math.max(0, H - 6);
-
-        if (cntDrawers > 0) {
-            const gaps = (cntDrawers - 1) * 4;
-            const drawerFrontHeight = (totalFrontHeight - gaps) / cntDrawers;
-            parts.push({ name: 'Frente Cajón', width: frontWidth, height: drawerFrontHeight, material: frontMat, quantity: cntDrawers, grain: 'horizontal' });
-        } 
-        
-        if (cntDoors > 0) {
-            if (cntDrawers === 0) {
-               const doorHeight = totalFrontHeight; 
-               const finalDoorWidth = cntDoors >= 2 ? (W - 10) / cntDoors : frontWidth;
-               parts.push({ name: 'Puerta', width: finalDoorWidth, height: doorHeight, material: frontMat, quantity: cntDoors, grain: 'horizontal' });
-            }
-        }
-        
-        if (cntFlaps > 0) {
-            const gaps = (cntFlaps - 1) * 4;
-            const flapHeight = (totalFrontHeight - gaps) / cntFlaps;
-            parts.push({ name: 'Frente Abatible', width: frontWidth, height: flapHeight, material: frontMat, quantity: cntFlaps, grain: 'horizontal' });
-        }
-
-        // 6. Interiores de Cajón
-        if (cntDrawers > 0) {
-            const drawerHeight = 120;
-            // LATERALES: Ancho = Profundidad_módulo - 20mm, Alto = Alto_cajón
-            parts.push({ name: 'Lateral Cajón', width: Math.max(0, D - 20), height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
-            // FRENTE Y TRASERO: Ancho = Ancho_módulo - 26mm, Alto = Alto_cajón
-            parts.push({ name: 'Contra/Frente Cajón', width: Math.max(0, W - 26), height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
-            // FONDO: Ancho = Ancho_módulo - 26mm, Profundidad = Profundidad_módulo - 20mm
-            parts.push({ name: 'Fondo Cajón', width: Math.max(0, W - 26), height: Math.max(0, D - 20), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
-        }
-
-        return parts;
-    };
-
-  const calculateItemQuantities = (currentModules: ExtendedCabinetModule[], scenarioOverride: Partial<CabinetModule> = {}) => {
-      if (!currentModules || currentModules.length === 0) {
-          return {
-              boards18Color: 0, boards18White: 0, boards18MDFMelamine: 0, boards18MDF: 0,
-              boards15: 0, backing55: 0, backing3: 0,
-              linearWhite22: 0, linearWhite45: 0, linearColor22: 0, linearColor45: 0, linear2mm: 0,
-              lacquerAreaM2: 0, veneerAreaM2: 0,
-              totalHinges: 0, totalPistons: 0, totalSlides: 0, totalExtrasCost: 0,
-              detailedBoards: {}, detailedHardware: {}
-          };
-      }
-
-      let totalBoard18ColorArea = 0; 
-      let totalBoard18WhiteArea = 0; 
-      let totalBoard18MDFMelamineArea = 0; 
-      let totalBoard18MDFArea = 0; 
-      let totalBoard15Area = 0; 
-      let totalBacking55Area = 0; 
-      let totalBacking3Area = 0; 
-      let linearWhite22 = 0;
-      let linearWhite45 = 0;
-      let linearColor22 = 0;
-      let linearColor45 = 0;
-      let linear2mm = 0;
-      let totalHinges = 0;
-      let totalPistons = 0;
-      let totalSlides = 0;
-      let lacquerArea = 0; 
-      let veneerArea = 0; 
-      let totalExtrasCost = 0;
-      let totalComplexityFactor = 0;
-      let totalAreaForComplexity = 0;
-
-      const detailedMaterialsArea: Record<string, number> = {};
-      const detailedHardware: Record<string, number> = {};
-
-      currentModules.forEach(rawMod => {
-          const mod = { ...rawMod, ...scenarioOverride };
-          const qty = mod.quantity || 1;
-          const parts = calculateModuleParts(mod);
-          
-          const h = mod.height || 0;
-          const d = mod.depth || 0;
-          let modHinges = 0;
-          let modPistons = 0;
-          let modSlides = 0;
-
-          if (mod.calculateHinges) {
-              const hingesPerDoor = h > 1500 ? 4 : h > 900 ? 3 : 2;
-              modHinges += ((mod.cntDoors || 0) * hingesPerDoor);
-              modHinges += ((mod.cntFlaps || 0) * 2);
-              const hingeName = HINGE_LABELS[mod.hingeType || 'COMMON'];
-              if (modHinges > 0) detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (modHinges * qty);
-          }
-          if (mod.hasGasPistons) {
-              modPistons += (mod.cntFlaps || 0);
-              if (modPistons > 0) detailedHardware['Pistones a Gas'] = (detailedHardware['Pistones a Gas'] || 0) + (modPistons * qty);
-          }
-          // Herrajes de módulos especiales (templates)
-          if ((mod as any).isSpecialModule && (mod as any).specialHardware) {
-              const sh = (mod as any).specialHardware;
-              if (sh.slides && sh.slides > 0) {
-                  const slideLen  = sh.slideLength || 500;
-                  const slideType = sh.slideType   || 'TELESCOPIC';
-                  const slideName = `${SLIDE_LABELS[slideType] || 'Guías'} (${slideLen}mm)`;
-                  detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (sh.slides * qty);
-              }
-              if (sh.hinges && sh.hinges > 0) {
-                  const hingeName = HINGE_LABELS[sh.hingeType || 'COMMON'] || 'Bisagras Estándar';
-                  detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (sh.hinges * qty);
-              }
-          }
-          if (mod.calculateSlides) {
-              modSlides += (mod.cntDrawers || 0);
-              const slideLen = getStandardSlideLength(d);
-              const slideName = `${SLIDE_LABELS[mod.slideType || 'TELESCOPIC']} (${slideLen}mm)`;
-              if (modSlides > 0) detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (modSlides * qty);
-          }
-
-          totalHinges += modHinges * qty;
-          totalPistons += modPistons * qty;
-          totalSlides += modSlides * qty;
-
-          if (mod.extras) {
-              mod.extras.forEach(extra => {
-                  totalExtrasCost += (extra.unitPrice * extra.quantity) * qty;
-              });
-          }
-
-          const w = mod.width || 0;
-          const frontArea = (w * h) / 1000000; 
-          const sidesArea = (h * d) * 2 / 1000000; 
-          const topBottomArea = (w * d) * 2 / 1000000; 
-          const modArea = frontArea + sidesArea + topBottomArea;
-
-          let modComplexity = 1.0;
-          const mType = mod.moduleType || 'MELAMINE_FULL';
-          if (mType.includes('LACQUER')) modComplexity = 1.3;
-          else if (mType.includes('VENEER')) modComplexity = 1.5;
-
-          totalComplexityFactor += modComplexity * modArea * qty;
-          totalAreaForComplexity += modArea * qty;
-
-          // Área de terminación según tipo + coeficiente de seguridad 1.15
-          // MELAMINE_STRUCT_LACQUER/VENEER → solo frentes (W×H)
-          // LACQUER_FULL / VENEER_FULL     → exterior completo (frente + laterales + techo + piso)
-          const FINISH_SAFETY = 1.15;
-          const visibleExteriorArea = frontArea + sidesArea + topBottomArea;
-          const baseFinishArea = (mType === 'LACQUER_FULL' || mType === 'VENEER_FULL')
-              ? visibleExteriorArea
-              : frontArea; // MELAMINE_STRUCT → solo frente
-          const finishArea = baseFinishArea * FINISH_SAFETY;
-
-          if (mType && mType.includes('LACQUER')) lacquerArea += finishArea * qty;
-          else if (mType && mType.includes('VENEER')) veneerArea += finishArea * qty;
-
-          parts.forEach(p => {
-              const area = p.width * p.height * p.quantity * qty;
-              const perimeter = (p.width + p.height) * 2 * p.quantity * qty;
-              const isFront = p.name.includes('Frente') || p.name.includes('Puerta');
-
-              const isTechnicalMode = Object.keys(scenarioOverride).length === 0;
-              
-              let currentCore = 'AGLO';
-              let currentMatName = 'Melamina';
-
-              if (isTechnicalMode) {
-                  currentCore = isFront ? (mod.frontsCore || 'AGLO') : (mod.structureCore || 'AGLO');
-                  const colorName = mod.materialColorName || (mod.isWhiteStructure ? 'Melamina Blanca' : 'Melamina Color');
-                  // materialFrontName es independiente de la estructura — puede ser blanca aunque estructura sea color
-                  const frontName = mod.materialFrontName || colorName;
-                  currentMatName = isFront ? frontName : colorName;
-              } else {
-                  // En modo override, MDFCrudo y Kiri siempre son MDF
-                  const isSpecialMat = p.material === '18mm_MDFCrudo' || p.material === '18mm_Kiri';
-                  currentCore = isSpecialMat ? 'MDF' : (mod.isMDFCore ? 'MDF' : 'AGLO');
-                  // En modo scenario: frentes usan materialFrontName si existe, si no hereda estructura
-                  const frontMatName = mod.materialFrontName || '';
-                  const isFrontWhite = frontMatName.toLowerCase().includes('blanca') || frontMatName.toLowerCase().includes('white')
-                      || (!frontMatName && mod.isWhiteStructure);
-                  currentMatName = isFront ? (isFrontWhite ? 'Blanco' : 'Color') : (mod.isWhiteStructure ? 'Blanco' : 'Color');
-              }
-
-              // Acumular área por tipo de material
-              if      (p.material.includes('15mm'))          totalBoard15Area     += area;
-              else if (p.material.includes('5.5mm'))         totalBacking55Area   += area;
-              else if (p.material.includes('3mm'))           totalBacking3Area    += area;
-              else if (p.material === '18mm_MDFCrudo')       totalBoard18MDFArea  += area;  // laca
-              else if (p.material === '18mm_Kiri')           totalBoard18MDFArea  += area;  // enchapado
-              else if (p.material.includes('Color'))         totalBoard18ColorArea += area;
-              else if (p.material.includes('White'))         totalBoard18WhiteArea += area;
-              else if (p.material.includes('MDF'))           totalBoard18MDFArea  += area;
-
-              // Tapacanto: distinguir 22mm (interior) vs 45mm (visible/frentes)
-              // — Frentes (Puerta, Frente*, Abatible): tapacanto visible 45mm
-              // — Estructura, cajones e interiores: tapacanto interior 22mm
-              // — MDFCrudo y Kiri: siempre tapacanto color visible 45mm
-              if (mod.edgeCategory === 'PVC_2MM') {
-                  if (p.material.includes('18mm') || p.material.includes('15mm')) linear2mm += perimeter;
-              } else {
-                  const safeMatName = (currentMatName || '').toLowerCase();
-                  const isSpecialFront = p.material === '18mm_MDFCrudo' || p.material === '18mm_Kiri';
-                  const isWhiteMat = !isSpecialFront && (safeMatName.includes('blanco') || safeMatName.includes('white'));
-                  const isFrontPiece = p.name.includes('Frente') || p.name.includes('Puerta');
-                  if (isSpecialFront) {
-                      // MDFCrudo/Kiri: siempre tapacanto color visible 45mm (nunca blanco)
-                      linearColor45 += perimeter;
-                  } else if (isFrontPiece) {
-                      // Frentes melamina: tapacanto visible 45mm, blanco o color según material
-                      if (isWhiteMat) linearWhite45 += perimeter;
-                      else            linearColor45 += perimeter;
-                  } else {
-                      // Estructura, cajones, estantes: tapacanto interior 22mm
-                      if (isWhiteMat) linearWhite22 += perimeter;
-                      else            linearColor22 += perimeter;
-                  }
-              }
-
-              // Clave del reporte — basada en el material de la pieza, no en mType del módulo
-              let reportKey = '';
-              if (p.material === '18mm_MDFCrudo') {
-                  reportKey = `MDF Crudo (para laquear) 18mm MDF`;
-              } else if (p.material === '18mm_Kiri') {
-                  reportKey = `Enchapado Kiri 18mm MDF`;
-              } else if (p.material.includes('18mm') || (p.material.includes('MDF') && !p.material.includes('3mm'))) {
-                  // El material '18mm_MDF' no codifica blanco/color: se infiere del contexto
-                  // (currentMatName) para no cobrar siempre Color MDF a una estructura blanca.
-                  const ctxIsWhite = (currentMatName || '').toLowerCase().includes('blanc')
-                                  || (currentMatName || '').toLowerCase().includes('white');
-                  const isWhitePiece = p.material.includes('White') || p.material === '18mm_White'
-                                  || (p.material === '18mm_MDF' && ctxIsWhite);
-                  const matLabel = isWhitePiece ? 'Melamina Blanca' : 'Melamina Color';
-                  const displayCore = currentCore === 'AGLO' ? 'MDP' : 'MDF';
-                  reportKey = `${matLabel} 18mm ${displayCore}`;
-              }
-              else if (p.material.includes('15mm'))  reportKey = 'Melamina Blanca 15mm MDP';
-              else if (p.material.includes('5.5mm')) reportKey = `Fondo ${currentMatName} (5.5mm)`;
-              else if (p.material.includes('3mm'))   reportKey = 'Fondo Blanco (3mm)';
-
-              if (reportKey) {
-                  detailedMaterialsArea[reportKey] = (detailedMaterialsArea[reportKey] || 0) + area;
-              }
-          });
-      });
-
-      const SHEET_AREA = 2750 * 1830;
-      
-      const detailedBoards: Record<string, number> = {};
-      Object.entries(detailedMaterialsArea).forEach(([name, area]) => {
-          detailedBoards[name] = Math.ceil(area * 1.2 / SHEET_AREA); // Estimate sheets just for internal calculations if needed
-      });
-
-      return {
-          boards18Color: Math.ceil(totalBoard18ColorArea * 1.2 / SHEET_AREA),
-          boards18White: Math.ceil(totalBoard18WhiteArea * 1.2 / SHEET_AREA),
-          boards18MDFMelamine: Math.ceil(totalBoard18MDFMelamineArea * 1.2 / SHEET_AREA),
-          boards18MDF: Math.ceil(totalBoard18MDFArea * 1.2 / SHEET_AREA),
-          boards15: Math.ceil(totalBoard15Area * 1.2 / SHEET_AREA),
-          backing55: Math.ceil(totalBacking55Area * 1.1 / SHEET_AREA),
-          backing3: Math.ceil(totalBacking3Area * 1.1 / SHEET_AREA),
-          linearWhite22: Math.ceil(linearWhite22 / 1000),
-          linearWhite45: Math.ceil(linearWhite45 / 1000),
-          linearColor22: Math.ceil(linearColor22 / 1000),
-          linearColor45: Math.ceil(linearColor45 / 1000),
-          linear2mm: Math.ceil(linear2mm / 1000),
-          lacquerAreaM2: Math.round(lacquerArea * 100) / 100,  // ya está en m²
-          veneerAreaM2:  Math.round(veneerArea  * 100) / 100,  // ya está en m²
-          totalHinges, totalPistons, totalSlides, totalExtrasCost,
-          // Report Details
-          detailedBoards,
-          detailedHardware,
-          avgComplexity: parseFloat((totalAreaForComplexity > 0 ? totalComplexityFactor / totalAreaForComplexity : 1.0).toFixed(2))
-      };
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // MOTOR ÚNICO DE COSTOS — fuente de verdad financiera
-  // ─────────────────────────────────────────────────────────────
-  // boardPriceFor / hwPriceFor: lookups únicos de precio por nombre.
-  // computeItemFinancials: construye costo directo / precio taller / precio final
-  // para una config. override=null => CONFIG REAL del módulo (cores reales, mezcla
-  // MDP+MDF, etc.). override={...} => escenario forzado (las 14 terminaciones).
-  // SIEMPRE incluye extras y fijos, de forma idéntica en planilla, comparativa y
-  // presupuesto, para que las tres rutas no puedan divergir.
-  // ─────────────────────────────────────────────────────────────
-
-  const boardPriceFor = (name: string, count: number, S: any): number => {
-      const n = name.toLowerCase();
-      let p = S.priceBoard18WhiteAglo || 0;
-      if      (n.includes('trupan') || n.includes('5.5'))        p = S.priceBacking55Color       || 0;
-      else if (n.includes('fondo') && n.includes('3'))           p = S.priceBacking3White         || 0;
-      else if (n.includes('15mm'))                               p = S.priceBoard15WhiteAglo      || 0;
-      else if (n.includes('laquear') || n.includes('crudo'))     p = S.priceBoard18MDFCrudo1Face  || 0;
-      else if (n.includes('kiri') || n.includes('veneer'))       p = S.priceBoard18VeneerMDF      || 0;
-      else if (n.includes('color') && n.includes('mdf'))         p = S.priceBoard18ColorMDF       || 0;
-      else if (n.includes('color'))                              p = S.priceBoard18ColorAglo      || 0;
-      else if (n.includes('blanca') && n.includes('mdf'))        p = S.priceBoard18WhiteMDF       || 0;
-      return p * count;
-  };
-
-  const hwPriceFor = (name: string, qty: number, S: any): number => {
-      const n = name.toLowerCase();
-      let unitPrice = 0;
-      if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard || 0;
-      else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose || 0;
-      else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
-      else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
-      else if (n.includes('guías') || n.includes('guia')) {
-          const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
-          const isS = n.includes('suave'); const isP = n.includes('push');
-          if      (len <= 300) unitPrice = isS ? (S.priceSlide300Soft || 0) : isP ? (S.priceSlide300Push || 0) : (S.priceSlide300Std || 0);
-          else if (len <= 400) unitPrice = isS ? (S.priceSlide400Soft || 0) : isP ? (S.priceSlide400Push || 0) : (S.priceSlide400Std || 0);
-          else                 unitPrice = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
-      }
-      return unitPrice * qty;
-  };
-
-  // Devuelve el desglose completo y los precios de una config.
-  // override === null  → config REAL (technical mode, sin forzar cores)
-  // override === {...}  → escenario forzado
-  const computeItemFinancials = (item: any, snapshot: any, override: Partial<CabinetModule> | null) => {
-      const S: any = snapshot;
-      const modules = item?.modules || [];
-      const margins = item?.margins || { workshop: 35, roden: 0 };
-      const laborCost  = (item?.labor?.workers || 1) * (item?.labor?.days || 1) * (S.costLaborDay || 0);
-      const fixedCosts = (S.priceScrews || 0) + (S.priceGlueTin || 0);
-      const extrasCost = (modules as any[]).flatMap((m: any) => m.extras || [])
-          .reduce((a: number, e: any) => a + (e.unitPrice || 0) * (e.quantity || 0), 0);
-
-      // Cantidades: override=null → sin override (config real); si no, escenario forzado.
-      const q = override ? calculateItemQuantities(modules, override) : calculateItemQuantities(modules);
-
-      // Terminación: derivada del despiece real (lacquer/veneer ya resueltos por calculateItemQuantities).
-      const finArea  = q.lacquerAreaM2 > 0 ? q.lacquerAreaM2 : q.veneerAreaM2 > 0 ? q.veneerAreaM2 : 0;
-      const finPrice = q.lacquerAreaM2 > 0 ? (S.priceFinishLacquerSemi || 0)
-                     : q.veneerAreaM2  > 0 ? (S.priceFinishLustreSemi  || 0) : 0;
-
-      const tPlacas  = Object.entries(q.detailedBoards).filter(([, v]) => (v as number) > 0)
-          .reduce((a, [n, c]) => a + boardPriceFor(n, c as number, S), 0);
-      const tTapac   = (q.linearWhite22 * (S.priceEdge22White045 || 0)) + (q.linearWhite45 * (S.priceEdge45White045 || 0))
-                     + (q.linearColor22 * (S.priceEdge22Color045 || 0)) + (q.linearColor45 * (S.priceEdge45Color045 || 0))
-                     + (q.linear2mm * (S.priceEdge2mm || 0));
-      const tHerrajes = Object.entries(q.detailedHardware)
-          .reduce((a, [n, hqty]) => a + hwPriceFor(n, hqty as number, S), 0);
-      const tFinish  = finArea * finPrice;
-
-      const costoDirecto = tPlacas + tTapac + tHerrajes + extrasCost + fixedCosts + tFinish + laborCost;
-      const precioTaller = costoDirecto * (1 + (margins.workshop ?? 35) / 100);
-      const precioFinal  = precioTaller * (1 + (margins.roden ?? 0) / 100);
-
-      return { q, laborCost, fixedCosts, extrasCost, tPlacas, tTapac, tHerrajes, tFinish,
-               finArea, finPrice, costoDirecto, precioTaller, precioFinal };
-  };
 
   // ─────────────────────────────────────────────────────────────
   // [DEPRECADO] calculateFinancialsForScenario — sin llamadas activas.
@@ -1128,9 +636,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       if (isFullyManual) {
           // Ítem manual: costo directo = suma de ítems del módulo (materiales) + mano de obra
           // Sobre ese costo directo se aplican beneficio taller y beneficio roden
-          const totalExtras = pendingModules.reduce((sum, m) => {
-              return sum + (m.extras || []).reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0);
-          }, 0);
+          const totalExtras = sumModuleExtras(pendingModules);
           const costoDirecto = totalExtras + laborCost;
           const wm = 1 + (margins.workshop / 100);
           const wr = 1 + (margins.roden / 100);
@@ -1187,27 +693,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               modules: [...pendingModules],
               labor: { workers: itemForm.workers, days: itemForm.days },
               margins: margins,
-              scenarioPrices: {
-                  whiteAglo:     rp.whiteAglo,
-                  whiteMDF:      rp.whiteMDF,
-                  colorAglo:     rp.colorAglo,
-                  colorMDF:      rp.colorMDF,
-                  whiteLacqAglo: rp.whiteLacqAglo,
-                  whiteLacqMDF:  rp.whiteLacqMDF,
-                  colorLacqAglo: rp.colorLacqAglo,
-                  colorLacqMDF:  rp.colorLacqMDF,
-                  whiteVenrAglo: rp.whiteVenrAglo,
-                  whiteVenrMDF:  rp.whiteVenrMDF,
-                  colorVenrAglo: rp.colorVenrAglo,
-                  colorVenrMDF:  rp.colorVenrMDF,
-                  baseConfig: rp.colorAglo,
-                  lacquer: rp.lacquer,
-                  veneer:  rp.veneer,
-              } as any,
-              details: {
-                  totalHardwareCost: (rp as any).totalDirectCost,
-                  totalMaterialCostBase: 0
-              }
+              scenarioPrices: scenarioPricesFromRecalc(rp),
+              details: detailsFromRecalc(rp),
           };
       }
 
@@ -1722,16 +1209,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           item.modules.forEach(mod => {
               const parts = calculateModuleParts(mod);
               parts.forEach(part => {
-                  // Resolver clave de material legible
-                  let materialKey = part.material as string;
-                  if (materialKey === '18mm_White')    materialKey = mod.materialColorName?.includes('blanc') ? mod.materialColorName : 'Melamina Blanca 18mm';
-                  else if (materialKey === '18mm_Color')    materialKey = mod.materialColorName || 'Melamina Color 18mm';
-                  else if (materialKey === '18mm_MDF')      materialKey = 'Melamina Blanca MDF 18mm';
-                  else if (materialKey === '18mm_MDFCrudo') materialKey = 'MDF Crudo 1 Cara 18mm';
-                  else if (materialKey === '18mm_Kiri')     materialKey = 'Enchapado Kiri 18mm';
-                  else if (materialKey === '15mm_White')    materialKey = 'Melamina Blanca 15mm';
-                  else if (materialKey === '3mm_White')     materialKey = 'Fondo 3mm Blanco';
-                  else if (materialKey === '5.5mm_Color' || materialKey.includes('55mm')) materialKey = 'Fondo 5.5mm Color';
+                  const materialKey = getBoardLabel(mod, part);
 
                   if (!groupedByMaterial[materialKey]) groupedByMaterial[materialKey] = [];
 
@@ -1754,12 +1232,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       const allUnplaceable: { material: string; id: string; label?: string; reason: string }[] = [];
 
       Object.keys(groupedByMaterial).forEach(material => {
-          const n = material.toLowerCase();
-          const isTrupan = n.includes('5.5') || n.includes('trupan') || n.includes('kiri');
           const input = {
               pieces:      groupedByMaterial[material],
-              sheetWidth:  isTrupan ? 2600 : 2750,
-              sheetHeight: 1830,
+              sheetWidth:  getSheetSize(material).width,
+              sheetHeight: getSheetSize(material).height,
               kerf:        3,
           };
           const { sheets, unplaceable } = generateCutPlan(input);
@@ -1795,36 +1271,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
               parts.forEach(part => {
                   // Determine Material Name and Thickness based on logic
-                  let matName = "Otros";
-                  let thickness = "18mm";
-                  let allowRotation = true; // Default
-
-                  const isFront = part.name.includes('Frente') || part.name.includes('Puerta');
-                  const colorName = mod.materialColorName || 'Estándar';
-                  const frontName = mod.materialFrontName || colorName;
-
-                  if (part.material.includes('18mm')) {
-                      thickness = "18mm";
-                      // Determine specific name based on module config
-                      if (part.material.includes('Color')) matName = isFront ? frontName : colorName;
-                      else if (part.material.includes('White')) matName = 'Melamina Blanca';
-                      else if (part.material.includes('MDF')) {
-                          matName = isFront ? frontName : colorName;
-                          if (matName === 'Estándar' || !matName) matName = 'MDF Crudo';
-                      }
-                      
-                      // Check grain for rotation
-                      if (part.grain !== 'free') allowRotation = false; // Usually wood-like patterns
-                  } else if (part.material.includes('15mm')) {
-                      thickness = "15mm";
-                      matName = 'Melamina Blanca (Cajón)';
-                  } else if (part.material.includes('5.5mm')) {
-                      thickness = "5.5mm";
-                      matName = 'Fondo Color';
-                  } else if (part.material.includes('3mm')) {
-                      thickness = "3mm";
-                      matName = 'Fondo Blanco';
-                  }
+                  // Misma etiqueta de placa que el optimizador
+                  const matName = getBoardLabel(mod, part);
+                  const thickness = part.material.includes('18mm') ? '18mm'
+                                  : part.material.includes('15mm') ? '15mm'
+                                  : (part.material.includes('5.5mm') || part.material.includes('55mm')) ? '5.5mm'
+                                  : part.material.includes('3mm') ? '3mm' : '18mm';
+                  // Con veta definida (melamina con dibujo) no se rota
+                  const allowRotation = !(part.material.includes('18mm') && part.grain !== 'free');
 
                   if (!grouped[matName]) grouped[matName] = {};
                   if (!grouped[matName][thickness]) grouped[matName][thickness] = [];
@@ -1931,6 +1385,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               extras:     [],  // sin extras de costo fijo
               isSpecialModule:    true,
               specialTemplateId,
+              specialOptions:     { ...specialOptions }, // trazabilidad: con qué opciones se generó
               specialParts:       result.parts,   // piezas para despiece
               specialHardware:    result.hardware, // herrajes del template
               specialLaborDays:   result.laborDays,
@@ -2278,71 +1733,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       setIsCostSheetModalOpen(true);
   };
 
-  const getRecalculatedItemPrices = (item: EstimatorItem, snapshot: CostSettings) => {
-      // Guard: item puede venir de Supabase con estructura incompleta
-      if (!item?.labor || !item?.margins || !item?.modules) {
-          return { whiteAglo: 0, whiteMDF: 0, colorAglo: 0, colorMDF: 0, whiteLacqAglo: 0, whiteLacqMDF: 0, colorLacqAglo: 0, colorLacqMDF: 0, whiteVenrAglo: 0, whiteVenrMDF: 0, colorVenrAglo: 0, colorVenrMDF: 0, baseConfig: 0, totalDirectCost: 0, realConfig: 0, realConfigTaller: 0, realConfigDirect: 0, lacquer: 0, veneer: 0 };
-      }
-
-      // Ítem manual: devolver precios originales sin recalcular con escenarios de materiales
-      const isManual = (item as any).isManualItem ||
-          item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
-      if (isManual) {
-          const p = item.scenarioPrices?.colorAglo || (item as any).details?.manualPrecioFinal || 0;
-          const taller = item.scenarioPrices?.baseConfig || (item as any).details?.manualPrecioTaller || 0;
-          const directCost = (item.details?.totalMaterialCostBase || 0) + (item.details?.totalHardwareCost || 0);
-          return { whiteAglo: p, whiteMDF: p, colorAglo: p, colorMDF: p,
-                   whiteLacqAglo: p, whiteLacqMDF: p, colorLacqAglo: p, colorLacqMDF: p,
-                   whiteVenrAglo: p, whiteVenrMDF: p, colorVenrAglo: p, colorVenrMDF: p,
-                   baseConfig: taller, totalDirectCost: directCost,
-                   realConfig: p, realConfigTaller: taller, realConfigDirect: directCost,
-                   lacquer: p, veneer: p };
-      }
-
-      // ── Motor único: computeItemFinancials para cada escenario ──
-      // Cada escenario fuerza cores; realConfig usa los cores reales del módulo (override=null).
-      const scen = (override: Partial<CabinetModule>) => computeItemFinancials(item, snapshot, override);
-      const real = computeItemFinancials(item, snapshot, null);
-
-      const whiteAglo     = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
-      const whiteMDF      = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
-      const colorAglo     = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'AGLO' });
-      const colorMDF      = scen({ moduleType: 'MELAMINE_FULL',          isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF'  });
-      const whiteLacqAglo = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const whiteLacqMDF  = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-      const colorLacqAglo = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const colorLacqMDF  = scen({ moduleType: 'MELAMINE_STRUCT_LACQUER', isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-      const whiteVenrAglo = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const whiteVenrMDF  = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: true,  isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-      const colorVenrAglo = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: false, structureCore: 'AGLO', frontsCore: 'MDF' });
-      const colorVenrMDF  = scen({ moduleType: 'MELAMINE_STRUCT_VENEER',  isWhiteStructure: false, isMDFCore: true,  structureCore: 'MDF',  frontsCore: 'MDF' });
-
-      return {
-          whiteAglo:     whiteAglo.precioFinal,
-          whiteMDF:      whiteMDF.precioFinal,
-          colorAglo:     colorAglo.precioFinal,
-          colorMDF:      colorMDF.precioFinal,
-          whiteLacqAglo: whiteLacqAglo.precioFinal,
-          whiteLacqMDF:  whiteLacqMDF.precioFinal,
-          colorLacqAglo: colorLacqAglo.precioFinal,
-          colorLacqMDF:  colorLacqMDF.precioFinal,
-          whiteVenrAglo: whiteVenrAglo.precioFinal,
-          whiteVenrMDF:  whiteVenrMDF.precioFinal,
-          colorVenrAglo: colorVenrAglo.precioFinal,
-          colorVenrMDF:  colorVenrMDF.precioFinal,
-          baseConfig:    colorAglo.precioFinal,
-          totalDirectCost: colorAglo.costoDirecto,
-          // ── Config REAL del módulo (cores reales, mezcla MDP+MDF, etc.) ──
-          // El presupuesto y el recuadro principal de la planilla usan esto.
-          realConfig:        real.precioFinal,
-          realConfigTaller:  real.precioTaller,
-          realConfigDirect:  real.costoDirecto,
-          // Aliases para compatibilidad con render del presupuesto
-          lacquer: whiteLacqAglo.precioFinal,
-          veneer:  whiteVenrAglo.precioFinal,
-      };
-  };
-
   // Precio de un ítem tal como lo imprime el presupuesto: config REAL, redondeada a 10.
   // Es la única fuente para finalPrice; antes se guardaba colorAglo (melamina color MDP)
   // y un mueble laqueado o en MDF quedaba registrado por debajo de lo cotizado.
@@ -2637,8 +2027,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         const hasVeneer  = q.veneerAreaM2  > 0;
                                         const structDesc = item.modules[0]?.isWhiteStructure ? 'Mel. Blanca' : 'Mel. Color';
                                         const coreDesc   = item.modules[0]?.structureCore === 'MDF' ? 'MDF' : 'Aglo';
-                                        const frontDesc  = hasLacquer ? 'Frentes Laca Semi Mate'
-                                                         : hasVeneer  ? 'Frentes Enchapado Kiri'
+                                        const frontDesc  = (hasLacquer || hasVeneer) ? (finishDescription(item.modules) || 'Frentes')
                                                          : (item.modules[0]?.materialFrontName || 'Melamina');
                                         const slideDesc  = SLIDE_LABELS[item.modules[0]?.slideType as keyof typeof SLIDE_LABELS] || 'Telescópicas estándar';
                                         return (
@@ -2718,7 +2107,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     item.modules?.filter((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID) || []
                                 );
                                 if (manualMods.length === 0) return null;
-                                const allExtras = manualMods.flatMap((m: any) => m.extras || []);
+                                const allExtras = expandModuleExtras(manualMods);
                                 if (allExtras.length === 0) return null;
                                 return (
                                 <div className="py-4">
@@ -2831,7 +2220,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <strong className="bg-gray-100 px-2 py-0.5 rounded">{count}</strong>
                                             </li>
                                         ))}
-                                        {itemsToPrint.flatMap(i => i.modules).flatMap(m => m.extras || []).map((ex, i) => (
+                                        {expandModuleExtras(itemsToPrint.flatMap(i => i.modules)).map((ex, i) => (
                                             <li key={i} className="flex justify-between items-center text-sm mb-1 text-indigo-900">
                                                 <span>{ex.description}</span>
                                                 <strong className="bg-indigo-50 px-2 py-0.5 rounded">{ex.quantity} {ex.unit}</strong>
@@ -2922,8 +2311,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             item.modules?.every((m: any) => m.specialTemplateId === SPECIAL_MANUAL_ID);
 
                         if (isManualItem) {
-                            const totalExtras = item.modules.reduce((sum: number, m: any) =>
-                                sum + (m.extras || []).reduce((s: number, ex: any) => s + ex.unitPrice * ex.quantity, 0), 0);
+                            const totalExtras = sumModuleExtras(item.modules);
                             const costoDirecto = totalExtras + laborCost;
                             const wm = 1 + (margins.workshop / 100);
                             const wr = 1 + ((margins.roden ?? 0) / 100);
@@ -2946,7 +2334,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                     <p style={{ fontSize:'10px', fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'2px', borderBottom:'1px solid #e5e7eb', paddingBottom:'1px' }}>Materiales y trabajos</p>
                                                     <table style={{ width:'100%', fontSize:'12px', borderCollapse:'collapse', marginBottom:'4mm' }}>
                                                         <tbody>
-                                                            {item.modules?.flatMap((m: any) => m.extras || []).map((ex: any, i: number) => (
+                                                            {expandModuleExtras(item.modules).map((ex: any, i: number) => (
                                                                 <tr key={i} style={{ borderBottom:'1px solid #f3f4f6' }}>
                                                                     <td style={{ padding:'2px 0', color:'#374151' }}>{ex.description}</td>
                                                                     <td style={{ padding:'2px 0', textAlign:'right', color:'#9ca3af', width:'40px' }}>{ex.quantity} {ex.unit}</td>
@@ -3027,34 +2415,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             return `Melamina ${color} ${core}`;
                         })();
 
-                        // ── Terminación del ítem real ──
-                        const hasLacquer = q.lacquerAreaM2 > 0;
-                        const hasVeneer  = q.veneerAreaM2  > 0;
-                        const finishAreaM2  = hasLacquer ? q.lacquerAreaM2 : hasVeneer ? q.veneerAreaM2 : 0;
-                        const finishPriceM2 = hasLacquer ? (S.priceFinishLacquerSemi || 0) : hasVeneer ? (S.priceFinishLustreSemi || 0) : 0;
-                        const finishLabel   = hasLacquer
-                            ? (realMT === 'LACQUER_FULL' ? 'Laca Semi Mate — todo el mueble' : 'Laca Semi Mate — frentes')
-                            : hasVeneer
-                            ? (realMT === 'VENEER_FULL'  ? 'Enchapado Kiri — todo el mueble' : 'Enchapado Kiri — frentes')
-                            : null;
 
-                        // ── Precio de herrajes: lookup según nombre ──
-                        const hwPrice = (name: string, qty: number): number => {
-                            const n = name.toLowerCase();
-                            let unitPrice = 0;
-                            if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard;
-                            else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose;
-                            else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush;
-                            else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston;
-                            else if (n.includes('guías') || n.includes('guia')) {
-                                const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
-                                const isS = n.includes('suave'); const isP = n.includes('push');
-                                if      (len <= 300) unitPrice = isS ? S.priceSlide300Soft : isP ? S.priceSlide300Push : S.priceSlide300Std;
-                                else if (len <= 400) unitPrice = isS ? S.priceSlide400Soft : isP ? S.priceSlide400Push : S.priceSlide400Std;
-                                else                 unitPrice = isS ? S.priceSlide500Soft : isP ? S.priceSlide500Push : S.priceSlide500Std;
-                            }
-                            return unitPrice * qty;
-                        };
+                        // ── Precio de herrajes: mismo lookup que el motor (antes era una copia local) ──
+                        const hwPrice = (name: string, qty: number): number => hwPriceFor(name, qty, S);
 
                         // ── Precio de placas por nombre ──
                         const boardPrice = (name: string, count: number): number => {
@@ -3207,12 +2570,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <tbody>
                                                     {Object.entries(q.detailedHardware).map(([hw, qty]) => (
                                                         <tr key={hw} style={{ borderBottom:'1px solid #f3f4f6' }}>
-                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}</td>
+                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}{(() => { const fb = (hw.toLowerCase().includes('guía') || hw.toLowerCase().includes('guia')) ? resolveSlidePrice(hw, S).fallback : null; return fb && <span style={{ color:'#b45309', fontSize:'9px' }}> — {fb}</span>; })()}</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{qty as number} un</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(hwPrice(hw, qty as number))}</td>
                                                         </tr>
                                                     ))}
-                                                    {item.modules?.flatMap((m:any)=>m.extras||[]).map((ex:any, ei:number) => (
+                                                    {expandModuleExtras(item.modules).map((ex:any, ei:number) => (
                                                         <tr key={ei} style={{ borderBottom:'1px solid #f3f4f6' }}>
                                                             <td style={{ padding:'1.5px 0', color:'#374151' }}>{ex.description}</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{ex.quantity} {ex.unit}</td>
@@ -3255,15 +2618,17 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                             {(item.modules.reduce((a:number,m:any)=>{const W=m.width||0,H=m.height||0,D=m.depth||0;return a+(W*H+2*H*D+2*W*D)/1e6*(m.quantity||1);},0)*1.15).toFixed(2)} m²
                                                         </td>
                                                     </tr>
-                                                    {finishLabel && (
-                                                        <tr style={{ background:'#fffbeb', borderBottom:'1px solid #fde68a' }}>
-                                                            <td style={{ padding:'1.5px 0', color:'#92400e', fontWeight:600 }}>{finishLabel}</td>
+                                                    {realFin.finishLines.map((fl, fi) => (
+                                                        <tr key={fi} style={{ background:'#fffbeb', borderBottom:'1px solid #fde68a' }}>
+                                                            <td style={{ padding:'1.5px 0', color:'#92400e', fontWeight:600 }}>
+                                                                {fl.label}{fl.fallback && <span style={{ color:'#b45309', fontSize:'9px', fontWeight:400 }}> — {fl.fallback}</span>}
+                                                            </td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:700, color:'#92400e' }}>
-                                                                {finishAreaM2.toFixed(1)} m² × {formatCurrency(finishPriceM2)}/m² = {formatCurrency(totalFinish)}
+                                                                {fl.area.toFixed(1)} m² × {formatCurrency(fl.price)}/m² = {formatCurrency(fl.total)}
                                                             </td>
                                                         </tr>
-                                                    )}
-                                                    {!finishLabel && (
+                                                    ))}
+                                                    {realFin.finishLines.length === 0 && (
                                                         <tr><td colSpan={2} style={{ padding:'1.5px 0', color:'#9ca3af', fontStyle:'italic' }}>Sin terminación especial (melamina estándar)</td></tr>
                                                     )}
                                                 </tbody>
@@ -3608,7 +2973,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                                     m.calculateSlides ? SLIDE_LABELS[m.slideType || 'TELESCOPIC'] : null,
                                                                     m.hasGasPistons ? 'Pistones a Gas' : null
                                                                 ].filter(Boolean)))).map((hw, i) => <li key={i}>{cleanHardwareName(hw as string)}</li>)}
-                                                                {item.modules?.flatMap(m => m.extras || []).map((ex, i) => <li key={`ex${i}`}>{ex.description} ({ex.quantity} {ex.unit})</li>)}
+                                                                {expandModuleExtras(item.modules).map((ex, i) => <li key={`ex${i}`}>{ex.description} ({ex.quantity} {ex.unit})</li>)}
                                                             </ul>
                                                         </div>
                                                         )}
@@ -3639,12 +3004,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
                                                             // Descripción larga de la configuración real
                                                             let configDescLocal = '';
-                                                            if (hasLacquer) {
+                                                            if (hasLacquer || hasVeneer) {
                                                                 const struc = isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP');
-                                                                configDescLocal = `${struc} + Frentes Laca Semi Mate`;
-                                                            } else if (hasVeneer) {
-                                                                const struc = isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP');
-                                                                configDescLocal = `${struc} + Frentes Enchapado Kiri`;
+                                                                configDescLocal = `${struc} + ${finishDescription(baseMods)}`;
                                                             } else if (isWhite && isMDF) {
                                                                 configDescLocal = 'Melamina Blanca MDF';
                                                             } else if (isWhite) {
@@ -3895,6 +3257,27 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <input type="number" placeholder="Std" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Std} onChange={e => setSettings({...settings, priceSlide500Std: Number(e.target.value)})} />
                                         <input type="number" placeholder="Soft" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Soft} onChange={e => setSettings({...settings, priceSlide500Soft: Number(e.target.value)})} />
                                         <input type="number" placeholder="Push" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Push} onChange={e => setSettings({...settings, priceSlide500Push: Number(e.target.value)})} />
+
+                                        <div className="col-span-3 text-[10px] text-gray-400 uppercase mt-1">600mm <span className="normal-case">(vacío = usa el de 500)</span></div>
+                                        <input type="number" placeholder="Std" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Std ?? ''} onChange={e => setSettings({...settings, priceSlide600Std: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Soft" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Soft ?? ''} onChange={e => setSettings({...settings, priceSlide600Soft: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Push" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Push ?? ''} onChange={e => setSettings({...settings, priceSlide600Push: Number(e.target.value) || undefined})} />
+                                    </div>
+                                    <div><label className="text-xs block font-bold text-gray-400 mt-3 mb-1">Guías Z (Epoxi) y Ocultas <span className="font-normal normal-case">(vacío = usa telescópica estándar)</span></label></div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <div></div><div className="text-[10px] text-gray-400 uppercase">Z (epoxi)</div><div className="text-[10px] text-gray-400 uppercase">Oculta</div>
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">300mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide300Z ?? ''} onChange={e => setSettings({...settings, priceSlide300Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide300Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide300Hidden: Number(e.target.value) || undefined})} />
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">400mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide400Z ?? ''} onChange={e => setSettings({...settings, priceSlide400Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide400Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide400Hidden: Number(e.target.value) || undefined})} />
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">500mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Z ?? ''} onChange={e => setSettings({...settings, priceSlide500Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide500Hidden: Number(e.target.value) || undefined})} />
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">600mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Z ?? ''} onChange={e => setSettings({...settings, priceSlide600Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide600Hidden: Number(e.target.value) || undefined})} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -4086,6 +3469,36 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block">Cajones</label>
                                         <input type="number" min="0" className="w-full border p-2 rounded text-sm text-center" value={moduleForm.cntDrawers} onChange={e => handleInputChange('cntDrawers', Number(e.target.value))}/>
                                     </div>
+                                    {(() => {
+                                        // Frentes combinados: alto de cada frente de cajón / abatible (vacío = automático)
+                                        const f = moduleForm as ExtendedCabinetModule;
+                                        const nDr = f.cntDrawers || 0, nFl = f.cntFlaps || 0, nDo = f.cntDoors || 0;
+                                        const groups = (nDr > 0 ? 1 : 0) + (nFl > 0 ? 1 : 0) + (nDo > 0 ? 1 : 0);
+                                        if (groups <= 1) return null;
+                                        const layout = getFrontLayout(f);
+                                        const fmt = (v: number) => `${Math.round(v)}`;
+                                        return (
+                                            <div className="flex gap-2 items-end">
+                                                {nDr > 0 && (
+                                                    <div className="w-20">
+                                                        <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block" title="Alto de cada frente de cajón">Alto cajón</label>
+                                                        <input type="number" min="0" placeholder={fmt(layout.drawerH)} className="w-full border p-2 rounded text-sm text-center" value={f.drawerFrontHeight || ''} onChange={e => handleInputChange('drawerFrontHeight', Number(e.target.value) || undefined)}/>
+                                                    </div>
+                                                )}
+                                                {nFl > 0 && (
+                                                    <div className="w-20">
+                                                        <label className="text-[10px] text-gray-500 uppercase font-bold mb-1 block" title="Alto de cada frente abatible">Alto abatib.</label>
+                                                        <input type="number" min="0" placeholder={fmt(layout.flapH)} className="w-full border p-2 rounded text-sm text-center" value={f.flapFrontHeight || ''} onChange={e => handleInputChange('flapFrontHeight', Number(e.target.value) || undefined)}/>
+                                                    </div>
+                                                )}
+                                                <span className={`text-[10px] pb-2 max-w-[120px] leading-tight ${layout.overflow ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                                                    {layout.overflow
+                                                        ? 'Los altos cargados no entran en el módulo'
+                                                        : nDo > 0 ? `Puertas: ${fmt(layout.doorH)} mm de alto` : 'Vacío = reparto automático'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                                 )}
                             </div>
@@ -4215,7 +3628,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="mel_color_mdf">Color — MDF</option>
                                             </optgroup>
                                             <optgroup label="Terminación">
-                                                <option value="laca">Laca Semi Mate</option>
+                                                <option value="laca">Laca</option>
                                                 <option value="enchapad">Enchapado Kiri</option>
                                             </optgroup>
                                         </select>
@@ -4223,6 +3636,20 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <span className="text-[9px] text-amber-600 italic">Igual a estructura</span>
                                         )}
                                     </div>
+
+                                    {((moduleForm.moduleType || '').includes('LACQUER') || (moduleForm.moduleType || '').includes('VENEER')) && (
+                                        <div className="flex flex-col border-l border-amber-200 pl-4">
+                                            <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Brillo</label>
+                                            <select
+                                                className="border p-1.5 rounded text-xs bg-white w-28"
+                                                value={(moduleForm as ExtendedCabinetModule).finishSheen || 'SEMI'}
+                                                onChange={e => handleInputChange('finishSheen', e.target.value)}
+                                            >
+                                                <option value="SEMI">Semi Mate</option>
+                                                <option value="GLOSS">Brillante</option>
+                                            </select>
+                                        </div>
+                                    )}
 
                                     <div className="flex flex-col border-l border-amber-200 pl-4">
                                         <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Fondo</label>
@@ -4340,11 +3767,18 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
                                 <h4 className="font-bold text-gray-700 flex items-center gap-2"><Box size={18}/> Módulos Pendientes ({pendingModules.length})</h4>
                                 {pendingModules.length > 0 && (
+                                    <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setBuilder3d({ target: 'PENDING', furnitures: [{ id: 'pending', name: 'Módulos pendientes', modules: pendingModules }] })}
+                                        className="bg-white border border-indigo-300 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-50">
+                                        <Box size={16}/> 3D
+                                    </button>
                                     <button 
                                         onClick={handleOpenItemModal}
                                         className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-md animate-pulse">
                                         <Package size={16}/> Crear Item
                                     </button>
+                                    </div>
                                 )}
                             </div>
                             
@@ -4387,6 +3821,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                     Laqueado: {formatCurrency(item.scenarioPrices.lacquer)}
                                                 </div>
                                                 <div className="flex justify-end gap-3 mt-2">
+                                                    {!(item as any).isManualItem && (
+                                                        <button onClick={() => setBuilder3d({ target: 'ITEM', furnitures: [{ id: item.id, name: item.name, modules: item.modules }], priceLabel: `Precio: ${formatCurrency(getQuotedItemPrice(item, activeSettings))}` })} className="text-indigo-600 hover:text-indigo-800 text-xs underline flex items-center gap-1">
+                                                            <Box size={10}/> 3D
+                                                        </button>
+                                                    )}
                                                     <button onClick={() => handleEditItem(item)} className="text-indigo-600 hover:text-indigo-800 text-xs underline flex items-center gap-1">
                                                         <Pencil size={10}/> Editar
                                                     </button>
@@ -4618,6 +4057,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                         >
                                                             <FileText size={14} className="text-indigo-500"/> Presupuesto
                                                         </button>
+                                                        {(latestDoc.items || []).some((it: any) => !it?.isManualItem && (it?.modules || []).length) && (
+                                                            <button
+                                                                onClick={() => setBuilder3d({ target: 'READONLY', furnitures: (latestDoc.items || []).filter((it: any) => !it?.isManualItem && (it?.modules || []).length).map((it: any) => ({ id: it.id, name: it.name, modules: it.modules })) })}
+                                                                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 text-xs font-bold text-gray-700 transition-all"
+                                                            >
+                                                                <Box size={14} className="text-indigo-500"/> Modelo 3D
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => { setPrintMode('COSTS'); setActiveSettings(latestDoc.settingsSnapshot); setTechnicalItems(latestDoc.items || []); }}
                                                             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-amber-400 hover:bg-amber-50 text-xs font-bold text-gray-700 transition-all"
@@ -4823,11 +4270,53 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 </div>
             )}
 
+            {builder3d && (
+                <React.Suspense fallback={<div className="fixed inset-0 z-[300] bg-black/40 flex items-center justify-center text-white text-sm">Cargando constructor 3D…</div>}>
+                    <Builder3D
+                        furnitures={builder3d.furnitures}
+                        readOnly={builder3d.target === 'READONLY'}
+                        priceLabel={builder3d.priceLabel}
+                        onClose={() => setBuilder3d(null)}
+                        onApply={(furnitureId, modules) => {
+                            if (builder3d.target === 'PENDING') {
+                                setPendingModules(modules);
+                            } else if (builder3d.target === 'ITEM') {
+                                // Mismos módulos que se cotizan: se recalculan los precios de escenario
+                                // del ítem con el mismo motor que al crearlo.
+                                setItems(prev => prev.map(it => {
+                                    if (it.id !== furnitureId) return it;
+                                    const next = { ...it, modules };
+                                    const rp = getRecalculatedItemPrices(next, activeSettings);
+                                    return { ...next, scenarioPrices: scenarioPricesFromRecalc(rp), details: detailsFromRecalc(rp) };
+                                }));
+                            }
+                            setBuilder3d(b => b ? { ...b, furnitures: b.furnitures.map(f => f.id === furnitureId ? { ...f, modules } : f) } : b);
+                        }}
+                    />
+                </React.Suspense>
+            )}
+
             {isItemModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
                         <h3 className="text-xl font-bold mb-4">Crear Item (Mueble Completo)</h3>
                         <p className="text-sm text-gray-500 mb-4">Estás agrupando {pendingModules.length} módulos. Define los costos de mano de obra y rentabilidad para este conjunto.</p>
+                        {(() => {
+                            // Días-operario que estiman los templates de módulos especiales.
+                            // Se muestran como referencia (no se suman solos): la mano de obra del
+                            // ítem es una sola cifra y sumarlos además duplicaría lo que se cargue a mano.
+                            const templateDays = pendingModules.reduce((sum, m: any) =>
+                                sum + (m.isSpecialModule ? (m.specialLaborDays || 0) * (m.quantity || 1) : 0), 0);
+                            if (templateDays <= 0) return null;
+                            const workers = itemForm.workers > 0 ? itemForm.workers : 1;
+                            const suggestedDays = Math.ceil((templateDays / workers) * 2) / 2; // redondeo a medio día, hacia arriba
+                            return (
+                                <div className="mb-4 flex items-center justify-between gap-3 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-xs text-purple-800">
+                                    <span>Los módulos especiales estiman <b>{templateDays.toFixed(2)} días-operario</b> (≈ {suggestedDays} días con {workers} operario{workers === 1 ? '' : 's'}). No incluye los módulos estándar.</span>
+                                    <button type="button" onClick={() => setItemForm({ ...itemForm, days: suggestedDays })} className="shrink-0 bg-purple-600 text-white px-2 py-1 rounded font-bold">Usar</button>
+                                </div>
+                            );
+                        })()}
                         
                         <div className="space-y-4">
                             <div><label className="text-xs font-bold block mb-1">Nombre del Item</label><input autoFocus type="text" className="border p-2 rounded w-full" placeholder="Ej: Bajo Mesada Cocina" value={itemForm.name} onChange={e => setItemForm({...itemForm, name: e.target.value})}/></div>

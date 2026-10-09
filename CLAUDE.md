@@ -73,6 +73,18 @@ costo real del módulo mixto, nunca por debajo.** El redondeo a placa entera por
 es **intencional** (así siempre costea de más, no de menos) — NO "arreglarlo".
 `costEngine.ts` y `calculateFinancialsForScenario` son **código muerto**.
 
+**Dónde vive el motor:** `utils/estimatorEngine.ts` (despiece, cantidades, precios,
+`computeItemFinancials`, escenarios). Se extrajo textualmente de `CostEstimator.tsx`;
+`tests/estimatorEngine.test.ts` lo compara contra una foto (`tests/fixtures/engine.baseline.json`).
+Si cambiás una regla de cálculo a propósito, regenerá la foto y explicá el cambio.
+
+**Pruebas:** `npm test` (vitest). Correrlas antes de pushear cambios del estimador.
+
+**Constructor 3D** (`CONSTRUCTOR_3D.md`): `utils/furniture3d/` (geometría + export FBX/OBJ) y
+`components/estimator3d/` (three.js, carga lazy). Ubica las piezas que ya calcula
+`calculateModuleParts`; no calcula medidas ni costos propios. Los campos `layout3d` y
+`doorHingeSide` del módulo son solo de dibujo.
+
 **types.ts** (raíz): fuente de verdad. Importar SIEMPRE desde `../types`, nunca desde
 `../src/types`.
 

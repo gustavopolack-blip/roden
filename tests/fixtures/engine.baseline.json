@@ -1,0 +1,2395 @@
+{
+ "parts": {
+  "std0": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std1": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 562,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 5.5mm Color",
+    "width": 564,
+    "height": 702,
+    "material": "5.5mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std2": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std3": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 562,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo Estructural 18mm",
+    "width": 564,
+    "height": 702,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std4": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 562,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 5.5mm Color",
+    "width": 564,
+    "height": 702,
+    "material": "5.5mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std5": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 594,
+    "height": 714,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "std6": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 594,
+    "height": 714,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "std7": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 594,
+    "height": 714,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "std8": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 594,
+    "height": 714,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "std9": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_MDFCrudo",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std10": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 594,
+    "height": 235.33333333333334,
+    "material": "18mm_Kiri",
+    "quantity": 3,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 560,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 6,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 509,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 6,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 531,
+    "height": 552,
+    "material": "3mm_White",
+    "quantity": 3,
+    "grain": "free"
+   }
+  ],
+  "std11": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_MDFCrudo",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std12": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 594,
+    "height": 235.33333333333334,
+    "material": "18mm_Color",
+    "quantity": 3,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 560,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 6,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 509,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 6,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 531,
+    "height": 552,
+    "material": "3mm_White",
+    "quantity": 3,
+    "grain": "free"
+   }
+  ],
+  "std13": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 594,
+    "height": 150,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 560,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 560,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 2,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 509,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 2,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 531,
+    "height": 552,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "free"
+   }
+  ],
+  "std14": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 594,
+    "height": 355,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 355,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 560,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 2,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 509,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 2,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 531,
+    "height": 552,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "free"
+   }
+  ],
+  "std15": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 1964,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 1962,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Estante Interno",
+    "width": 564,
+    "height": 535,
+    "material": "18mm_Color",
+    "quantity": 4,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 1590,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Frente Abatible",
+    "width": 594,
+    "height": 400,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "std16": [
+   {
+    "name": "Tapa superior",
+    "width": 900,
+    "height": 650,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 900,
+    "height": 650,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 650,
+    "height": 2264,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 864,
+    "height": 2262,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Estante Interno",
+    "width": 864,
+    "height": 605,
+    "material": "18mm_Color",
+    "quantity": 5,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Puerta",
+    "width": 296.6666666666667,
+    "height": 2294,
+    "material": "18mm_Color",
+    "quantity": 3,
+    "grain": "horizontal"
+   }
+  ],
+  "std17": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 364,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 362,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Abatible",
+    "width": 594,
+    "height": 195,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std18": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std19": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 580,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 580,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta",
+    "width": 295,
+    "height": 714,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "std20": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 650,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 650,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 650,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 594,
+    "height": 355,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 630,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 509,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 531,
+    "height": 622,
+    "material": "3mm_White",
+    "quantity": 2,
+    "grain": "free"
+   }
+  ],
+  "std21": [
+   {
+    "name": "Tapa superior",
+    "width": 600,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 600,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm Blanco",
+    "width": 564,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 594,
+    "height": 355,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 430,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 509,
+    "height": 120,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 531,
+    "height": 422,
+    "material": "3mm_White",
+    "quantity": 2,
+    "grain": "free"
+   }
+  ],
+  "sp0": [
+   {
+    "name": "Tapa superior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 432,
+    "height": 684,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 5.5mm Color",
+    "width": 864,
+    "height": 702,
+    "material": "5.5mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp1": [
+   {
+    "name": "Tapa superior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm",
+    "width": 864,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Divisor vertical (×1)",
+    "width": 432,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Lateral caja cajón 15mm (×4)",
+    "width": 430,
+    "height": 674,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Testa cajón 15mm — frente+trasero (×4)",
+    "width": 368,
+    "height": 674,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Fondo caja cajón 3mm (×2)",
+    "width": 390,
+    "height": 422,
+    "material": "3mm_White",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Frente exterior cajón (×2)",
+    "width": 432,
+    "height": 720,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   }
+  ],
+  "sp2": [
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 720,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Piso",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja frontal",
+    "width": 864,
+    "height": 100,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja trasera",
+    "width": 864,
+    "height": 100,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Fondo 3mm",
+    "width": 864,
+    "height": 610,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Lateral caja cajón 15mm (×6)",
+    "width": 430,
+    "height": 190,
+    "material": "15mm_White",
+    "quantity": 6,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Testa cajón 15mm (×6)",
+    "width": 809,
+    "height": 190,
+    "material": "15mm_White",
+    "quantity": 6,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Fondo caja cajón 3mm (×3)",
+    "width": 831,
+    "height": 422,
+    "material": "3mm_White",
+    "quantity": 3,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Frente exterior cajón (×3)",
+    "width": 864,
+    "height": 240,
+    "material": "18mm_White",
+    "quantity": 3,
+    "grain": "vertical"
+   }
+  ],
+  "sp3": [
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 720,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Piso",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja frontal",
+    "width": 864,
+    "height": 100,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja trasera",
+    "width": 864,
+    "height": 100,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Fondo 3mm",
+    "width": 864,
+    "height": 610,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Panel fijo 620mm",
+    "width": 620,
+    "height": 720,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta esquinero",
+    "width": 276,
+    "height": 720,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp4": [
+   {
+    "name": "Lateral de esquina 560mm",
+    "width": 560,
+    "height": 720,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Piso brazo 1",
+    "width": 322,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja frontal brazo 1",
+    "width": 322,
+    "height": 100,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Fondo 3mm brazo 1",
+    "width": 322,
+    "height": 610,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Piso brazo 2",
+    "width": 22,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja frontal brazo 2",
+    "width": 22,
+    "height": 100,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Fondo 3mm brazo 2",
+    "width": 22,
+    "height": 610,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp5": [
+   {
+    "name": "Tapa horizontal 18mm",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja regrueso — largo (×2)",
+    "width": 900,
+    "height": 50,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja regrueso — profundidad (×2)",
+    "width": 350,
+    "height": 50,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "sp6": [
+   {
+    "name": "Divisor vertical 18mm",
+    "width": 450,
+    "height": 720,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp7": [
+   {
+    "name": "Lateral aplicado 18mm",
+    "width": 450,
+    "height": 720,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp8": [
+   {
+    "name": "Ajuste 18mm × 100mm",
+    "width": 900,
+    "height": 100,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp9": [
+   {
+    "name": "Zócalo aplicado 5.5mm",
+    "width": 900,
+    "height": 720,
+    "material": "5.5mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "sp10": [
+   {
+    "name": "Tapa",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 684,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Refuerzo interno (×1)",
+    "width": 684,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp11": [
+   {
+    "name": "Estante — cara superior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Estante — cara inferior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "sp12": [
+   {
+    "name": "Tapa superior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 684,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm",
+    "width": 864,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Bandeja extraíble (×3)",
+    "width": 839,
+    "height": 405,
+    "material": "18mm_MDF",
+    "quantity": 3,
+    "grain": "horizontal"
+   }
+  ],
+  "sp13": [
+   {
+    "name": "Tapa superior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 684,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm",
+    "width": 864,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Bandeja fija inclinada (×3)",
+    "width": 864,
+    "height": 405,
+    "material": "18mm_Color",
+    "quantity": 3,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Frentín bandeja 50mm (×3)",
+    "width": 864,
+    "height": 50,
+    "material": "18mm_Color",
+    "quantity": 3,
+    "grain": "horizontal"
+   }
+  ],
+  "sp14": [
+   {
+    "name": "Tapa superior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 684,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm",
+    "width": 864,
+    "height": 682,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Estante fijo (×2)",
+    "width": 864,
+    "height": 405,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "horizontal"
+   }
+  ],
+  "sp15": [
+   {
+    "name": "Panel frontal 18mm",
+    "width": 900,
+    "height": 720,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Bastidor horizontal",
+    "width": 800,
+    "height": 50,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Bastidor vertical",
+    "width": 50,
+    "height": 620,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   }
+  ],
+  "sp16": [
+   {
+    "name": "Panel base 18mm",
+    "width": 900,
+    "height": 720,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Listón horizontal 18×18mm (×20)",
+    "width": 900,
+    "height": 18,
+    "material": "18mm_White",
+    "quantity": 20,
+    "grain": "horizontal"
+   }
+  ],
+  "sp17": [
+   {
+    "name": "Puerta 18mm",
+    "width": 900,
+    "height": 720,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "vertical"
+   }
+  ],
+  "sp18": [
+   {
+    "name": "Estante 18mm",
+    "width": 900,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   }
+  ],
+  "man": []
+ },
+ "labels": {
+  "std0": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP"
+  ],
+  "std1": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Color 5.5mm",
+   "Melamina Color 18mm MDP"
+  ],
+  "std2": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "std3": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "std4": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Color 5.5mm",
+   "Melamina Color 18mm MDP"
+  ],
+  "std5": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 18mm MDP"
+  ],
+  "std6": [
+   "Melamina Blanca 18mm MDF",
+   "Melamina Blanca 18mm MDF",
+   "Melamina Blanca 18mm MDF",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 18mm MDF"
+  ],
+  "std7": [
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDF"
+  ],
+  "std8": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDF"
+  ],
+  "std9": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "MDF Crudo 1 Cara 18mm (para laquear)"
+  ],
+  "std10": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Enchapado Kiri 18mm MDF",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm"
+  ],
+  "std11": [
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Fondo Blanco 3mm",
+   "MDF Crudo 1 Cara 18mm (para laquear)"
+  ],
+  "std12": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm"
+  ],
+  "std13": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm"
+  ],
+  "std14": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm"
+  ],
+  "std15": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "std16": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "std17": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP"
+  ],
+  "std18": [
+   "Gris Humo 18mm MDP",
+   "Gris Humo 18mm MDP",
+   "Gris Humo 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Roble Kendal 18mm MDP"
+  ],
+  "std19": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP"
+  ],
+  "std20": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm"
+  ],
+  "std21": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm"
+  ],
+  "sp0": [
+   "Melamina Blanca 18mm MDF",
+   "Melamina Blanca 18mm MDF",
+   "Melamina Blanca 18mm MDF",
+   "Fondo Color 5.5mm"
+  ],
+  "sp1": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP"
+  ],
+  "sp2": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 18mm MDP"
+  ],
+  "sp3": [
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "sp4": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Fondo Blanco 3mm"
+  ],
+  "sp5": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "sp6": [
+   "Melamina Blanca 18mm MDF"
+  ],
+  "sp7": [
+   "Melamina Color 18mm MDP"
+  ],
+  "sp8": [
+   "Melamina Blanca 18mm MDP"
+  ],
+  "sp9": [
+   "Fondo Color 5.5mm"
+  ],
+  "sp10": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP"
+  ],
+  "sp11": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "sp12": [
+   "Melamina Blanca 18mm MDF",
+   "Melamina Blanca 18mm MDF",
+   "Melamina Blanca 18mm MDF",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 18mm MDF"
+  ],
+  "sp13": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "sp14": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Fondo Blanco 3mm",
+   "Melamina Blanca 18mm MDP"
+  ],
+  "sp15": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF"
+  ],
+  "sp16": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP"
+  ],
+  "sp17": [
+   "Melamina Color 18mm MDP"
+  ],
+  "sp18": [
+   "Melamina Blanca 18mm MDF"
+  ],
+  "man": []
+ },
+ "quantities": {
+  "cocina": {
+   "boards18Color": 3,
+   "boards18White": 1,
+   "boards18MDFMelamine": 0,
+   "boards18MDF": 0,
+   "boards15": 0,
+   "backing55": 1,
+   "backing3": 1,
+   "linearWhite22": 3,
+   "linearWhite45": 3,
+   "linearColor22": 13,
+   "linearColor45": 21,
+   "linear2mm": 0,
+   "lacquerAreaM2": 0,
+   "veneerAreaM2": 0,
+   "lacquerGlossAreaM2": 0,
+   "veneerGlossAreaM2": 0,
+   "totalHinges": 22,
+   "totalPistons": 0,
+   "totalSlides": 0,
+   "totalExtrasCost": 0,
+   "detailedBoards": {
+    "Melamina Color 18mm MDP": 3,
+    "Fondo Blanco (3mm)": 1,
+    "Fondo Melamina Color (5.5mm)": 1,
+    "Melamina Blanca 18mm MDP": 1
+   },
+   "detailedHardware": {
+    "Bisagras Estándar": 22
+   },
+   "avgComplexity": 1
+  },
+  "placard": {
+   "boards18Color": 2,
+   "boards18White": 0,
+   "boards18MDFMelamine": 0,
+   "boards18MDF": 2,
+   "boards15": 1,
+   "backing55": 0,
+   "backing3": 2,
+   "linearWhite22": 15,
+   "linearWhite45": 0,
+   "linearColor22": 21,
+   "linearColor45": 31,
+   "linear2mm": 0,
+   "lacquerAreaM2": 2.75,
+   "veneerAreaM2": 0.5,
+   "lacquerGlossAreaM2": 0.5,
+   "veneerGlossAreaM2": 0,
+   "totalHinges": 18,
+   "totalPistons": 0,
+   "totalSlides": 7,
+   "totalExtrasCost": 0,
+   "detailedBoards": {
+    "Melamina Blanca 18mm MDF": 1,
+    "Fondo Blanco (3mm)": 2,
+    "Melamina Color 18mm MDF": 1,
+    "Melamina Color 18mm MDP": 2,
+    "MDF Crudo (para laquear) 18mm MDF": 1,
+    "Enchapado Kiri 18mm MDF": 1,
+    "Melamina Blanca 15mm MDP": 1
+   },
+   "detailedHardware": {
+    "Bisagras Estándar": 18,
+    "Guías Telescópicas (500mm)": 4,
+    "Guías Telescópicas Cierre Suave (500mm)": 3
+   },
+   "avgComplexity": 1.14
+  },
+  "mixto": {
+   "boards18Color": 8,
+   "boards18White": 1,
+   "boards18MDFMelamine": 0,
+   "boards18MDF": 1,
+   "boards15": 2,
+   "backing55": 1,
+   "backing3": 3,
+   "linearWhite22": 26,
+   "linearWhite45": 7,
+   "linearColor22": 48,
+   "linearColor45": 60,
+   "linear2mm": 7,
+   "lacquerAreaM2": 0,
+   "veneerAreaM2": 0,
+   "lacquerGlossAreaM2": 0,
+   "veneerGlossAreaM2": 0,
+   "totalHinges": 48,
+   "totalPistons": 3,
+   "totalSlides": 10,
+   "totalExtrasCost": 30000,
+   "detailedBoards": {
+    "Melamina Color 18mm MDP": 8,
+    "Fondo Blanco (3mm)": 3,
+    "Melamina Blanca 15mm MDP": 2,
+    "Melamina Blanca 18mm MDF": 1,
+    "Fondo Melamina Blanca (5.5mm)": 1,
+    "Melamina Blanca 18mm MDP": 1,
+    "Melamina Color 18mm MDF": 1
+   },
+   "detailedHardware": {
+    "Bisagras Estándar": 32,
+    "Guías Telescópicas (500mm)": 1,
+    "Pistones a Gas": 3,
+    "Bisagras Cierre Suave": 12,
+    "Bisagras Push-Open": 4,
+    "Guías Ocultas (600mm)": 2,
+    "Guías Z (Epoxi) (400mm)": 2,
+    "Guías Telescópicas (400mm)": 5
+   },
+   "avgComplexity": 1
+  },
+  "especiales": {
+   "boards18Color": 3,
+   "boards18White": 2,
+   "boards18MDFMelamine": 0,
+   "boards18MDF": 2,
+   "boards15": 1,
+   "backing55": 1,
+   "backing3": 2,
+   "linearWhite22": 44,
+   "linearWhite45": 7,
+   "linearColor22": 37,
+   "linearColor45": 10,
+   "linear2mm": 0,
+   "lacquerAreaM2": 0,
+   "veneerAreaM2": 0,
+   "lacquerGlossAreaM2": 0,
+   "veneerGlossAreaM2": 0,
+   "totalHinges": 4,
+   "totalPistons": 0,
+   "totalSlides": 8,
+   "totalExtrasCost": 0,
+   "detailedBoards": {
+    "Melamina Blanca 18mm MDF": 2,
+    "Fondo Melamina Blanca (5.5mm)": 1,
+    "Melamina Color 18mm MDP": 2,
+    "Fondo Blanco (3mm)": 2,
+    "Melamina Blanca 15mm MDP": 1,
+    "Melamina Blanca 18mm MDP": 2,
+    "Melamina Color 18mm MDF": 1,
+    "Fondo Melamina Color (5.5mm)": 1
+   },
+   "detailedHardware": {
+    "Guías Telescópicas (400mm)": 8,
+    "Bisagras Estándar": 2,
+    "Bisagras Push-Open": 2
+   },
+   "avgComplexity": 1
+  },
+  "con_manual": {
+   "boards18Color": 1,
+   "boards18White": 0,
+   "boards18MDFMelamine": 0,
+   "boards18MDF": 0,
+   "boards15": 0,
+   "backing55": 0,
+   "backing3": 1,
+   "linearWhite22": 0,
+   "linearWhite45": 0,
+   "linearColor22": 3,
+   "linearColor45": 5,
+   "linear2mm": 0,
+   "lacquerAreaM2": 0,
+   "veneerAreaM2": 0,
+   "lacquerGlossAreaM2": 0,
+   "veneerGlossAreaM2": 0,
+   "totalHinges": 4,
+   "totalPistons": 0,
+   "totalSlides": 0,
+   "totalExtrasCost": 300000,
+   "detailedBoards": {
+    "Melamina Color 18mm MDP": 1,
+    "Fondo Blanco (3mm)": 1
+   },
+   "detailedHardware": {
+    "Bisagras Estándar": 4
+   },
+   "avgComplexity": 1
+  }
+ },
+ "financials": {
+  "cocina": {
+   "laborCost": 510000,
+   "fixedCosts": 78000,
+   "extrasCost": 0,
+   "tPlacas": 577100,
+   "tTapac": 63480,
+   "tHerrajes": 35200,
+   "tFinish": 0,
+   "finArea": 0,
+   "finPrice": 0,
+   "finishLines": [],
+   "costoDirecto": 1263780,
+   "precioTaller": 1706103,
+   "precioFinal": 2132628.75
+  },
+  "placard": {
+   "laborCost": 510000,
+   "fixedCosts": 78000,
+   "extrasCost": 0,
+   "tPlacas": 964100,
+   "tTapac": 97510,
+   "tHerrajes": 96800,
+   "tFinish": 460000,
+   "finArea": 3.25,
+   "finPrice": 141538.46153846153,
+   "finishLines": [
+    {
+     "label": "Laca Semi Mate",
+     "area": 2.25,
+     "price": 140000,
+     "total": 315000,
+     "fallback": null
+    },
+    {
+     "label": "Laca Brillante",
+     "area": 0.5,
+     "price": 150000,
+     "total": 75000,
+     "fallback": null
+    },
+    {
+     "label": "Lustre (enchapado Kiri) Semi Mate",
+     "area": 0.5,
+     "price": 140000,
+     "total": 70000,
+     "fallback": null
+    }
+   ],
+   "costoDirecto": 2206410,
+   "precioTaller": 2978653.5,
+   "precioFinal": 3723316.875
+  },
+  "mixto": {
+   "laborCost": 510000,
+   "fixedCosts": 78000,
+   "extrasCost": 30000,
+   "tPlacas": 1709300,
+   "tTapac": 217340,
+   "tHerrajes": 208300,
+   "tFinish": 0,
+   "finArea": 0,
+   "finPrice": 0,
+   "finishLines": [],
+   "costoDirecto": 2752940,
+   "precioTaller": 3716469.0000000005,
+   "precioFinal": 4645586.250000001
+  },
+  "especiales": {
+   "laborCost": 510000,
+   "fixedCosts": 78000,
+   "extrasCost": 0,
+   "tPlacas": 1119300,
+   "tTapac": 93400,
+   "tHerrajes": 60400,
+   "tFinish": 0,
+   "finArea": 0,
+   "finPrice": 0,
+   "finishLines": [],
+   "costoDirecto": 1861100,
+   "precioTaller": 2512485,
+   "precioFinal": 3140606.25
+  },
+  "con_manual": {
+   "laborCost": 510000,
+   "fixedCosts": 78000,
+   "extrasCost": 300000,
+   "tPlacas": 163600,
+   "tTapac": 13820,
+   "tHerrajes": 6400,
+   "tFinish": 0,
+   "finArea": 0,
+   "finPrice": 0,
+   "finishLines": [],
+   "costoDirecto": 1071820,
+   "precioTaller": 1446957,
+   "precioFinal": 1808696.25
+  }
+ },
+ "prices": {
+  "cocina": {
+   "whiteAglo": 1762981.875,
+   "whiteMDF": 1878406.875,
+   "colorAglo": 1981209.375,
+   "colorMDF": 2116884.375,
+   "whiteLacqAglo": 2696101.875,
+   "whiteLacqMDF": 2811526.875,
+   "colorLacqAglo": 2870859.375,
+   "colorLacqMDF": 3006534.375,
+   "whiteVenrAglo": 2811189.375,
+   "whiteVenrMDF": 2926614.375,
+   "colorVenrAglo": 2985946.875,
+   "colorVenrMDF": 3121621.875,
+   "baseConfig": 1981209.375,
+   "totalDirectCost": 1174050,
+   "realConfig": 2132628.75,
+   "realConfigTaller": 1706103,
+   "realConfigDirect": 1263780,
+   "lacquer": 2696101.875,
+   "veneer": 2811189.375
+  },
+  "placard": {
+   "whiteAglo": 2140644.375,
+   "whiteMDF": 2294544.3750000005,
+   "colorAglo": 2432041.8750000005,
+   "colorMDF": 2612941.8750000005,
+   "whiteLacqAglo": 3175959.375,
+   "whiteLacqMDF": 3291384.375,
+   "colorLacqAglo": 3353754.375,
+   "colorLacqMDF": 3489429.375,
+   "whiteVenrAglo": 3291046.875,
+   "whiteVenrMDF": 3406471.875,
+   "colorVenrAglo": 3468841.875,
+   "colorVenrMDF": 3604516.875,
+   "baseConfig": 2432041.8750000005,
+   "totalDirectCost": 1441210,
+   "realConfig": 3723316.875,
+   "realConfigTaller": 2978653.5,
+   "realConfigDirect": 2206410,
+   "lacquer": 3175959.375,
+   "veneer": 3291046.875
+  },
+  "mixto": {
+   "whiteAglo": 3821141.25,
+   "whiteMDF": 4212641.25,
+   "colorAglo": 4263384.375,
+   "colorMDF": 4670409.375000001,
+   "whiteLacqAglo": 6277230,
+   "whiteLacqMDF": 6546555,
+   "colorLacqAglo": 6694363.125,
+   "colorLacqMDF": 7010938.125,
+   "whiteVenrAglo": 6507405,
+   "whiteVenrMDF": 6776730,
+   "colorVenrAglo": 6924538.125,
+   "colorVenrMDF": 7241113.125,
+   "baseConfig": 4263384.375,
+   "totalDirectCost": 2526450,
+   "realConfig": 4645586.250000001,
+   "realConfigTaller": 3716469.0000000005,
+   "realConfigDirect": 2752940,
+   "lacquer": 6277230,
+   "veneer": 6507405
+  },
+  "especiales": {
+   "whiteAglo": 2534760.0000000005,
+   "whiteMDF": 2765610,
+   "colorAglo": 2939490,
+   "colorMDF": 3210840,
+   "whiteLacqAglo": 4976775.000000001,
+   "whiteLacqMDF": 5169150.000000001,
+   "colorLacqAglo": 5280997.5,
+   "colorLacqMDF": 5507122.5,
+   "whiteVenrAglo": 5091862.500000001,
+   "whiteVenrMDF": 5284237.5,
+   "colorVenrAglo": 5396085,
+   "colorVenrMDF": 5622210,
+   "baseConfig": 2939490,
+   "totalDirectCost": 1741920,
+   "realConfig": 3140606.25,
+   "realConfigTaller": 2512485,
+   "realConfigDirect": 1861100,
+   "lacquer": 4976775.000000001,
+   "veneer": 5091862.500000001
+  },
+  "con_manual": {
+   "whiteAglo": 1742411.25,
+   "whiteMDF": 1780886.25,
+   "colorAglo": 1808696.25,
+   "colorMDF": 1853921.25,
+   "whiteLacqAglo": 2171373.75,
+   "whiteLacqMDF": 2209848.75,
+   "colorLacqAglo": 2228208.7500000005,
+   "colorLacqMDF": 2273433.7500000005,
+   "whiteVenrAglo": 2286461.2500000005,
+   "whiteVenrMDF": 2324936.2500000005,
+   "colorVenrAglo": 2343296.2500000005,
+   "colorVenrMDF": 2388521.2500000005,
+   "baseConfig": 1808696.25,
+   "totalDirectCost": 1071820,
+   "realConfig": 1808696.25,
+   "realConfigTaller": 1446957,
+   "realConfigDirect": 1071820,
+   "lacquer": 2171373.75,
+   "veneer": 2286461.2500000005
+  }
+ }
+}
