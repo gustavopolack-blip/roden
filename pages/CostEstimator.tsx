@@ -901,11 +901,30 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       else if (n.includes('guías') || n.includes('guia')) {
           const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
           const isS = n.includes('suave'); const isP = n.includes('push');
+          const p500 = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
           if      (len <= 300) unitPrice = isS ? (S.priceSlide300Soft || 0) : isP ? (S.priceSlide300Push || 0) : (S.priceSlide300Std || 0);
           else if (len <= 400) unitPrice = isS ? (S.priceSlide400Soft || 0) : isP ? (S.priceSlide400Push || 0) : (S.priceSlide400Std || 0);
-          else                 unitPrice = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
+          else if (len <= 500) unitPrice = p500;
+          else {
+              // Guías de 600mm: precio propio. Las listas anteriores no lo tienen → se usa el de
+              // 500 (como antes) y la planilla lo advierte (ver slideUsesFallbackPrice).
+              const p600 = isS ? S.priceSlide600Soft : isP ? S.priceSlide600Push : S.priceSlide600Std;
+              unitPrice = (p600 || 0) > 0 ? p600 : p500;
+          }
       }
       return unitPrice * qty;
+  };
+
+  // true si una guía de más de 500mm se está cotizando con el precio de 500 porque la
+  // lista no tiene cargado el de 600.
+  const slideUsesFallbackPrice = (name: string, S: any): boolean => {
+      const n = name.toLowerCase();
+      if (!(n.includes('guías') || n.includes('guia'))) return false;
+      const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '0');
+      if (len <= 500) return false;
+      const isS = n.includes('suave'); const isP = n.includes('push');
+      const p600 = isS ? S.priceSlide600Soft : isP ? S.priceSlide600Push : S.priceSlide600Std;
+      return !((p600 || 0) > 0);
   };
 
   // Devuelve el desglose completo y los precios de una config.
@@ -3108,23 +3127,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             ? (realMT === 'VENEER_FULL'  ? 'Enchapado Kiri — todo el mueble' : 'Enchapado Kiri — frentes')
                             : null;
 
-                        // ── Precio de herrajes: lookup según nombre ──
-                        const hwPrice = (name: string, qty: number): number => {
-                            const n = name.toLowerCase();
-                            let unitPrice = 0;
-                            if      (n.includes('estándar') || n.includes('standard'))      unitPrice = S.priceHingeStandard;
-                            else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose;
-                            else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush;
-                            else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston;
-                            else if (n.includes('guías') || n.includes('guia')) {
-                                const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
-                                const isS = n.includes('suave'); const isP = n.includes('push');
-                                if      (len <= 300) unitPrice = isS ? S.priceSlide300Soft : isP ? S.priceSlide300Push : S.priceSlide300Std;
-                                else if (len <= 400) unitPrice = isS ? S.priceSlide400Soft : isP ? S.priceSlide400Push : S.priceSlide400Std;
-                                else                 unitPrice = isS ? S.priceSlide500Soft : isP ? S.priceSlide500Push : S.priceSlide500Std;
-                            }
-                            return unitPrice * qty;
-                        };
+                        // ── Precio de herrajes: mismo lookup que el motor (antes era una copia local) ──
+                        const hwPrice = (name: string, qty: number): number => hwPriceFor(name, qty, S);
 
                         // ── Precio de placas por nombre ──
                         const boardPrice = (name: string, count: number): number => {
@@ -3277,7 +3281,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <tbody>
                                                     {Object.entries(q.detailedHardware).map(([hw, qty]) => (
                                                         <tr key={hw} style={{ borderBottom:'1px solid #f3f4f6' }}>
-                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}</td>
+                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}{slideUsesFallbackPrice(hw, S) && <span style={{ color:'#b45309', fontSize:'9px' }}> — sin precio de 600 en la lista: se usó el de 500</span>}</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{qty as number} un</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(hwPrice(hw, qty as number))}</td>
                                                         </tr>
@@ -3965,6 +3969,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <input type="number" placeholder="Std" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Std} onChange={e => setSettings({...settings, priceSlide500Std: Number(e.target.value)})} />
                                         <input type="number" placeholder="Soft" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Soft} onChange={e => setSettings({...settings, priceSlide500Soft: Number(e.target.value)})} />
                                         <input type="number" placeholder="Push" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Push} onChange={e => setSettings({...settings, priceSlide500Push: Number(e.target.value)})} />
+
+                                        <div className="col-span-3 text-[10px] text-gray-400 uppercase mt-1">600mm <span className="normal-case">(vacío = usa el de 500)</span></div>
+                                        <input type="number" placeholder="Std" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Std ?? ''} onChange={e => setSettings({...settings, priceSlide600Std: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Soft" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Soft ?? ''} onChange={e => setSettings({...settings, priceSlide600Soft: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Push" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Push ?? ''} onChange={e => setSettings({...settings, priceSlide600Push: Number(e.target.value) || undefined})} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
