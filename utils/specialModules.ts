@@ -63,6 +63,13 @@ const getSlideLength = (depth: number): number => {
   return 500;
 };
 
+// Construcción del taller:
+// - Tapa y base van SOBRE los laterales: tapa/base = W × D, lateral = (H − 36) × D.
+// - Correderas laterales de 12,5mm por lado: caja de cajón = hueco − 25mm.
+// - Caja de cajón en melamina 15mm: testas (frente/trasero) entre los laterales de la caja.
+export const SLIDE_GAP_TOTAL = 25;   // 2 × 12,5mm
+export const DRAWER_BOX_SIDE = 15;   // espesor de los laterales de la caja
+
 // Bisagras por puerta según alto (misma regla que el módulo estándar):
 // ≤900mm → 2 | ≤1500mm → 3 | >1500mm → 4
 const hingesPerDoor = (height: number): number => height > 1500 ? 4 : height > 900 ? 3 : 2;
@@ -87,14 +94,14 @@ const BOTINERO_EXTRAIBLE: SpecialModuleTemplate = {
     // Cuerpo
     parts.push({ name: 'Tapa superior',   width: W,                    height: D,                   material: '18mm_Carcass', quantity: 1,       grain: 'horizontal' });
     parts.push({ name: 'Base inferior',   width: W,                    height: D,                   material: '18mm_Carcass', quantity: 1,       grain: 'horizontal' });
-    parts.push({ name: 'Lateral',         width: D,                    height: H,                   material: '18mm_Carcass', quantity: 2,       grain: 'vertical'   });
+    parts.push({ name: 'Lateral',         width: D,                    height: Math.max(0, H - 36), material: '18mm_Carcass', quantity: 2,       grain: 'vertical'   });
     parts.push({ name: 'Fondo 3mm',       width: Math.max(0, W - 36),  height: Math.max(0, H - 38), material: '3mm_White',    quantity: 1,       grain: 'vertical'   });
 
     // Bandejas extraíbles
     if (bandejas > 0) {
       parts.push({
         name: `Bandeja extraíble (×${bandejas})`,
-        width:    Math.max(0, W - 36),
+        width:    Math.max(0, W - 36 - SLIDE_GAP_TOTAL), // hueco menos correderas
         height:   Math.max(0, D - 45),
         material: '18mm_Carcass',
         quantity: bandejas,
@@ -130,7 +137,7 @@ const BOTINERO_FIJO: SpecialModuleTemplate = {
     // Cuerpo
     parts.push({ name: 'Tapa superior',   width: W,                    height: D,                   material: '18mm_Carcass', quantity: 1,       grain: 'horizontal' });
     parts.push({ name: 'Base inferior',   width: W,                    height: D,                   material: '18mm_Carcass', quantity: 1,       grain: 'horizontal' });
-    parts.push({ name: 'Lateral',         width: D,                    height: H,                   material: '18mm_Carcass', quantity: 2,       grain: 'vertical'   });
+    parts.push({ name: 'Lateral',         width: D,                    height: Math.max(0, H - 36), material: '18mm_Carcass', quantity: 2,       grain: 'vertical'   });
     parts.push({ name: 'Fondo 3mm',       width: Math.max(0, W - 36),  height: Math.max(0, H - 38), material: '3mm_White',    quantity: 1,       grain: 'vertical'   });
 
     // Bandejas fijas inclinadas + frentín
@@ -178,7 +185,7 @@ const BIBLIOTECA: SpecialModuleTemplate = {
     // Cuerpo
     parts.push({ name: 'Tapa superior',   width: W,                    height: D,                   material: '18mm_Carcass', quantity: 1,       grain: 'horizontal' });
     parts.push({ name: 'Base inferior',   width: W,                    height: D,                   material: '18mm_Carcass', quantity: 1,       grain: 'horizontal' });
-    parts.push({ name: 'Lateral',         width: D,                    height: H,                   material: '18mm_Carcass', quantity: 2,       grain: 'vertical'   });
+    parts.push({ name: 'Lateral',         width: D,                    height: Math.max(0, H - 36), material: '18mm_Carcass', quantity: 2,       grain: 'vertical'   });
     parts.push({ name: 'Fondo 3mm',       width: Math.max(0, W - 36),  height: Math.max(0, H - 38), material: '3mm_White',    quantity: 1,       grain: 'vertical'   });
 
     // Estantes
@@ -365,7 +372,7 @@ const MODULO_ABIERTO: SpecialModuleTemplate = {
 
     parts.push({ name: 'Tapa superior',  width: W,                   height: D,                   material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
     parts.push({ name: 'Base inferior',  width: W,                   height: D,                   material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
-    parts.push({ name: 'Lateral',        width: lateralDepth,        height: H,                   material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
+    parts.push({ name: 'Lateral',        width: lateralDepth,        height: Math.max(0, H - 36), material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
 
     // Fondo según tipo
     if (backingType === '3MM_WHITE') {
@@ -472,7 +479,7 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
     const numDividers = numPanels - 1;
 
     // ── Medidas interiores ───────────────────────────────────
-    // Tapa/base = ancho total. Laterales = H exterior × D exterior.
+    // Tapa/base = ancho total (van sobre los laterales). Laterales = (H − 36) × D.
     // innerW = W - 2×18mm (laterales). innerH = H - 2×18mm (tapa+base).
     // innerD = D - 18mm (fondo 3mm entra en ranura; lateral compacto).
     const innerW      = Math.max(0, W - 36);
@@ -484,7 +491,7 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
     // ── Cuerpo exterior ──────────────────────────────────────
     parts.push({ name: 'Tapa superior', width: W,      height: D,                   material: '18mm_Carcass', quantity: 1,          grain: 'horizontal' });
     parts.push({ name: 'Base inferior', width: W,      height: D,                   material: '18mm_Carcass', quantity: 1,          grain: 'horizontal' });
-    parts.push({ name: 'Lateral',       width: D,      height: H,                   material: '18mm_Carcass', quantity: 2,          grain: 'vertical'   });
+    parts.push({ name: 'Lateral',       width: D,      height: innerH,              material: '18mm_Carcass', quantity: 2,          grain: 'vertical'   });
     parts.push({ name: 'Fondo 3mm',     width: innerW, height: Math.max(0, H - 38), material: '3mm_White',    quantity: 1,          grain: 'vertical'   });
 
     // ── Divisores internos ───────────────────────────────────
@@ -519,14 +526,17 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
       // ── Cajones (caja en melamina blanca 15mm) ─────────────
       // Cada "cajón" ocupa un panel de ancho clearW y la altura interior total (un cajón por columna).
       // La caja se construye con 15mm_White.
-      // Lateral caja: profundidad = D - 20mm (espacio para carros), alto = innerH - 10mm (juego)
-      // Testa caja (frente + trasero): ancho = clearW - 30mm (2 × 15mm lat), alto = innerH - 10mm
-      // Fondo caja 3mm: ancho = clearW - 30mm, profundidad = D - 20mm
+      // Hueco por columna = (innerW − divisores 18mm) / columnas.
+      // Caja exterior = hueco − correderas (25mm). Testa = caja − 2 × 15mm.
+      // Lateral caja: profundidad = D - 20mm, alto = innerH - 10mm (juego)
+      // Fondo caja 3mm: ancho exterior de la caja × (D - 20mm)
       // Frente exterior visible (18mm_Front): clearW × H
 
       const boxDepth  = Math.max(80, D - 20);        // profundidad de la caja interior
       const boxHeight = Math.max(50, innerH - 10);    // alto de la caja
-      const boxInnerW = Math.max(0, clearW - 30);     // ancho interior de la caja (clearW - 2×15mm)
+      const openingW  = Math.max(0, (innerW - 18 * numDividers) / numPanels);
+      const boxOuterW = Math.max(0, openingW - SLIDE_GAP_TOTAL);
+      const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);
 
       parts.push({
         name:     `Lateral caja cajón 15mm (×${numPanels * 2})`,
@@ -546,7 +556,7 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
       });
       parts.push({
         name:     `Fondo caja cajón 3mm (×${numPanels})`,
-        width:    boxInnerW,
+        width:    boxOuterW,
         height:   boxDepth,
         material: '3mm_White',
         quantity: numPanels,
@@ -782,11 +792,12 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
       cntDrawers = Math.max(1, Math.floor(innerH / 180));
       const boxHeight  = Math.max(50, Math.floor(innerH / cntDrawers) - 10);
       const boxDepth   = Math.max(80, D - 20);
-      const boxInnerW  = Math.max(0, innerW - 30);
+      const boxOuterW  = Math.max(0, innerW - SLIDE_GAP_TOTAL);           // hueco − correderas
+      const boxInnerW  = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);
 
       parts.push({ name: `Lateral caja cajón 15mm (×${cntDrawers * 2})`, width: boxDepth,  height: boxHeight,                         material: '15mm_White',   quantity: cntDrawers * 2, grain: 'horizontal' });
       parts.push({ name: `Testa cajón 15mm (×${cntDrawers * 2})`,        width: boxInnerW, height: boxHeight,                         material: '15mm_White',   quantity: cntDrawers * 2, grain: 'horizontal' });
-      parts.push({ name: `Fondo caja cajón 3mm (×${cntDrawers})`,        width: boxInnerW, height: boxDepth,                          material: '3mm_White',    quantity: cntDrawers,     grain: 'horizontal' });
+      parts.push({ name: `Fondo caja cajón 3mm (×${cntDrawers})`,        width: boxOuterW, height: boxDepth,                          material: '3mm_White',    quantity: cntDrawers,     grain: 'horizontal' });
       parts.push({ name: `Frente exterior cajón (×${cntDrawers})`,       width: innerW,    height: Math.floor(H / cntDrawers),        material: '18mm_Front',   quantity: cntDrawers,     grain: 'vertical'   });
       laborDays += cntDrawers * 0.22;
     }

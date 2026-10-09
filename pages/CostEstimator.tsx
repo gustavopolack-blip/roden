@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
-import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem } from '../utils/specialModules';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE } from '../utils/specialModules';
 import { supabase } from '../services/supabaseClient';
 
 interface CostEstimatorProps {
@@ -546,19 +546,20 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             );
         }
 
-        // 1. Tapas y Bases: SIEMPRE pasan completas (sin descuentos)
+        // 1. Tapas y Bases: van SOBRE los laterales → pasan completas (sin descuentos)
         // Ancho = Ancho_exterior, Profundidad = Profundidad_exterior
         parts.push({ name: 'Tapa superior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
         parts.push({ name: 'Base inferior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
         
-        // 2. Laterales: Alto = Alto_exterior
+        // 2. Laterales: van ENTRE tapa y base → Alto = Alto_exterior − 36mm
+        //    (antes salían a alto completo: el módulo armado quedaba 36mm más alto)
         // SI fondo = 3mm: Profundidad = Profundidad_exterior
         // SI fondo = 5.5mm o 18mm: Profundidad = Profundidad_exterior - 18mm
         let lateralDepth = D;
         if (backingType === '55_COLOR' || backingType === '18MM_STRUCTURE') {
             lateralDepth = D - 18;
         }
-        parts.push({ name: 'Lateral', width: lateralDepth, height: H, material: carcassMat, quantity: 2, grain: 'vertical' });
+        parts.push({ name: 'Lateral', width: lateralDepth, height: Math.max(0, H - 36), material: carcassMat, quantity: 2, grain: 'vertical' });
         
         // 3. Fondos
         if (backingType === '3MM_WHITE') {
@@ -603,14 +604,18 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         }
 
         // 6. Interiores de Cajón
+        // Hueco = W − 36 (entre laterales). Correderas 12,5mm por lado → caja exterior = hueco − 25.
+        // Antes contra/frente y fondo medían W − 26: más que el hueco, la caja no entraba.
         if (cntDrawers > 0) {
             const drawerHeight = 120;
+            const boxOuterW = Math.max(0, W - 36 - SLIDE_GAP_TOTAL);          // W − 61
+            const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);   // W − 91
             // LATERALES: Ancho = Profundidad_módulo - 20mm, Alto = Alto_cajón
             parts.push({ name: 'Lateral Cajón', width: Math.max(0, D - 20), height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
-            // FRENTE Y TRASERO: Ancho = Ancho_módulo - 26mm, Alto = Alto_cajón
-            parts.push({ name: 'Contra/Frente Cajón', width: Math.max(0, W - 26), height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
-            // FONDO: Ancho = Ancho_módulo - 26mm, Profundidad = Profundidad_módulo - 20mm
-            parts.push({ name: 'Fondo Cajón', width: Math.max(0, W - 26), height: Math.max(0, D - 20), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
+            // FRENTE Y TRASERO: entre los laterales de la caja
+            parts.push({ name: 'Contra/Frente Cajón', width: boxInnerW, height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
+            // FONDO: ancho exterior de la caja × (Profundidad_módulo - 20mm)
+            parts.push({ name: 'Fondo Cajón', width: boxOuterW, height: Math.max(0, D - 20), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
         }
 
         return parts;
