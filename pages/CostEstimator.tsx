@@ -898,33 +898,38 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       else if (n.includes('cierre suave') && n.includes('bisag'))     unitPrice = S.priceHingeSoftClose || 0;
       else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
       else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
-      else if (n.includes('guías') || n.includes('guia')) {
-          const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
-          const isS = n.includes('suave'); const isP = n.includes('push');
-          const p500 = isS ? (S.priceSlide500Soft || 0) : isP ? (S.priceSlide500Push || 0) : (S.priceSlide500Std || 0);
-          if      (len <= 300) unitPrice = isS ? (S.priceSlide300Soft || 0) : isP ? (S.priceSlide300Push || 0) : (S.priceSlide300Std || 0);
-          else if (len <= 400) unitPrice = isS ? (S.priceSlide400Soft || 0) : isP ? (S.priceSlide400Push || 0) : (S.priceSlide400Std || 0);
-          else if (len <= 500) unitPrice = p500;
-          else {
-              // Guías de 600mm: precio propio. Las listas anteriores no lo tienen → se usa el de
-              // 500 (como antes) y la planilla lo advierte (ver slideUsesFallbackPrice).
-              const p600 = isS ? S.priceSlide600Soft : isP ? S.priceSlide600Push : S.priceSlide600Std;
-              unitPrice = (p600 || 0) > 0 ? p600 : p500;
-          }
-      }
+      else if (n.includes('guías') || n.includes('guia')) unitPrice = resolveSlidePrice(name, S).price;
       return unitPrice * qty;
   };
 
-  // true si una guía de más de 500mm se está cotizando con el precio de 500 porque la
-  // lista no tiene cargado el de 600.
-  const slideUsesFallbackPrice = (name: string, S: any): boolean => {
+  // ── Precio de guías ──
+  // Clave en la lista: priceSlide{300|400|500|600}{Std|Soft|Push|Z|Hidden}.
+  // Fallbacks (siempre hacia lo que se cobraba antes, nunca a 0 si hay alternativa):
+  //  - 600mm sin precio → el de 500 del mismo tipo.
+  //  - Z (epoxi) / Ocultas sin precio → telescópica estándar del mismo largo.
+  // `fallback` describe el reemplazo para que la planilla lo advierta.
+  const SLIDE_KIND_LABEL: Record<string, string> = { Std: 'telescópica estándar', Soft: 'cierre suave', Push: 'push', Z: 'Z (epoxi)', Hidden: 'oculta' };
+  const resolveSlidePrice = (name: string, S: any): { price: number; fallback: string | null } => {
       const n = name.toLowerCase();
-      if (!(n.includes('guías') || n.includes('guia'))) return false;
-      const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '0');
-      if (len <= 500) return false;
-      const isS = n.includes('suave'); const isP = n.includes('push');
-      const p600 = isS ? S.priceSlide600Soft : isP ? S.priceSlide600Push : S.priceSlide600Std;
-      return !((p600 || 0) > 0);
+      const len = parseInt(name.match(/\((\d+)mm\)/)?.[1] || '300');
+      const tier = len <= 300 ? 300 : len <= 400 ? 400 : len <= 500 ? 500 : 600;
+      const kind = n.includes('suave') ? 'Soft' : n.includes('push') ? 'Push'
+                 : n.includes('epoxi') ? 'Z' : n.includes('oculta') ? 'Hidden' : 'Std';
+      const candidates: Array<[number, string]> = [[tier, kind]];
+      if (tier === 600) candidates.push([500, kind]);
+      if (kind === 'Z' || kind === 'Hidden') {
+          candidates.push([tier, 'Std']);
+          if (tier === 600) candidates.push([500, 'Std']);
+      }
+      for (const [t, k] of candidates) {
+          const v = S[`priceSlide${t}${k}`] || 0;
+          if (v > 0) {
+              const fallback = (t === tier && k === kind) ? null
+                  : `sin precio de guía ${SLIDE_KIND_LABEL[kind]} ${tier}mm en la lista: se usó ${SLIDE_KIND_LABEL[k]} ${t}mm`;
+              return { price: v, fallback };
+          }
+      }
+      return { price: 0, fallback: null };
   };
 
   // Devuelve el desglose completo y los precios de una config.
@@ -3281,7 +3286,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <tbody>
                                                     {Object.entries(q.detailedHardware).map(([hw, qty]) => (
                                                         <tr key={hw} style={{ borderBottom:'1px solid #f3f4f6' }}>
-                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}{slideUsesFallbackPrice(hw, S) && <span style={{ color:'#b45309', fontSize:'9px' }}> — sin precio de 600 en la lista: se usó el de 500</span>}</td>
+                                                            <td style={{ padding:'1.5px 0', color:'#374151' }}>{hw}{(() => { const fb = (hw.toLowerCase().includes('guía') || hw.toLowerCase().includes('guia')) ? resolveSlidePrice(hw, S).fallback : null; return fb && <span style={{ color:'#b45309', fontSize:'9px' }}> — {fb}</span>; })()}</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', color:'#9ca3af', width:'32px' }}>{qty as number} un</td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:500, width:'72px' }}>{formatCurrency(hwPrice(hw, qty as number))}</td>
                                                         </tr>
@@ -3974,6 +3979,22 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         <input type="number" placeholder="Std" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Std ?? ''} onChange={e => setSettings({...settings, priceSlide600Std: Number(e.target.value) || undefined})} />
                                         <input type="number" placeholder="Soft" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Soft ?? ''} onChange={e => setSettings({...settings, priceSlide600Soft: Number(e.target.value) || undefined})} />
                                         <input type="number" placeholder="Push" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Push ?? ''} onChange={e => setSettings({...settings, priceSlide600Push: Number(e.target.value) || undefined})} />
+                                    </div>
+                                    <div><label className="text-xs block font-bold text-gray-400 mt-3 mb-1">Guías Z (Epoxi) y Ocultas <span className="font-normal normal-case">(vacío = usa telescópica estándar)</span></label></div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <div></div><div className="text-[10px] text-gray-400 uppercase">Z (epoxi)</div><div className="text-[10px] text-gray-400 uppercase">Oculta</div>
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">300mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide300Z ?? ''} onChange={e => setSettings({...settings, priceSlide300Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide300Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide300Hidden: Number(e.target.value) || undefined})} />
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">400mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide400Z ?? ''} onChange={e => setSettings({...settings, priceSlide400Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide400Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide400Hidden: Number(e.target.value) || undefined})} />
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">500mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Z ?? ''} onChange={e => setSettings({...settings, priceSlide500Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide500Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide500Hidden: Number(e.target.value) || undefined})} />
+                                        <div className="text-[10px] text-gray-400 uppercase self-center">600mm</div>
+                                        <input type="number" placeholder="Z" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Z ?? ''} onChange={e => setSettings({...settings, priceSlide600Z: Number(e.target.value) || undefined})} />
+                                        <input type="number" placeholder="Oculta" className="border p-1 w-full rounded text-xs" value={settings.priceSlide600Hidden ?? ''} onChange={e => setSettings({...settings, priceSlide600Hidden: Number(e.target.value) || undefined})} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
