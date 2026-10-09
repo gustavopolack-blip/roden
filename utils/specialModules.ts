@@ -63,6 +63,13 @@ const getSlideLength = (depth: number): number => {
   return 500;
 };
 
+// Bisagras por puerta según alto (misma regla que el módulo estándar):
+// ≤900mm → 2 | ≤1500mm → 3 | >1500mm → 4
+const hingesPerDoor = (height: number): number => height > 1500 ? 4 : height > 900 ? 3 : 2;
+
+// Nota: los templates NO fijan hingeType/slideType salvo que el usuario lo elija en una
+// extraOption propia; el engine usa entonces el tipo elegido en el formulario del módulo.
+
 // ─────────────────────────────────────────────────────────────
 // TEMPLATE 1 — BOTINERO CON EXTRAÍBLES
 // Bandejas extraíbles con guías telescópicas, 1 cada 200mm de alto
@@ -100,7 +107,6 @@ const BOTINERO_EXTRAIBLE: SpecialModuleTemplate = {
       hardware: {
         slides:      bandejas,
         slideLength: getSlideLength(D),
-        slideType:   'TELESCOPIC'
       },
       laborDays: 0.5 + bandejas * 0.08
     };
@@ -562,7 +568,10 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
 
     return {
       parts,
-      hardware: {},
+      // Puertas: bisagras según alto. Cajones: 1 par de guías por cajón.
+      hardware: frontType === 'DOORS'
+        ? { hinges: numPanels * hingesPerDoor(H) }
+        : { slides: numPanels, slideLength: getSlideLength(D) },
       laborDays
     };
   }
@@ -754,6 +763,7 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
     parts.push({ name: 'Fondo 3mm',     width: innerW, height: Math.max(0, H - 100 - 10),    material: '3mm_White',    quantity: 1, grain: 'vertical'   });
 
     let laborDays = 0.5;
+    let cntDrawers = 0;
 
     if (interior === 'ESTANTE') {
       parts.push({
@@ -769,7 +779,7 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
     } else {
       // Cajones: 1 cada ~180mm de altura interior disponible
       const innerH    = Math.max(180, H - 100 - 18);
-      const cntDrawers = Math.max(1, Math.floor(innerH / 180));
+      cntDrawers = Math.max(1, Math.floor(innerH / 180));
       const boxHeight  = Math.max(50, Math.floor(innerH / cntDrawers) - 10);
       const boxDepth   = Math.max(80, D - 20);
       const boxInnerW  = Math.max(0, innerW - 30);
@@ -781,7 +791,9 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
       laborDays += cntDrawers * 0.22;
     }
 
-    return { parts, hardware: {}, laborDays };
+    // 1 par de guías por cajón (antes no se cobraban).
+    const hardware = cntDrawers > 0 ? { slides: cntDrawers, slideLength: getSlideLength(D) } : {};
+    return { parts, hardware, laborDays };
   }
 };
 
@@ -814,7 +826,9 @@ const ESQUINERO: SpecialModuleTemplate = {
       parts.push({ name: 'Puerta esquinero', width: doorW, height: H, material: '18mm_Front', quantity: 1, grain: 'vertical' });
     }
 
-    return { parts, hardware: {}, laborDays: 0.7 };
+    // Bisagras solo para la puerta; el panel de 620mm es fijo (antes no se cobraban).
+    const hardware = doorW > 0 ? { hinges: hingesPerDoor(H) } : {};
+    return { parts, hardware, laborDays: 0.7 };
   }
 };
 
@@ -967,7 +981,7 @@ const PUERTA_18MM: SpecialModuleTemplate = {
   fixedDims: () => ({ depth: 18 }),
   calculate: ({ width: W, height: H }, options = {}) => {
     const hingeType = options.hingeType || 'COMMON';
-    const hinges    = H > 1500 ? 4 : H > 900 ? 3 : 2;
+    const hinges    = hingesPerDoor(H);
     const parts: CalculatedPart[] = [];
 
     parts.push({
