@@ -647,6 +647,11 @@ export const layoutRows = (assembly: Assembly): LayoutRow[] => {
   return rows.sort((a, b) => a.y - b.y);
 };
 
+/** Regla del taller: las alacenas van 600 mm por encima del tope de los bajomesadas. */
+export const WALL_CABINET_GAP = 600;
+/** Para el tope de los bajomesadas no cuentan las torres / columnas (más altas que esto). */
+const BASE_CABINET_MAX_H = 1200;
+
 export interface ReorderPlan {
   layouts: Map<number, ModuleLayout3D>;   // nueva ubicación (instancia 0) de los módulos que se mueven
   rowY: number;
@@ -667,6 +672,17 @@ export const planReorder = (assembly: Assembly, moduleIndex: number, pointer: { 
   if (!d) return null;
   const rows = layoutRows(assembly);
   const src = rows.find(r => r.members.includes(moduleIndex))!;
+  // Sin alacenas todavía: fila virtual a 600 mm sobre el tope de los bajomesadas, para poder
+  // subir un módulo arrastrándolo.
+  const floor = rows.find(r => Math.abs(r.y) < 1);
+  if (floor && !rows.some(r => r.y > 1)) {
+    const baseTops = floor.members.map(mi => spans.get(mi)!.h).filter(h => h <= BASE_CABINET_MAX_H);
+    if (baseTops.length) {
+      floor.top = Math.max(...baseTops);           // la torre no "estira" la fila de bajos
+      const y = floor.top + WALL_CABINET_GAP;
+      rows.push({ y, top: y + d.h, members: [] });
+    }
+  }
   const dist = (r: LayoutRow) => pointer.y < r.y ? r.y - pointer.y : pointer.y > r.top ? pointer.y - r.top : 0;
   const dst = rows.reduce((best, r) => dist(r) < dist(best) ? r : best, src);
 
@@ -683,7 +699,14 @@ export const planReorder = (assembly: Assembly, moduleIndex: number, pointer: { 
   let insertX: number;
   if (slot < others.length) insertX = pos.get(others[slot])!;
   else if (others.length) { const last = others[others.length - 1]; insertX = pos.get(last)! + spans.get(last)!.w; }
-  else insertX = pointer.x - d.w / 2;
+  else {
+    // Fila vacía: alinear con el borde izquierdo más cercano de los módulos de abajo
+    insertX = pointer.x - d.w / 2;
+    const edges = (floor?.members || [])
+      .filter(mi => mi !== moduleIndex && spans.get(mi)!.h <= BASE_CABINET_MAX_H)   // sobre una torre no va
+      .map(mi => pos.get(mi)!);
+    if (dst !== floor && edges.length) insertX = edges.reduce((b, e) => Math.abs(e - insertX) < Math.abs(b - insertX) ? e : b);
+  }
   others.slice(slot).forEach(mi => pos.set(mi, pos.get(mi)! + d.w));
 
   const layouts = new Map<number, ModuleLayout3D>();

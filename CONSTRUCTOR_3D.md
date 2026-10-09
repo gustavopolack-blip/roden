@@ -26,7 +26,9 @@ En el constructor:
   salta al hueco más cercano y los demás de la fila se corren para hacerle lugar (los huecos que
   había entre otros módulos, p. ej. heladera, se conservan). Arrastrando hacia arriba o abajo pasa a
   la otra fila (bajos ↔ alacenas). Fila = módulos sin girar apoyados a la misma altura; los girados
-  (alas de una L) se ubican con X/Y/Z. Para crear una fila nueva (primera alacena) se carga su Y.
+  (alas de una L) se ubican con X/Y/Z. Si todavía no hay alacenas, arrastrar hacia arriba crea esa
+  fila a **600 mm sobre el tope de los bajomesadas** (regla del taller; las torres de más de 1200 mm
+  no cuentan) y la alinea con el borde del bajo más cercano (`WALL_CABINET_GAP`).
   Lógica: `layoutRows` / `planReorder` en `geometry.ts` (pruebas en `tests/reorder3d.test.ts`).
 - Elegí un módulo en la lista para editar medidas, puertas, cajones, abatibles, alto de frentes
   combinados, apertura (bisagra) y posición X/Y/Z (mm) y giro (0/90/180/270°).

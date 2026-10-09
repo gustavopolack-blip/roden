@@ -89,3 +89,22 @@ describe('arrastrar a otra fila', () => {
     }
   });
 });
+
+describe('crear la fila de alacenas arrastrando hacia arriba', () => {
+  // Bajos A(600) B(400) C(800) de 720 + torre T de 2100: sin alacenas.
+  const noWall = () => buildAssembly('Cocina', [m('A', 600), m('B', 400), m('C', 800), m('T', 600, { height: 2100 })]);
+  it('sube a 600 mm sobre el tope de los bajomesadas (la torre no cuenta)', () => {
+    const p = planReorder(noWall(), 1, { x: 1300, y: 1500 })!;
+    expect(p.rowY).toBe(720 + 600);
+    expect(p.layouts.get(1)).toEqual({ x: 600, y: 1320, z: 0, rotY: 0 });   // alineada con el borde de C (ya corrido)
+    expect(p.layouts.get(2)!.x).toBe(600);                                  // C cierra el hueco de B
+  });
+  it('soltando cerca del piso sigue en la fila de bajos', () => {
+    const p = planReorder(noWall(), 1, { x: 1300, y: 900 })!;
+    expect(p.rowY).toBe(0);
+  });
+  it('si ya hay alacenas no se crea otra fila', () => {
+    const p = planReorder(kitchen(), 1, { x: 100, y: 1400 })!;
+    expect(p.rowY).toBe(1500);
+  });
+});
