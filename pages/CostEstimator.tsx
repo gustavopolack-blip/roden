@@ -438,6 +438,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         if ((mod as any).specialTemplateId === SPECIAL_MANUAL_ID || mod.moduleType === 'MANUAL') {
             return [];
         }
+        // Módulo especial: usar las piezas pre-calculadas por el template
+        if ((mod as any).isSpecialModule && (mod as any).specialParts?.length > 0) {
+            return (mod as any).specialParts as CalculatedPart[];
+        }
         const parts: CalculatedPart[] = [];
         const W = mod.width || 0;
         const H = mod.height || 0;
@@ -446,12 +450,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         const cntDoors = mod.cntDoors || 0;
         const cntFlaps = mod.cntFlaps || 0;
         
-        // Códigos del selector (BACKING_OPTIONS): '3MM_WHITE' | '55_COLOR' | 'NONE'.
-        // '5.5MM_COLOR' se acepta como alias legacy. Antes el despiece comparaba solo contra
-        // '5.5MM_COLOR', así que 'NONE' caía al else y cobraba un fondo 5.5mm inexistente,
-        // y con fondo 5.5mm los laterales no se descontaban.
-        const rawBacking = mod.backingType || '3MM_WHITE';
-        const backingType = rawBacking === '5.5MM_COLOR' ? '55_COLOR' : rawBacking;
+        const backingType = mod.backingType || '3MM_WHITE';
         
         const structCore = mod.structureCore || (mod.isMDFCore ? 'MDF' : 'AGLO');
         const frontsCore = mod.frontsCore || (mod.isMDFCore ? 'MDF' : 'AGLO');
@@ -482,19 +481,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             frontMat = isFrontWhite ? '18mm_White' : '18mm_Color';
         }
 
-        // Módulo especial: piezas pre-calculadas por el template. Los templates usan
-        // materiales genéricos ('18mm_Carcass' / '18mm_Front') que acá se resuelven al
-        // material real del módulo. Sin esto el motor no los reconocía: se cotizaban
-        // siempre como Melamina Color (aunque el mueble fuera blanco), los escenarios no
-        // los variaban y el optimizador los cortaba en placas aparte.
-        if ((mod as any).isSpecialModule && (mod as any).specialParts?.length > 0) {
-            return ((mod as any).specialParts as CalculatedPart[]).map(p =>
-                p.material === '18mm_Carcass' ? { ...p, material: carcassMat }
-              : p.material === '18mm_Front'   ? { ...p, material: frontMat }
-              : p
-            );
-        }
-
         // 1. Tapas y Bases: SIEMPRE pasan completas (sin descuentos)
         // Ancho = Ancho_exterior, Profundidad = Profundidad_exterior
         parts.push({ name: 'Tapa superior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
@@ -504,7 +490,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         // SI fondo = 3mm: Profundidad = Profundidad_exterior
         // SI fondo = 5.5mm o 18mm: Profundidad = Profundidad_exterior - 18mm
         let lateralDepth = D;
-        if (backingType === '55_COLOR' || backingType === '18MM_STRUCTURE') {
+        if (backingType === '5.5MM_COLOR' || backingType === '18MM_STRUCTURE') {
             lateralDepth = D - 18;
         }
         parts.push({ name: 'Lateral', width: lateralDepth, height: H, material: carcassMat, quantity: 2, grain: 'vertical' });
@@ -518,10 +504,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             // El prompt dice: Ancho = Ancho_exterior - 36mm, Profundidad = Profundidad_exterior - 18mm para el fondo.
             // Asumimos que "Profundidad" en el fondo es su altura.
             parts.push({ name: 'Fondo Estructural 18mm', width: Math.max(0, W - 36), height: Math.max(0, H - 18), material: carcassMat, quantity: 1, grain: 'vertical' });
-        } else if (backingType === '55_COLOR') {
+        } else {
+            // 5.5mm
             parts.push({ name: 'Fondo 5.5mm Color', width: Math.max(0, W - 36), height: Math.max(0, H - 18), material: '5.5mm_Color', quantity: 1, grain: 'vertical' });
         }
-        // 'NONE' (Sin fondo): no se genera pieza.
 
         // 4. Estantes (si cantidad > 0)
         // Ancho = Ancho_exterior - 36mm, Profundidad = Profundidad_exterior - 45mm
@@ -619,14 +605,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           let modPistons = 0;
           let modSlides = 0;
 
-          // Herrajes que declara el template de un módulo especial. Si el template ya
-          // cuenta bisagras/guías, NO se suman además las del formulario (Puertas/Cajones)
-          // para no cobrarlas dos veces.
-          const sh = (mod as any).isSpecialModule ? ((mod as any).specialHardware || {}) : {};
-          const templateHinges = sh.hinges > 0;
-          const templateSlides = sh.slides > 0;
-
-          if (mod.calculateHinges && !templateHinges) {
+          if (mod.calculateHinges) {
               const hingesPerDoor = h > 1500 ? 4 : h > 900 ? 3 : 2;
               modHinges += ((mod.cntDoors || 0) * hingesPerDoor);
               modHinges += ((mod.cntFlaps || 0) * 2);
@@ -637,20 +616,21 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               modPistons += (mod.cntFlaps || 0);
               if (modPistons > 0) detailedHardware['Pistones a Gas'] = (detailedHardware['Pistones a Gas'] || 0) + (modPistons * qty);
           }
-          // Tipo: el que fije el template (extraOption) o, si no, el elegido en el formulario.
-          if (templateSlides) {
-              const slideLen  = sh.slideLength || 500;
-              const slideType = sh.slideType || mod.slideType || 'TELESCOPIC';
-              const slideName = `${SLIDE_LABELS[slideType] || 'Guías'} (${slideLen}mm)`;
-              detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (sh.slides * qty);
-              modSlides += sh.slides;
+          // Herrajes de módulos especiales (templates)
+          if ((mod as any).isSpecialModule && (mod as any).specialHardware) {
+              const sh = (mod as any).specialHardware;
+              if (sh.slides && sh.slides > 0) {
+                  const slideLen  = sh.slideLength || 500;
+                  const slideType = sh.slideType   || 'TELESCOPIC';
+                  const slideName = `${SLIDE_LABELS[slideType] || 'Guías'} (${slideLen}mm)`;
+                  detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (sh.slides * qty);
+              }
+              if (sh.hinges && sh.hinges > 0) {
+                  const hingeName = HINGE_LABELS[sh.hingeType || 'COMMON'] || 'Bisagras Estándar';
+                  detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (sh.hinges * qty);
+              }
           }
-          if (templateHinges) {
-              const hingeName = HINGE_LABELS[sh.hingeType || mod.hingeType || 'COMMON'] || 'Bisagras Estándar';
-              detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (sh.hinges * qty);
-              modHinges += sh.hinges;
-          }
-          if (mod.calculateSlides && !templateSlides) {
+          if (mod.calculateSlides) {
               modSlides += (mod.cntDrawers || 0);
               const slideLen = getStandardSlideLength(d);
               const slideName = `${SLIDE_LABELS[mod.slideType || 'TELESCOPIC']} (${slideLen}mm)`;
@@ -1951,7 +1931,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               extras:     [],  // sin extras de costo fijo
               isSpecialModule:    true,
               specialTemplateId,
-              specialOptions:     { ...specialOptions }, // trazabilidad: con qué opciones se generó
               specialParts:       result.parts,   // piezas para despiece
               specialHardware:    result.hardware, // herrajes del template
               specialLaborDays:   result.laborDays,
@@ -4849,22 +4828,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                     <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
                         <h3 className="text-xl font-bold mb-4">Crear Item (Mueble Completo)</h3>
                         <p className="text-sm text-gray-500 mb-4">Estás agrupando {pendingModules.length} módulos. Define los costos de mano de obra y rentabilidad para este conjunto.</p>
-                        {(() => {
-                            // Días-operario que estiman los templates de módulos especiales.
-                            // Se muestran como referencia (no se suman solos): la mano de obra del
-                            // ítem es una sola cifra y sumarlos además duplicaría lo que se cargue a mano.
-                            const templateDays = pendingModules.reduce((sum, m: any) =>
-                                sum + (m.isSpecialModule ? (m.specialLaborDays || 0) * (m.quantity || 1) : 0), 0);
-                            if (templateDays <= 0) return null;
-                            const workers = itemForm.workers > 0 ? itemForm.workers : 1;
-                            const suggestedDays = Math.ceil((templateDays / workers) * 2) / 2; // redondeo a medio día, hacia arriba
-                            return (
-                                <div className="mb-4 flex items-center justify-between gap-3 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-xs text-purple-800">
-                                    <span>Los módulos especiales estiman <b>{templateDays.toFixed(2)} días-operario</b> (≈ {suggestedDays} días con {workers} operario{workers === 1 ? '' : 's'}). No incluye los módulos estándar.</span>
-                                    <button type="button" onClick={() => setItemForm({ ...itemForm, days: suggestedDays })} className="shrink-0 bg-purple-600 text-white px-2 py-1 rounded font-bold">Usar</button>
-                                </div>
-                            );
-                        })()}
                         
                         <div className="space-y-4">
                             <div><label className="text-xs font-bold block mb-1">Nombre del Item</label><input autoFocus type="text" className="border p-2 rounded w-full" placeholder="Ej: Bajo Mesada Cocina" value={itemForm.name} onChange={e => setItemForm({...itemForm, name: e.target.value})}/></div>
