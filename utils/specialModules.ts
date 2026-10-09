@@ -69,6 +69,8 @@ const getSlideLength = (depth: number): number => {
 // - Caja de cajón en melamina 15mm: testas (frente/trasero) entre los laterales de la caja.
 export const SLIDE_GAP_TOTAL = 25;   // 2 × 12,5mm
 export const DRAWER_BOX_SIDE = 15;   // espesor de los laterales de la caja
+// Fondo de cajón en ranura en las 4 caras de la caja: caja exterior − 4mm por lado.
+export const DRAWER_BOTTOM_INSET = 4;
 
 // Bisagras por puerta según alto (misma regla que el módulo estándar):
 // ≤900mm → 2 | ≤1500mm → 3 | >1500mm → 4
@@ -529,7 +531,7 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
       // Hueco por columna = (innerW − divisores 18mm) / columnas.
       // Caja exterior = hueco − correderas (25mm). Testa = caja − 2 × 15mm.
       // Lateral caja: profundidad = D - 20mm, alto = innerH - 10mm (juego)
-      // Fondo caja 3mm: ancho exterior de la caja × (D - 20mm)
+      // Fondo caja 3mm (ranura 4 caras): caja exterior − 4mm por lado
       // Frente exterior visible (18mm_Front): clearW × H
 
       const boxDepth  = Math.max(80, D - 20);        // profundidad de la caja interior
@@ -556,8 +558,8 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
       });
       parts.push({
         name:     `Fondo caja cajón 3mm (×${numPanels})`,
-        width:    boxOuterW,
-        height:   boxDepth,
+        width:    Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET),
+        height:   Math.max(0, boxDepth - 2 * DRAWER_BOTTOM_INSET),
         material: '3mm_White',
         quantity: numPanels,
         grain:    'horizontal'
@@ -797,7 +799,7 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
 
       parts.push({ name: `Lateral caja cajón 15mm (×${cntDrawers * 2})`, width: boxDepth,  height: boxHeight,                         material: '15mm_White',   quantity: cntDrawers * 2, grain: 'horizontal' });
       parts.push({ name: `Testa cajón 15mm (×${cntDrawers * 2})`,        width: boxInnerW, height: boxHeight,                         material: '15mm_White',   quantity: cntDrawers * 2, grain: 'horizontal' });
-      parts.push({ name: `Fondo caja cajón 3mm (×${cntDrawers})`,        width: boxOuterW, height: boxDepth,                          material: '3mm_White',    quantity: cntDrawers,     grain: 'horizontal' });
+      parts.push({ name: `Fondo caja cajón 3mm (×${cntDrawers})`,        width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, boxDepth - 2 * DRAWER_BOTTOM_INSET),                          material: '3mm_White',    quantity: cntDrawers,     grain: 'horizontal' });
       parts.push({ name: `Frente exterior cajón (×${cntDrawers})`,       width: innerW,    height: Math.floor(H / cntDrawers),        material: '18mm_Front',   quantity: cntDrawers,     grain: 'vertical'   });
       laborDays += cntDrawers * 0.22;
     }

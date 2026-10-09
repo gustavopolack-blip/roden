@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
-import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE } from '../utils/specialModules';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET } from '../utils/specialModules';
 import { supabase } from '../services/supabaseClient';
 
 interface CostEstimatorProps {
@@ -614,8 +614,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             parts.push({ name: 'Lateral Cajón', width: Math.max(0, D - 20), height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
             // FRENTE Y TRASERO: entre los laterales de la caja
             parts.push({ name: 'Contra/Frente Cajón', width: boxInnerW, height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
-            // FONDO: ancho exterior de la caja × (Profundidad_módulo - 20mm)
-            parts.push({ name: 'Fondo Cajón', width: boxOuterW, height: Math.max(0, D - 20), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
+            // FONDO: en ranura en las 4 caras → caja exterior − 4mm por lado
+            parts.push({ name: 'Fondo Cajón', width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, D - 20 - 2 * DRAWER_BOTTOM_INSET), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
         }
 
         return parts;
