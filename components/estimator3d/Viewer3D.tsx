@@ -17,6 +17,9 @@ interface Viewer3DProps {
   issueModuleKeys: Set<string>;
   onPick: (sel: { pieceKey: string | null; moduleKey: string | null }) => void;
   fitToken: number; // cambia para pedir "encuadrar"
+  /** Arrastrar módulos con el mouse (solo vista ensamblada y editable). */
+  dragEnabled?: boolean;
+  onDrag?: (e: { phase: 'start' | 'move' | 'end'; moduleKey: string; point: { x: number; y: number } }) => void;
 }
 
 const disposeTree = (obj: THREE.Object3D) => {
@@ -29,7 +32,7 @@ const disposeTree = (obj: THREE.Object3D) => {
   });
 };
 
-const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken }) => {
+const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, dragEnabled = false, onDrag }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
@@ -37,6 +40,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
   } | null>(null);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const dragRef = useRef({ enabled: dragEnabled, onDrag });
+  dragRef.current = { enabled: dragEnabled, onDrag };
 
   // Inicialización (una vez)
   useEffect(() => {
@@ -74,25 +79,71 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     });
     ro.observe(mount);
 
-    // Selección por clic (ignora arrastres de órbita)
-    let down: { x: number; y: number } | null = null;
-    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY }; };
-    const onUp = (e: PointerEvent) => {
-      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+    // Clic = seleccionar (ignora arrastres de órbita). Clic sostenido sobre un módulo y mover =
+    // arrastrar ese módulo sobre el plano vertical que pasa por el punto tomado.
+    const ray = new THREE.Raycaster();
+    const toNdc = (e: PointerEvent) => {
       const r = renderer.domElement.getBoundingClientRect();
-      const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-      const ray = new THREE.Raycaster();
-      ray.setFromCamera(ndc, camera);
-      const hit = ray.intersectObjects(content.children, true).find(h => h.object.userData.pickable);
+      return new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    };
+    const hitAt = (e: PointerEvent) => {
+      ray.setFromCamera(toNdc(e), camera);
+      return ray.intersectObjects(content.children, true).find(h => h.object.userData.pickable);
+    };
+    const planePoint = (e: PointerEvent, plane: THREE.Plane) => {
+      ray.setFromCamera(toNdc(e), camera);
+      const p = new THREE.Vector3();
+      return ray.ray.intersectPlane(plane, p) ? { x: p.x, y: p.y } : null;
+    };
+    let down: { x: number; y: number } | null = null;
+    let grab: { moduleKey: string; plane: THREE.Plane; dragging: boolean; pointerId: number } | null = null;
+    const onDown = (e: PointerEvent) => {
+      down = { x: e.clientX, y: e.clientY };
+      grab = null;
+      if (!dragRef.current.enabled || e.button !== 0) return;
+      const hit = hitAt(e);
+      const moduleKey = hit?.object.userData.moduleKey;
+      if (!hit || !moduleKey) return;
+      grab = { moduleKey, plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), -hit.point.z), dragging: false, pointerId: e.pointerId };
+      controls.enabled = false; // sin órbita mientras se toma un módulo
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!grab || !down) return;
+      const pt = planePoint(e, grab.plane);
+      if (!pt) return;
+      if (!grab.dragging) {
+        if (Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 4) return;
+        grab.dragging = true;
+        renderer.domElement.setPointerCapture(grab.pointerId);
+        renderer.domElement.style.cursor = 'grabbing';
+        dragRef.current.onDrag?.({ phase: 'start', moduleKey: grab.moduleKey, point: pt });
+      }
+      dragRef.current.onDrag?.({ phase: 'move', moduleKey: grab.moduleKey, point: pt });
+    };
+    const onUp = (e: PointerEvent) => {
+      const g = grab;
+      grab = null;
+      controls.enabled = true;
+      renderer.domElement.style.cursor = '';
+      if (g?.dragging) {
+        const pt = planePoint(e, g.plane);
+        dragRef.current.onDrag?.({ phase: 'end', moduleKey: g.moduleKey, point: pt || { x: 0, y: 0 } });
+        return;
+      }
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+      const hit = hitAt(e);
       onPickRef.current(hit ? { pieceKey: hit.object.userData.pieceKey || null, moduleKey: hit.object.userData.moduleKey || null } : { pieceKey: null, moduleKey: null });
     };
-    renderer.domElement.addEventListener('pointerdown', onDown);
+    // captura: este manejador corre antes que el de OrbitControls y puede frenar la órbita
+    renderer.domElement.addEventListener('pointerdown', onDown, { capture: true });
+    renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerup', onUp);
 
     return () => {
       cancelAnimationFrame(state.raf);
       ro.disconnect();
-      renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointerdown', onDown, { capture: true });
+      renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerup', onUp);
       disposeTree(s);
       controls.dispose();

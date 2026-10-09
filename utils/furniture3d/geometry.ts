@@ -609,3 +609,112 @@ export const buildScene = (assembly: Assembly, factor = 0, onlyModuleKey?: strin
     }),
   };
 };
+
+// ─────────────────────────────────────────────────────────────
+// Reordenar arrastrando (filas)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Fila = módulos sin girar (rotY 0) apoyados a la misma altura (y). Los bajos forman una fila,
+ * las alacenas colgadas otra. Los módulos girados (alas de una L) no participan.
+ */
+export interface LayoutRow { y: number; top: number; members: number[] }   // members: moduleIndex ordenados por x
+
+interface Span { x: number; w: number; layout: ModuleLayout3D; h: number }
+
+const spansOf = (assembly: Assembly): Map<number, Span> => {
+  const spans = new Map<number, Span>();
+  assembly.modules.forEach(pm => {
+    if (pm.layout.rotY !== 0) return;
+    const s = spans.get(pm.moduleIndex);
+    if (pm.instance === 0) spans.set(pm.moduleIndex, { x: pm.layout.x, w: (s?.w || 0) + pm.dims.w, layout: pm.layout, h: pm.dims.h });
+    else if (s) s.w += pm.dims.w;
+    else spans.set(pm.moduleIndex, { x: NaN, w: pm.dims.w, layout: pm.layout, h: pm.dims.h });
+  });
+  return spans;
+};
+
+export const layoutRows = (assembly: Assembly): LayoutRow[] => {
+  const rows: LayoutRow[] = [];
+  spansOf(assembly).forEach((s, mi) => {
+    let row = rows.find(r => Math.abs(r.y - s.layout.y) < 1);
+    if (!row) { row = { y: s.layout.y, top: s.layout.y, members: [] }; rows.push(row); }
+    row.members.push(mi);
+    row.top = Math.max(row.top, s.layout.y + s.h);
+  });
+  const spans = spansOf(assembly);
+  rows.forEach(r => r.members.sort((a, b) => spans.get(a)!.x - spans.get(b)!.x));
+  return rows.sort((a, b) => a.y - b.y);
+};
+
+/** Regla del taller: las alacenas van 600 mm por encima del tope de los bajomesadas. */
+export const WALL_CABINET_GAP = 600;
+/** Para el tope de los bajomesadas no cuentan las torres / columnas (más altas que esto). */
+const BASE_CABINET_MAX_H = 1200;
+
+export interface ReorderPlan {
+  layouts: Map<number, ModuleLayout3D>;   // nueva ubicación (instancia 0) de los módulos que se mueven
+  rowY: number;
+  slot: number;                           // posición dentro de la fila destino
+  changed: boolean;
+}
+
+/**
+ * Plan para soltar el módulo `moduleIndex` con su centro en `pointer` (x, y del mundo, mm).
+ * - Fila destino: la que contiene la altura del puntero (o la más cercana).
+ * - Al sacarlo de su fila, los que estaban a su derecha se corren a la izquierda su ancho.
+ * - Al insertarlo, los que quedan a su derecha se corren a la derecha su ancho.
+ * Las separaciones que había entre los demás módulos se conservan.
+ */
+export const planReorder = (assembly: Assembly, moduleIndex: number, pointer: { x: number; y: number }): ReorderPlan | null => {
+  const spans = spansOf(assembly);
+  const d = spans.get(moduleIndex);
+  if (!d) return null;
+  const rows = layoutRows(assembly);
+  const src = rows.find(r => r.members.includes(moduleIndex))!;
+  // Sin alacenas todavía: fila virtual a 600 mm sobre el tope de los bajomesadas, para poder
+  // subir un módulo arrastrándolo.
+  const floor = rows.find(r => Math.abs(r.y) < 1);
+  if (floor && !rows.some(r => r.y > 1)) {
+    const baseTops = floor.members.map(mi => spans.get(mi)!.h).filter(h => h <= BASE_CABINET_MAX_H);
+    if (baseTops.length) {
+      floor.top = Math.max(...baseTops);           // la torre no "estira" la fila de bajos
+      const y = floor.top + WALL_CABINET_GAP;
+      rows.push({ y, top: y + d.h, members: [] });
+    }
+  }
+  const dist = (r: LayoutRow) => pointer.y < r.y ? r.y - pointer.y : pointer.y > r.top ? pointer.y - r.top : 0;
+  const dst = rows.reduce((best, r) => dist(r) < dist(best) ? r : best, src);
+
+  const pos = new Map<number, number>();
+  spans.forEach((s, mi) => pos.set(mi, s.x));
+  // 1) sacarlo de su fila
+  src.members.forEach(mi => { if (mi !== moduleIndex && pos.get(mi)! > d.x) pos.set(mi, pos.get(mi)! - d.w); });
+  // 2) hueco en la fila destino
+  const others = dst.members.filter(mi => mi !== moduleIndex).sort((a, b) => pos.get(a)! - pos.get(b)!);
+  const slot = others.filter(mi => pos.get(mi)! + spans.get(mi)!.w / 2 < pointer.x).length;
+  if (dst === src && slot === src.members.indexOf(moduleIndex)) {
+    return { layouts: new Map(), rowY: dst.y, slot, changed: false };
+  }
+  let insertX: number;
+  if (slot < others.length) insertX = pos.get(others[slot])!;
+  else if (others.length) { const last = others[others.length - 1]; insertX = pos.get(last)! + spans.get(last)!.w; }
+  else {
+    // Fila vacía: alinear con el borde izquierdo más cercano de los módulos de abajo
+    insertX = pointer.x - d.w / 2;
+    const edges = (floor?.members || [])
+      .filter(mi => mi !== moduleIndex && spans.get(mi)!.h <= BASE_CABINET_MAX_H)   // sobre una torre no va
+      .map(mi => pos.get(mi)!);
+    if (dst !== floor && edges.length) insertX = edges.reduce((b, e) => Math.abs(e - insertX) < Math.abs(b - insertX) ? e : b);
+  }
+  others.slice(slot).forEach(mi => pos.set(mi, pos.get(mi)! + d.w));
+
+  const layouts = new Map<number, ModuleLayout3D>();
+  spans.forEach((s, mi) => {
+    if (mi === moduleIndex) return;
+    if (Math.abs(pos.get(mi)! - s.x) > 1e-6) layouts.set(mi, { ...s.layout, x: pos.get(mi)! });
+  });
+  const z = others.length ? spans.get(others[0])!.layout.z : d.layout.z;
+  layouts.set(moduleIndex, { x: insertX, y: dst.y, z, rotY: 0 });
+  return { layouts, rowY: dst.y, slot, changed: true };
+};
