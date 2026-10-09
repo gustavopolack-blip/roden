@@ -623,6 +623,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         return parts;
     };
 
+  // Frente visible (puerta, frente de cajón, abatible): el nombre EMPIEZA con Frente/Puerta.
+  // Con includes(), "Contra/Frente Cajón" (pieza interior de la caja, 15mm) se tomaba como
+  // frente visible y llevaba tapacanto visible 45mm del color de los frentes.
+  const isVisibleFrontPiece = (name: string = ''): boolean => /^(Frente|Puerta)/.test(name);
+
   const calculateItemQuantities = (currentModules: ExtendedCabinetModule[], scenarioOverride: Partial<CabinetModule> = {}) => {
       if (!currentModules || currentModules.length === 0) {
           return {
@@ -760,7 +765,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           parts.forEach(p => {
               const area = p.width * p.height * p.quantity * qty;
               const perimeter = (p.width + p.height) * 2 * p.quantity * qty;
-              const isFront = p.name.includes('Frente') || p.name.includes('Puerta');
+              const isFront = isVisibleFrontPiece(p.name);
 
               const isTechnicalMode = Object.keys(scenarioOverride).length === 0;
               
@@ -798,13 +803,21 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               // — Frentes (Puerta, Frente*, Abatible): tapacanto visible 45mm
               // — Estructura, cajones e interiores: tapacanto interior 22mm
               // — MDFCrudo y Kiri: siempre tapacanto color visible 45mm
-              if (mod.edgeCategory === 'PVC_2MM') {
-                  if (p.material.includes('18mm') || p.material.includes('15mm')) linear2mm += perimeter;
+              // — Fondos de 3mm / 5.5mm (módulo y cajón): NO llevan tapacanto. Antes la rama
+              //   0.45mm les sumaba el perímetro completo como canto interior 22mm.
+              const takesEdge = p.material.includes('18mm') || p.material.includes('15mm');
+              if (!takesEdge) {
+                  // sin tapacanto
+              } else if (mod.edgeCategory === 'PVC_2MM') {
+                  linear2mm += perimeter;
               } else {
                   const safeMatName = (currentMatName || '').toLowerCase();
                   const isSpecialFront = p.material === '18mm_MDFCrudo' || p.material === '18mm_Kiri';
-                  const isWhiteMat = !isSpecialFront && (safeMatName.includes('blanco') || safeMatName.includes('white'));
-                  const isFrontPiece = p.name.includes('Frente') || p.name.includes('Puerta');
+                  // Pieza de material blanco (ej. caja de cajón 15mm blanca) → canto blanco, aunque la
+                  // estructura del módulo sea de color. Antes heredaba el color de la estructura.
+                  const isWhiteMat = !isSpecialFront && (p.material.includes('White')
+                      || safeMatName.includes('blanco') || safeMatName.includes('white'));
+                  const isFrontPiece = isVisibleFrontPiece(p.name);
                   if (isSpecialFront) {
                       // MDFCrudo/Kiri: siempre tapacanto color visible 45mm (nunca blanco)
                       linearColor45 += perimeter;
@@ -1950,7 +1963,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                   let thickness = "18mm";
                   let allowRotation = true; // Default
 
-                  const isFront = part.name.includes('Frente') || part.name.includes('Puerta');
+                  const isFront = isVisibleFrontPiece(part.name);
                   const colorName = mod.materialColorName || 'Estándar';
                   const frontName = mod.materialFrontName || colorName;
 
