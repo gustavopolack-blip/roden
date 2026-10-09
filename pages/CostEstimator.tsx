@@ -163,6 +163,19 @@ const BOARD_OPTIONS = [
     { label: 'Fondo Color 5.5mm', value: 'priceBacking55Color' },
 ];
 
+// Medidas de placa (mm), única fuente para costo y optimizador de corte.
+// Según el taller: todas 2750 × 1830 salvo el Trupan / fondo color 5.5mm, 2600 × 1830.
+// Antes el costo usaba 2750 para todo (Trupan) y el optimizador 2600 para el Kiri.
+const getSheetSize = (materialName: string = ''): { width: number; height: number } => {
+    const n = materialName.toLowerCase();
+    if (n.includes('5.5') || n.includes('55mm') || n.includes('trupan')) return { width: 2600, height: 1830 };
+    return { width: 2750, height: 1830 };
+};
+const getSheetArea = (materialName: string = ''): number => {
+    const { width, height } = getSheetSize(materialName);
+    return width * height;
+};
+
 const CostEstimator: React.FC<CostEstimatorProps> = ({ 
     projects = [], 
     clients = [],
@@ -881,7 +894,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       
       const detailedBoards: Record<string, number> = {};
       Object.entries(detailedMaterialsArea).forEach(([name, area]) => {
-          detailedBoards[name] = Math.ceil(area * 1.2 / SHEET_AREA); // Estimate sheets just for internal calculations if needed
+          detailedBoards[name] = Math.ceil(area * 1.2 / getSheetArea(name)); // placas enteras por material (con 20% de desperdicio)
       });
 
       return {
@@ -890,7 +903,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           boards18MDFMelamine: Math.ceil(totalBoard18MDFMelamineArea * 1.2 / SHEET_AREA),
           boards18MDF: Math.ceil(totalBoard18MDFArea * 1.2 / SHEET_AREA),
           boards15: Math.ceil(totalBoard15Area * 1.2 / SHEET_AREA),
-          backing55: Math.ceil(totalBacking55Area * 1.1 / SHEET_AREA),
+          backing55: Math.ceil(totalBacking55Area * 1.1 / getSheetArea('5.5mm')),
           backing3: Math.ceil(totalBacking3Area * 1.1 / SHEET_AREA),
           linearWhite22: Math.ceil(linearWhite22 / 1000),
           linearWhite45: Math.ceil(linearWhite45 / 1000),
@@ -1936,12 +1949,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       const allUnplaceable: { material: string; id: string; label?: string; reason: string }[] = [];
 
       Object.keys(groupedByMaterial).forEach(material => {
-          const n = material.toLowerCase();
-          const isTrupan = n.includes('5.5') || n.includes('trupan') || n.includes('kiri');
           const input = {
               pieces:      groupedByMaterial[material],
-              sheetWidth:  isTrupan ? 2600 : 2750,
-              sheetHeight: 1830,
+              sheetWidth:  getSheetSize(material).width,
+              sheetHeight: getSheetSize(material).height,
               kerf:        3,
           };
           const { sheets, unplaceable } = generateCutPlan(input);
