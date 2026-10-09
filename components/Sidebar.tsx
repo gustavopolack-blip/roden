@@ -216,6 +216,12 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span>Cerrar Sesi&#243;n</span>
             </button>
           )}
+          <p
+            className="px-3 pt-1 text-[10px] font-mono text-gray-400"
+            title={'Build: ' + new Date(__APP_BUILD_TIME__).toLocaleString('es-AR')}
+          >
+            v {__APP_VERSION__} · {new Date(__APP_BUILD_TIME__).toLocaleDateString('es-AR')}
+          </p>
         </div>
       </aside>
     </React.Fragment>
