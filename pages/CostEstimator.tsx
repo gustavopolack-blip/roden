@@ -213,6 +213,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       updatedCost: number;
       difference: number;
       percentage: number;
+      priceFrozen?: boolean;
       onConfirm: () => void;
       onCancel: () => void;
   } | null>(null);
@@ -1438,6 +1439,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               version: (originalEstimate.version || 1) + 1,
               parentId: originalEstimate.id,
               isLatest: true,
+              quoteData: withoutFrozenPrices(originalEstimate.quoteData),
               status: BudgetStatus.DRAFT,
               commercialStatus: CommercialStatus.DRAFT,
               productionStatus: ProductionStatus.PENDING,
@@ -1474,6 +1476,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           version: (updatePricesEstimate.version || 1) + 1,
           parentId: updatePricesEstimate.id,
           isLatest: true,
+          quoteData: withoutFrozenPrices(updatePricesEstimate.quoteData),
           settingsSnapshot: { ...listSettings, id, name } as any,
           priceListId: (id && id !== 'current') ? id : null,
           auditLog: [
@@ -1556,6 +1559,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           return sum + getQuotedItemPrice(item, budgetHistSnap);
       }, 0);
 
+      // Presupuesto con precios congelados (aprobado): la definición técnica actualiza el
+      // despiece y el costo directo, pero NO el precio cotizado al cliente. La alerta
+      // informa cuánto costaría ahora, para revisar el margen.
+      const keepApprovedPrice = isPriceFrozen(originalEstimateForComparison);
+      const savedFinalPrice = keepApprovedPrice ? (originalEstimateForComparison.finalPrice || 0) : updatedFinalPrice;
+
       const originalCost = originalEstimateForComparison.finalPrice || 0;
       const difference = updatedFinalPrice - originalCost;
       const percentage = originalCost === 0 ? 0 : (difference / originalCost) * 100;
@@ -1567,13 +1576,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               updatedCost: updatedFinalPrice,
               difference,
               percentage,
+              priceFrozen: keepApprovedPrice,
               onConfirm: () => {
                   // User confirmed, save the changes
                   const updatedEstimate: SavedEstimate = {
                       ...originalEstimateForComparison,
                       items: technicalItems,
                       totalDirectCost: updatedTotalDirectCost,
-                      finalPrice: updatedFinalPrice,
+                      finalPrice: savedFinalPrice,
                       date: new Date().toISOString(),
                       hasTechnicalDefinition: true,
                   };
@@ -1593,7 +1603,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               ...originalEstimateForComparison,
               items: technicalItems,
               totalDirectCost: updatedTotalDirectCost,
-              finalPrice: updatedFinalPrice,
+              finalPrice: savedFinalPrice,
               date: new Date().toISOString(),
               hasTechnicalDefinition: true,
           };
@@ -2023,14 +2033,15 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
         );
         const snapshot = editingEstimate.settingsSnapshot;
         
-        const totalRef = selectedItemsList.reduce((sum, item) => sum + getQuotedItemPrice(item, snapshot), 0);
+        const totalRef = selectedItemsList.reduce((sum, item) => sum + getQuotedItemPrice(item, snapshot, editingEstimate), 0);
 
         const updatedEstimate: SavedEstimate = {
             ...editingEstimate,
             items: selectedItemsList,
             modules: selectedItemsList.flatMap(i => i.modules) as any,
             finalPrice: totalRef,
-            totalDirectCost: selectedItemsList.reduce((sum, item) => sum + getRecalculatedItemPrices(item, snapshot).realConfigDirect, 0),
+            totalDirectCost: selectedItemsList.reduce((sum, item) =>
+                sum + (getFrozenItemPrices(editingEstimate, item.id) || getRecalculatedItemPrices(item, snapshot)).realConfigDirect, 0),
             date: new Date().toISOString()
         };
 
@@ -2086,8 +2097,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             const estimateToUpdate = savedEstimates.find(e => e.id === estimateId);
             if (estimateToUpdate) {
                 const auditLog = estimateToUpdate.auditLog || [];
+                const base = FREEZE_STATUSES.includes(newStatus) ? withFrozenPrices(estimateToUpdate) : estimateToUpdate;
                 onSaveEstimate({ 
-                    ...estimateToUpdate, 
+                    ...base, 
                     commercialStatus: newStatus,
                     auditLog: [...auditLog, { 
                         from: estimateToUpdate.commercialStatus || 'N/A', 
@@ -2108,7 +2120,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                 const isFinishing = newStatus === ProductionStatus.READY;
                 
                 onSaveEstimate({ 
-                    ...estimateToUpdate, 
+                    ...(isFinishing ? withFrozenPrices(estimateToUpdate) : estimateToUpdate), 
                     productionStatus: newStatus,
                     commercialStatus: isFinishing ? CommercialStatus.FINISHED : estimateToUpdate.commercialStatus,
                     isArchived: isFinishing ? true : estimateToUpdate.isArchived,
@@ -2159,7 +2171,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
         // 1. Actualizar estimate — vincular al proyecto y pasar a En Producción
         onSaveEstimate({
-            ...estimateToUpdate,
+            ...withFrozenPrices(estimateToUpdate),
             projectId,
             commercialStatus: CommercialStatus.IN_PRODUCTION,
             auditLog: [...(estimateToUpdate.auditLog || []), {
@@ -2355,8 +2367,83 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   // Precio de un ítem tal como lo imprime el presupuesto: config REAL, redondeada a 10.
   // Es la única fuente para finalPrice; antes se guardaba colorAglo (melamina color MDP)
   // y un mueble laqueado o en MDF quedaba registrado por debajo de lo cotizado.
-  const getQuotedItemPrice = (item: EstimatorItem, snapshot: CostSettings): number =>
-      roundUp10(getRecalculatedItemPrices(item, snapshot).realConfig);
+  const getQuotedItemPrice = (item: EstimatorItem, snapshot: CostSettings, estimate?: SavedEstimate | null): number => {
+      const frozen = getFrozenItemPrices(estimate, item.id);
+      return roundUp10(frozen ? frozen.realConfig : getRecalculatedItemPrices(item, snapshot).realConfig);
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // PRECIOS CONGELADOS (presupuestos aprobados)
+  // ─────────────────────────────────────────────────────────────
+  // Al aprobarse, un presupuesto guarda en quoteData.frozenPrices los precios de cada
+  // ítem tal como estaban en ese momento. Desde ahí el presupuesto impreso y finalPrice
+  // usan esa foto y NO se recalculan: ni un cambio del motor ni un cambio de lista
+  // modifica lo que se le cotizó al cliente. Para re-cotizar hay que generar una nueva
+  // versión (que nace sin foto).
+  // Se guarda dentro de quoteData (JSONB existente) para no requerir migración.
+  const FREEZE_STATUSES: string[] = [CommercialStatus.APPROVED, CommercialStatus.IN_PRODUCTION, CommercialStatus.FINISHED];
+
+  const getFrozenItemPrices = (estimate: SavedEstimate | null | undefined, itemId: string): any | null =>
+      (estimate as any)?.quoteData?.frozenPrices?.items?.[itemId] || null;
+
+  const isPriceFrozen = (estimate: SavedEstimate | null | undefined): boolean =>
+      !!(estimate as any)?.quoteData?.frozenPrices;
+
+  // Devuelve el presupuesto con la foto de precios, si todavía no la tiene.
+  const withFrozenPrices = (estimate: SavedEstimate): SavedEstimate => {
+      if (isPriceFrozen(estimate)) return estimate;
+      const snapshot = (estimate.settingsSnapshot || activeSettings) as CostSettings;
+      const items = ((estimate.items || []) as EstimatorItem[]).filter(i => i && i.id);
+      if (items.length === 0) return estimate;
+      const frozenItems: Record<string, any> = {};
+      items.forEach(item => { frozenItems[item.id] = getRecalculatedItemPrices(item, snapshot); });
+      const finalPrice = items.reduce((sum, item) => sum + roundUp10(frozenItems[item.id].realConfig), 0);
+      const totalDirectCost = items.reduce((sum, item) => sum + (frozenItems[item.id].realConfigDirect || 0), 0);
+      return {
+          ...estimate,
+          finalPrice,
+          totalDirectCost,
+          quoteData: {
+              ...(estimate.quoteData || {}),
+              frozenPrices: { frozenAt: new Date().toISOString(), items: frozenItems, finalPrice, totalDirectCost },
+          },
+      };
+  };
+
+  // Una nueva versión se re-cotiza: no hereda la foto de la versión aprobada.
+  const withoutFrozenPrices = (quoteData: any) => {
+      if (!quoteData?.frozenPrices) return quoteData;
+      const { frozenPrices, ...rest } = quoteData;
+      return rest;
+  };
+
+  // Red de seguridad: presupuestos aprobados / en producción / finalizados que todavía no
+  // tienen foto (aprobados antes de esta función, o cuyo estado se cambió por otra vía)
+  // se congelan una sola vez al abrir el Estimador. Solo administrador: es el único rol
+  // con permiso de escritura sobre saved_estimates (RLS).
+  // Se escribe directo (sin onSaveEstimate) para no disparar un fetchData por presupuesto.
+  const backfillAttemptedRef = React.useRef<Set<string>>(new Set());
+  useEffect(() => {
+      if (userRole !== 'administrador') return;
+      const pending = savedEstimates.filter(e =>
+          FREEZE_STATUSES.includes(e.commercialStatus as string) &&
+          !isPriceFrozen(e) &&
+          (e.items || []).length > 0 &&
+          !backfillAttemptedRef.current.has(e.id)
+      );
+      pending.forEach(estimate => {
+          backfillAttemptedRef.current.add(estimate.id);
+          const frozen = withFrozenPrices(estimate);
+          if (!isPriceFrozen(frozen)) return;
+          supabase.from('saved_estimates')
+              .update({ quoteData: frozen.quoteData, finalPrice: frozen.finalPrice, totalDirectCost: frozen.totalDirectCost })
+              .eq('id', estimate.id)
+              .then(({ error }) => {
+                  if (error) console.error('[frozenPrices] No se pudo congelar', estimate.id, error);
+              });
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedEstimates, userRole]);
 
   if (printMode === 'SUPPLIES' || printMode === 'CUTTING' || printMode === 'COSTS' || printMode === 'COSTS_CUTS' || printMode === 'PRODUCTION_ORDER') {
       const itemsToPrint = technicalItems.length > 0 ? technicalItems : items.filter(i => selectedItemIds.has(i.id));
@@ -3470,6 +3557,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
             <div className="no-print w-full max-w-[210mm] flex justify-between items-center mb-6 pt-6">
                 <button onClick={() => setPrintMode('NONE')} className="text-gray-500 hover:text-black flex items-center gap-2 text-sm font-medium transition-colors bg-white px-4 py-2 rounded-lg border border-gray-200"><ArrowLeft size={16} /> Volver</button>
                 <div className="flex gap-2">
+                    {isPriceFrozen(editingEstimate) && (
+                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium" title="Precios fijados al aprobar. Para re-cotizar, generá una nueva versión.">
+                            <CheckCircle size={14}/> Precios congelados al aprobar ({new Date((editingEstimate as any).quoteData.frozenPrices.frozenAt).toLocaleDateString('es-AR')})
+                        </div>
+                    )}
                     {!editingEstimate && onSaveEstimate && (
                         <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm font-medium">
                             <Archive size={14}/> Guardado en Historial
@@ -3519,9 +3611,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                         <h3 className="font-bold border-b border-black mb-4 uppercase text-sm pb-1">Detalle y Precios por Item: {quoteItemTitle}</h3>
                         <div className="space-y-4">
                                     {(selectedItemIds.size > 0 ? items.filter(i => selectedItemIds.has(i.id)) : items).map((item, idx) => {
-                                        // Siempre recalcular con engine actual usando snapshot del presupuesto
+                                        // Aprobado: precios congelados al aprobar. Si no: motor actual con el snapshot del presupuesto.
                                         const budgetSnapshot = (editingEstimate?.settingsSnapshot || activeSettings) as CostSettings;
-                                        const prices = getRecalculatedItemPrices(item, budgetSnapshot);
+                                        const prices = getFrozenItemPrices(editingEstimate, item.id) || getRecalculatedItemPrices(item, budgetSnapshot);
                                         return (
                                             <div key={idx} className="text-sm mb-4 border-b border-gray-200 pb-2 break-inside-avoid">
                                                 <div className="flex justify-between items-start gap-4">
@@ -5367,10 +5459,16 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 La modificación técnica ha resultado en un cambio de costo superior al 5%.
                                 Por favor, revisa los detalles antes de confirmar.
                             </p>
+                            {costComparisonAlert.priceFrozen && (
+                                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+                                    Presupuesto aprobado: el precio cotizado al cliente ({formatCurrency(costComparisonAlert.originalCost)}) <b>no cambia</b>.
+                                    Al confirmar se guarda la definición técnica; la diferencia impacta en el margen.
+                                </p>
+                            )}
                             <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div className="font-medium text-gray-500">Costo Original:</div>
                                 <div className="font-bold text-right">{formatCurrency(costComparisonAlert.originalCost)}</div>
-                                <div className="font-medium text-gray-500">Costo Actualizado:</div>
+                                <div className="font-medium text-gray-500">{costComparisonAlert.priceFrozen ? 'Precio recalculado:' : 'Costo Actualizado:'}</div>
                                 <div className="font-bold text-right text-red-600">{formatCurrency(costComparisonAlert.updatedCost)}</div>
                                 <div className="font-medium text-gray-500">Diferencia:</div>
                                 <div className={`font-bold text-right ${costComparisonAlert.difference > 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -5389,7 +5487,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 onClick={costComparisonAlert.onConfirm}
                                 className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
                             >
-                                Confirmar Cambio
+                                {costComparisonAlert.priceFrozen ? 'Guardar definición técnica' : 'Confirmar Cambio'}
                             </button>
                         </div>
                     </div>
