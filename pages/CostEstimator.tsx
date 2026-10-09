@@ -48,6 +48,8 @@ interface ExtendedCabinetModule extends CabinetModule {
     // Alto de cada frente cuando el módulo combina tipos de frente (vacío = automático)
     drawerFrontHeight?: number;
     flapFrontHeight?: number;
+    // Brillo de la laca / lustre del módulo (vacío = semi mate)
+    finishSheen?: 'SEMI' | 'GLOSS';
 }
 
 // NEW: Item definition (Grouping of Modules)
@@ -627,7 +629,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               boards18Color: 0, boards18White: 0, boards18MDFMelamine: 0, boards18MDF: 0,
               boards15: 0, backing55: 0, backing3: 0,
               linearWhite22: 0, linearWhite45: 0, linearColor22: 0, linearColor45: 0, linear2mm: 0,
-              lacquerAreaM2: 0, veneerAreaM2: 0,
+              lacquerAreaM2: 0, veneerAreaM2: 0, lacquerGlossAreaM2: 0, veneerGlossAreaM2: 0,
               totalHinges: 0, totalPistons: 0, totalSlides: 0, totalExtrasCost: 0,
               detailedBoards: {}, detailedHardware: {}
           };
@@ -650,6 +652,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       let totalSlides = 0;
       let lacquerArea = 0; 
       let veneerArea = 0; 
+      let lacquerGlossArea = 0; // parte de lacquerArea con terminación brillante
+      let veneerGlossArea = 0;  // parte de veneerArea con terminación brillante
       let totalExtrasCost = 0;
       let totalComplexityFactor = 0;
       let totalAreaForComplexity = 0;
@@ -744,8 +748,14 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               : frontArea; // MELAMINE_STRUCT → solo frente
           const finishArea = baseFinishArea * FINISH_SAFETY;
 
-          if (mType && mType.includes('LACQUER')) lacquerArea += finishArea * qty;
-          else if (mType && mType.includes('VENEER')) veneerArea += finishArea * qty;
+          const isGloss = (mod as any).finishSheen === 'GLOSS';
+          if (mType && mType.includes('LACQUER')) {
+              lacquerArea += finishArea * qty;
+              if (isGloss) lacquerGlossArea += finishArea * qty;
+          } else if (mType && mType.includes('VENEER')) {
+              veneerArea += finishArea * qty;
+              if (isGloss) veneerGlossArea += finishArea * qty;
+          }
 
           parts.forEach(p => {
               const area = p.width * p.height * p.quantity * qty;
@@ -858,6 +868,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           linear2mm: Math.ceil(linear2mm / 1000),
           lacquerAreaM2: Math.round(lacquerArea * 100) / 100,  // ya está en m²
           veneerAreaM2:  Math.round(veneerArea  * 100) / 100,  // ya está en m²
+          lacquerGlossAreaM2: Math.round(lacquerGlossArea * 100) / 100,
+          veneerGlossAreaM2:  Math.round(veneerGlossArea  * 100) / 100,
           totalHinges, totalPistons, totalSlides, totalExtrasCost,
           // Report Details
           detailedBoards,
@@ -932,6 +944,49 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       return { price: 0, fallback: null };
   };
 
+  // Líneas de terminación a partir de las áreas de calculateItemQuantities.
+  // Brillante sin precio en la lista → se usa semi mate (lo que se cobraba antes) y se avisa.
+  type FinishLine = { label: string; area: number; price: number; total: number; fallback: string | null };
+  const buildFinishLines = (q: any, S: any): FinishLine[] => {
+      const lines: FinishLine[] = [];
+      const add = (kind: 'Lacquer' | 'Lustre', gloss: boolean, rawArea: number) => {
+          const area = Math.round(Math.max(0, rawArea) * 100) / 100;
+          if (area <= 0) return;
+          const semi = S[`priceFinish${kind}Semi`] || 0;
+          const glossPrice = S[`priceFinish${kind}Gloss`] || 0;
+          const price = gloss ? (glossPrice > 0 ? glossPrice : semi) : semi;
+          const name = kind === 'Lacquer' ? 'Laca' : 'Lustre (enchapado Kiri)';
+          lines.push({
+              label: `${name} ${gloss ? 'Brillante' : 'Semi Mate'}`,
+              area, price, total: area * price,
+              fallback: gloss && !(glossPrice > 0) ? 'sin precio brillante en la lista: se usó semi mate' : null,
+          });
+      };
+      add('Lacquer', false, (q.lacquerAreaM2 || 0) - (q.lacquerGlossAreaM2 || 0));
+      add('Lacquer', true,  q.lacquerGlossAreaM2 || 0);
+      add('Lustre',  false, (q.veneerAreaM2 || 0) - (q.veneerGlossAreaM2 || 0));
+      add('Lustre',  true,  q.veneerGlossAreaM2 || 0);
+      return lines;
+  };
+
+  // Texto de terminación de frentes para descripciones (presupuesto / insumos).
+  const finishDescription = (modules: any[] = []): string | null => {
+      const sheenOf = (kind: string) => {
+          const ms = modules.filter((m: any) => (m.moduleType || '').includes(kind));
+          if (ms.length === 0) return null;
+          const g = ms.some((m: any) => m.finishSheen === 'GLOSS');
+          const sm = ms.some((m: any) => m.finishSheen !== 'GLOSS');
+          return g && sm ? 'Semi Mate / Brillante' : g ? 'Brillante' : 'Semi Mate';
+      };
+      const lac = sheenOf('LACQUER');
+      const ven = sheenOf('VENEER');
+      const parts = [
+          lac ? `Laca ${lac}` : null,
+          ven ? `Enchapado Kiri${ven === 'Semi Mate' ? '' : ` (${ven})`}` : null,
+      ].filter(Boolean);
+      return parts.length ? `Frentes ${parts.join(' + ')}` : null;
+  };
+
   // Devuelve el desglose completo y los precios de una config.
   // override === null  → config REAL (technical mode, sin forzar cores)
   // override === {...}  → escenario forzado
@@ -946,10 +1001,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       // Cantidades: override=null → sin override (config real); si no, escenario forzado.
       const q = override ? calculateItemQuantities(modules, override) : calculateItemQuantities(modules);
 
-      // Terminación: derivada del despiece real (lacquer/veneer ya resueltos por calculateItemQuantities).
-      const finArea  = q.lacquerAreaM2 > 0 ? q.lacquerAreaM2 : q.veneerAreaM2 > 0 ? q.veneerAreaM2 : 0;
-      const finPrice = q.lacquerAreaM2 > 0 ? (S.priceFinishLacquerSemi || 0)
-                     : q.veneerAreaM2  > 0 ? (S.priceFinishLustreSemi  || 0) : 0;
+      // Terminación: una línea por (laca | lustre) × (semi | brillante). Antes se cobraba una
+      // sola: si el ítem mezclaba laca y enchapado solo se cobraba la laca, y el brillante
+      // nunca se usaba.
+      const finishLines = buildFinishLines(q, S);
+      const finArea  = finishLines.reduce((a, l) => a + l.area, 0);
 
       const tPlacas  = Object.entries(q.detailedBoards).filter(([, v]) => (v as number) > 0)
           .reduce((a, [n, c]) => a + boardPriceFor(n, c as number, S), 0);
@@ -958,14 +1014,15 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                      + (q.linear2mm * (S.priceEdge2mm || 0));
       const tHerrajes = Object.entries(q.detailedHardware)
           .reduce((a, [n, hqty]) => a + hwPriceFor(n, hqty as number, S), 0);
-      const tFinish  = finArea * finPrice;
+      const tFinish  = finishLines.reduce((a, l) => a + l.total, 0);
+      const finPrice = finArea > 0 ? tFinish / finArea : 0; // promedio, solo informativo
 
       const costoDirecto = tPlacas + tTapac + tHerrajes + extrasCost + fixedCosts + tFinish + laborCost;
       const precioTaller = costoDirecto * (1 + (margins.workshop ?? 35) / 100);
       const precioFinal  = precioTaller * (1 + (margins.roden ?? 0) / 100);
 
       return { q, laborCost, fixedCosts, extrasCost, tPlacas, tTapac, tHerrajes, tFinish,
-               finArea, finPrice, costoDirecto, precioTaller, precioFinal };
+               finArea, finPrice, finishLines, costoDirecto, precioTaller, precioFinal };
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -2732,8 +2789,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         const hasVeneer  = q.veneerAreaM2  > 0;
                                         const structDesc = item.modules[0]?.isWhiteStructure ? 'Mel. Blanca' : 'Mel. Color';
                                         const coreDesc   = item.modules[0]?.structureCore === 'MDF' ? 'MDF' : 'Aglo';
-                                        const frontDesc  = hasLacquer ? 'Frentes Laca Semi Mate'
-                                                         : hasVeneer  ? 'Frentes Enchapado Kiri'
+                                        const frontDesc  = (hasLacquer || hasVeneer) ? (finishDescription(item.modules) || 'Frentes')
                                                          : (item.modules[0]?.materialFrontName || 'Melamina');
                                         const slideDesc  = SLIDE_LABELS[item.modules[0]?.slideType as keyof typeof SLIDE_LABELS] || 'Telescópicas estándar';
                                         return (
@@ -3121,16 +3177,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             return `Melamina ${color} ${core}`;
                         })();
 
-                        // ── Terminación del ítem real ──
-                        const hasLacquer = q.lacquerAreaM2 > 0;
-                        const hasVeneer  = q.veneerAreaM2  > 0;
-                        const finishAreaM2  = hasLacquer ? q.lacquerAreaM2 : hasVeneer ? q.veneerAreaM2 : 0;
-                        const finishPriceM2 = hasLacquer ? (S.priceFinishLacquerSemi || 0) : hasVeneer ? (S.priceFinishLustreSemi || 0) : 0;
-                        const finishLabel   = hasLacquer
-                            ? (realMT === 'LACQUER_FULL' ? 'Laca Semi Mate — todo el mueble' : 'Laca Semi Mate — frentes')
-                            : hasVeneer
-                            ? (realMT === 'VENEER_FULL'  ? 'Enchapado Kiri — todo el mueble' : 'Enchapado Kiri — frentes')
-                            : null;
 
                         // ── Precio de herrajes: mismo lookup que el motor (antes era una copia local) ──
                         const hwPrice = (name: string, qty: number): number => hwPriceFor(name, qty, S);
@@ -3334,15 +3380,17 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                             {(item.modules.reduce((a:number,m:any)=>{const W=m.width||0,H=m.height||0,D=m.depth||0;return a+(W*H+2*H*D+2*W*D)/1e6*(m.quantity||1);},0)*1.15).toFixed(2)} m²
                                                         </td>
                                                     </tr>
-                                                    {finishLabel && (
-                                                        <tr style={{ background:'#fffbeb', borderBottom:'1px solid #fde68a' }}>
-                                                            <td style={{ padding:'1.5px 0', color:'#92400e', fontWeight:600 }}>{finishLabel}</td>
+                                                    {realFin.finishLines.map((fl, fi) => (
+                                                        <tr key={fi} style={{ background:'#fffbeb', borderBottom:'1px solid #fde68a' }}>
+                                                            <td style={{ padding:'1.5px 0', color:'#92400e', fontWeight:600 }}>
+                                                                {fl.label}{fl.fallback && <span style={{ color:'#b45309', fontSize:'9px', fontWeight:400 }}> — {fl.fallback}</span>}
+                                                            </td>
                                                             <td style={{ padding:'1.5px 0', textAlign:'right', fontWeight:700, color:'#92400e' }}>
-                                                                {finishAreaM2.toFixed(1)} m² × {formatCurrency(finishPriceM2)}/m² = {formatCurrency(totalFinish)}
+                                                                {fl.area.toFixed(1)} m² × {formatCurrency(fl.price)}/m² = {formatCurrency(fl.total)}
                                                             </td>
                                                         </tr>
-                                                    )}
-                                                    {!finishLabel && (
+                                                    ))}
+                                                    {realFin.finishLines.length === 0 && (
                                                         <tr><td colSpan={2} style={{ padding:'1.5px 0', color:'#9ca3af', fontStyle:'italic' }}>Sin terminación especial (melamina estándar)</td></tr>
                                                     )}
                                                 </tbody>
@@ -3718,12 +3766,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
                                                             // Descripción larga de la configuración real
                                                             let configDescLocal = '';
-                                                            if (hasLacquer) {
+                                                            if (hasLacquer || hasVeneer) {
                                                                 const struc = isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP');
-                                                                configDescLocal = `${struc} + Frentes Laca Semi Mate`;
-                                                            } else if (hasVeneer) {
-                                                                const struc = isMDF ? 'Melamina MDF' : (isWhite ? 'Melamina Blanca MDP' : 'Melamina Color MDP');
-                                                                configDescLocal = `${struc} + Frentes Enchapado Kiri`;
+                                                                configDescLocal = `${struc} + ${finishDescription(baseMods)}`;
                                                             } else if (isWhite && isMDF) {
                                                                 configDescLocal = 'Melamina Blanca MDF';
                                                             } else if (isWhite) {
@@ -4345,7 +4390,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="mel_color_mdf">Color — MDF</option>
                                             </optgroup>
                                             <optgroup label="Terminación">
-                                                <option value="laca">Laca Semi Mate</option>
+                                                <option value="laca">Laca</option>
                                                 <option value="enchapad">Enchapado Kiri</option>
                                             </optgroup>
                                         </select>
@@ -4353,6 +4398,20 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <span className="text-[9px] text-amber-600 italic">Igual a estructura</span>
                                         )}
                                     </div>
+
+                                    {((moduleForm.moduleType || '').includes('LACQUER') || (moduleForm.moduleType || '').includes('VENEER')) && (
+                                        <div className="flex flex-col border-l border-amber-200 pl-4">
+                                            <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Brillo</label>
+                                            <select
+                                                className="border p-1.5 rounded text-xs bg-white w-28"
+                                                value={(moduleForm as ExtendedCabinetModule).finishSheen || 'SEMI'}
+                                                onChange={e => handleInputChange('finishSheen', e.target.value)}
+                                            >
+                                                <option value="SEMI">Semi Mate</option>
+                                                <option value="GLOSS">Brillante</option>
+                                            </select>
+                                        </div>
+                                    )}
 
                                     <div className="flex flex-col border-l border-amber-200 pl-4">
                                         <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Fondo</label>
