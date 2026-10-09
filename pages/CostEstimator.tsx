@@ -3530,11 +3530,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] text-amber-800 uppercase font-bold">Estructura</label>
                                         <select
-                                            className="border p-2 rounded text-xs bg-white w-48 font-medium"
+                                            className="border p-2 rounded text-xs bg-white w-60 font-medium"
                                             value={(() => {
                                                 const mt = moduleForm.moduleType || 'MELAMINE_FULL';
-                                                if (mt === 'LACQUER_FULL')  return 'laca';
-                                                if (mt === 'VENEER_FULL')   return 'enchapad';
+                                                const gl = (moduleForm as ExtendedCabinetModule).finishSheen === 'GLOSS' ? '_gloss' : '';
+                                                if (mt === 'LACQUER_FULL')  return 'laca' + gl;
+                                                if (mt === 'VENEER_FULL')   return 'enchapad' + gl;
                                                 const isWhite = moduleForm.isWhiteStructure;
                                                 const isMDF   = moduleForm.structureCore === 'MDF';
                                                 if (isWhite && !isMDF)  return 'mel_blanca_aglo';
@@ -3543,14 +3544,16 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 return 'mel_color_mdf';
                                             })()}
                                             onChange={e => {
-                                                const val = e.target.value;
+                                                // El brillo viaja en el mismo valor: 'laca_gloss' = laca brillante
+                                                const finishSheen = e.target.value.endsWith('_gloss') ? 'GLOSS' : 'SEMI';
+                                                const val = e.target.value.replace('_gloss', '');
                                                 const mt = moduleForm.moduleType || 'MELAMINE_FULL';
                                                 // Si los frentes son terminación especial, respetar el moduleType de frentes
                                                 const isFrontsSpecial = mt === 'MELAMINE_STRUCT_LACQUER' || mt === 'MELAMINE_STRUCT_VENEER';
                                                 if (val === 'laca') {
-                                                    setModuleForm(prev => ({ ...prev, moduleType: 'LACQUER_FULL', isWhiteStructure: false, structureCore: 'MDF', frontsCore: 'MDF', frontsType: 'LACQUER' }));
+                                                    setModuleForm(prev => ({ ...prev, moduleType: 'LACQUER_FULL', isWhiteStructure: false, structureCore: 'MDF', frontsCore: 'MDF', frontsType: 'LACQUER', finishSheen }));
                                                 } else if (val === 'enchapad') {
-                                                    setModuleForm(prev => ({ ...prev, moduleType: 'VENEER_FULL', isWhiteStructure: false, structureCore: 'MDF', frontsCore: 'MDF', frontsType: 'VENEER' }));
+                                                    setModuleForm(prev => ({ ...prev, moduleType: 'VENEER_FULL', isWhiteStructure: false, structureCore: 'MDF', frontsCore: 'MDF', frontsType: 'VENEER', finishSheen }));
                                                 } else {
                                                     const isWhite = val.includes('blanca');
                                                     const isMDF   = val.includes('mdf');
@@ -3567,8 +3570,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="mel_color_mdf">Color — MDF</option>
                                             </optgroup>
                                             <optgroup label="Terminación completa">
-                                                <option value="laca">Laqueado (todo el mueble)</option>
-                                                <option value="enchapad">Enchapado Kiri (todo el mueble)</option>
+                                                <option value="laca">Laca semi mate (todo el mueble)</option>
+                                                <option value="laca_gloss">Laca brillante (todo el mueble)</option>
+                                                <option value="enchapad">Kiri lustre semi mate (todo el mueble)</option>
+                                                <option value="enchapad_gloss">Kiri lustre brillante (todo el mueble)</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -3579,11 +3584,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] text-amber-800 uppercase font-bold">Frentes</label>
                                         <select
-                                            className="border p-2 rounded text-xs bg-white w-48 font-medium"
+                                            className="border p-2 rounded text-xs bg-white w-60 font-medium"
                                             value={(() => {
                                                 const mt = moduleForm.moduleType || 'MELAMINE_FULL';
-                                                if (mt === 'MELAMINE_STRUCT_LACQUER' || mt === 'LACQUER_FULL') return 'laca';
-                                                if (mt === 'MELAMINE_STRUCT_VENEER'  || mt === 'VENEER_FULL')  return 'enchapad';
+                                                const gl = (moduleForm as ExtendedCabinetModule).finishSheen === 'GLOSS' ? '_gloss' : '';
+                                                if (mt === 'MELAMINE_STRUCT_LACQUER' || mt === 'LACQUER_FULL') return 'laca' + gl;
+                                                if (mt === 'MELAMINE_STRUCT_VENEER'  || mt === 'VENEER_FULL')  return 'enchapad' + gl;
                                                 // Melamina: leer materialFrontName para saber si es blanca o color
                                                 const frontName = (moduleForm.materialFrontName || '').toLowerCase();
                                                 const isFrontWhite = frontName.includes('blanca') || frontName.includes('white') || (!frontName && moduleForm.isWhiteStructure);
@@ -3594,15 +3600,16 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 return 'mel_color_mdf';
                                             })()}
                                             onChange={e => {
-                                                const val = e.target.value;
+                                                const finishSheen = e.target.value.endsWith('_gloss') ? 'GLOSS' : 'SEMI';
+                                                const val = e.target.value.replace('_gloss', '');
                                                 const mt = moduleForm.moduleType || 'MELAMINE_FULL';
                                                 const isStructFull = mt === 'LACQUER_FULL' || mt === 'VENEER_FULL';
                                                 if (val === 'laca') {
                                                     const newMt = isStructFull ? 'LACQUER_FULL' : 'MELAMINE_STRUCT_LACQUER';
-                                                    setModuleForm(prev => ({ ...prev, moduleType: newMt as any, frontsCore: 'MDF', frontsType: 'LACQUER', materialFrontName: 'Laqueado' }));
+                                                    setModuleForm(prev => ({ ...prev, moduleType: newMt as any, frontsCore: 'MDF', frontsType: 'LACQUER', materialFrontName: 'Laqueado', finishSheen }));
                                                 } else if (val === 'enchapad') {
                                                     const newMt = isStructFull ? 'VENEER_FULL' : 'MELAMINE_STRUCT_VENEER';
-                                                    setModuleForm(prev => ({ ...prev, moduleType: newMt as any, frontsCore: 'MDF', frontsType: 'VENEER', materialFrontName: 'Enchapado Kiri' }));
+                                                    setModuleForm(prev => ({ ...prev, moduleType: newMt as any, frontsCore: 'MDF', frontsType: 'VENEER', materialFrontName: 'Enchapado Kiri', finishSheen }));
                                                 } else {
                                                     // Frentes melamina — completamente independiente de la estructura
                                                     const isFrontWhite = val.includes('blanca');
@@ -3628,8 +3635,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="mel_color_mdf">Color — MDF</option>
                                             </optgroup>
                                             <optgroup label="Terminación">
-                                                <option value="laca">Laca</option>
-                                                <option value="enchapad">Enchapado Kiri</option>
+                                                <option value="laca">Laca semi mate</option>
+                                                <option value="laca_gloss">Laca brillante</option>
+                                                <option value="enchapad">Kiri lustre semi mate</option>
+                                                <option value="enchapad_gloss">Kiri lustre brillante</option>
                                             </optgroup>
                                         </select>
                                         {(moduleForm.moduleType === 'LACQUER_FULL' || moduleForm.moduleType === 'VENEER_FULL') && (
@@ -3637,19 +3646,6 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         )}
                                     </div>
 
-                                    {((moduleForm.moduleType || '').includes('LACQUER') || (moduleForm.moduleType || '').includes('VENEER')) && (
-                                        <div className="flex flex-col border-l border-amber-200 pl-4">
-                                            <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Brillo</label>
-                                            <select
-                                                className="border p-1.5 rounded text-xs bg-white w-28"
-                                                value={(moduleForm as ExtendedCabinetModule).finishSheen || 'SEMI'}
-                                                onChange={e => handleInputChange('finishSheen', e.target.value)}
-                                            >
-                                                <option value="SEMI">Semi Mate</option>
-                                                <option value="GLOSS">Brillante</option>
-                                            </select>
-                                        </div>
-                                    )}
 
                                     <div className="flex flex-col border-l border-amber-200 pl-4">
                                         <label className="text-[10px] text-amber-800 uppercase font-bold mb-1">Fondo</label>
