@@ -11,6 +11,32 @@ con lógica y datos. Si falta información, decirlo y verificar contra el códig
 de afirmar — no inventar ni rellenar huecos con suposiciones. Siempre que se proponga un
 cambio, justificar por qué es mejor. Priorizar la veracidad sobre la velocidad.
 
+## Reglas de trabajo para Claude
+
+Adaptadas de las observaciones de Karpathy sobre errores típicos de los modelos al programar.
+Valen para todo cambio no trivial; para un typo, usar criterio.
+
+1. **Pensar antes de programar.** Explicitar los supuestos. Si el pedido admite más de una
+   lectura, presentarlas y preguntar: no elegir en silencio. Si hay un camino más simple,
+   decirlo. Si algo no se entiende, frenar y nombrar la duda.
+2. **Simplicidad primero.** El mínimo código que resuelve lo pedido. Nada especulativo: sin
+   features, abstracciones, configurabilidad ni manejo de errores para casos imposibles que
+   nadie pidió.
+3. **Cambios quirúrgicos.** Cada línea cambiada tiene que poder rastrearse hasta el pedido.
+   No "mejorar" código, comentarios ni formato vecinos; respetar el estilo existente. El
+   código muerto que no es tuyo se menciona, no se borra. Sí limpiar lo que *tu* cambio dejó
+   sin uso. Esto pesa el doble en `App.tsx` y `CostEstimator.tsx`, donde un cambio "de paso"
+   rompe contratos.
+4. **Ejecución guiada por un criterio verificable.** Convertir el pedido en un objetivo que se
+   pueda comprobar antes de empezar: "arreglar el bug" → "un test que lo reproduce y pasa";
+   "cambiar una regla del estimador" → "`npm test` pasa y la foto (baseline) se regenera con
+   el cambio explicado". En tareas de varios pasos, plan breve con su verificación por paso.
+   No dar algo por terminado sin haberlo verificado.
+5. **Usar el vocabulario del dominio.** **`GLOSSARY.md`** define los términos del negocio
+   (módulo, ítem, despiece, core MDP/MDF, escenario, precios congelados…) y su nombre en el
+   código. Usarlos en conversaciones, commits y código nuevo. Si un término no está o no
+   coincide con el código, preguntar y después actualizar el glosario.
+
 ## Qué es el sistema
 
 **rødën OS** es una app web de gestión operativa para un taller de muebles a medida
@@ -63,7 +89,10 @@ cualquiera de estos archivos. Resumen de lo crítico:
 
 **CostEstimator.tsx** (el módulo más grande):
 - `calculateModuleParts()` impacta corte, optimizador, reporte técnico y materiales.
-- Presupuestos en `phase=APPROVED` son inmutables.
+- Presupuestos aprobados son inmutables: al pasar a `commercialStatus` `APPROVED` /
+  `IN_PRODUCTION` / `FINISHED` (`FREEZE_STATUSES`) se congela una foto de precios en
+  `quoteData.frozenPrices` y ya no se recalculan. Re-cotizar = versión nueva. (Antes este
+  archivo decía `phase=APPROVED`: ese campo no existe en `CostEstimator.tsx`.)
 - `priceHistory` se persiste en Supabase (tabla `price_lists`).
 
 **Motor único de costos:** `computeItemFinancials(item, snapshot, override|null)` unifica las
@@ -121,7 +150,8 @@ formal de migraciones — riesgo de divergencia entre entornos.
 
 ## Docs de referencia en el repo
 
-`ARQUITECTURA.md` (maestro, leer antes de cambios grandes), `ROLES_PERMISSIONS.md`,
+`ARQUITECTURA.md` (maestro, leer antes de cambios grandes), `GLOSSARY.md` (lenguaje del
+dominio), `ROLES_PERMISSIONS.md`,
 `DEPLOYMENT_GUIDE.md`, `DEPLOYMENT_CHECKLIST.md`, `INSTRUCCIONES_SUPABASE.md`,
 `INSTRUCCIONES_SEGURIDAD.md`, `db_schema.sql`, `supabase_setup_complete.sql`,
 `services/ANALISIS_PROBLEMAS.md`.
