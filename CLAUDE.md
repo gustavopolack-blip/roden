@@ -66,11 +66,28 @@ Nunca poner un secreto detrás de `VITE_`.
 ## Flujo de trabajo entre computadoras (LEER SIEMPRE)
 
 El código se sincroniza por GitHub (`github.com/gustavopolack-blip/roden`, rama `main`).
+**`main` es producción:** cada push a `main` despliega solo en rodenmobel.com/os.
 La disciplina de git no es opcional cuando se trabaja desde más de una máquina:
 
-- **Al empezar** en cualquier máquina: `git pull`
-- **Al terminar**: `git add . && git commit -m "..." && git push origin main`
-- Nunca dejar una máquina sin pushear: genera divergencia y conflictos.
+- **Al empezar** en cualquier máquina: `git pull` (en `main`).
+- **Al terminar**: `git status` para ver qué se va a subir (no subir archivos sueltos ni
+  `.env`), después commit y push. Nunca dejar una máquina sin pushear: genera divergencia
+  y conflictos.
+
+**Cuándo usar rama + PR (pull request) y cuándo push directo:**
+
+| Cambio | Cómo |
+|---|---|
+| Código de la app, sobre todo `CostEstimator.tsx`, `App.tsx`, `utils/estimatorEngine.ts`, auth o SQL | **Rama + PR.** `git checkout -b nombre-corto`, commits, `git push -u origin nombre-corto`, abrir el PR en GitHub, revisar el diff y el deploy de prueba de Vercel, y recién ahí mergear. |
+| Documentación, typos, textos | Push directo a `main` aceptable. |
+| Cualquier cambio hecho por Claude en una sesión en la nube | Siempre rama + PR (no puede pushear a `main`). Gustavo decide el merge. |
+
+Por qué: un PR genera un deploy de prueba (link en el PR) con los cambios **sin tocar la
+app que usa el taller**, muestra todo el diff junto y se revierte entero si algo sale mal.
+Un error en el motor de costos que llega directo a `main` llega directo a presupuestos.
+
+Después de mergear un PR: `git checkout main && git pull` en cada máquina. No seguir
+trabajando sobre una rama ya mergeada: para el próximo cambio, rama nueva desde `main`.
 
 `.env` NO está en el repo (está en `.gitignore`, correcto). Para correr local:
 `cp .env.example .env` (ya trae URL + anon key de Supabase). La key de Gemini vive del
