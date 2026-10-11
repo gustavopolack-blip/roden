@@ -61,7 +61,7 @@ Variables de entorno (prefijo `VITE_` obligatorio, acceder con `import.meta.env.
 NUNCA `process.env.*` en código de cliente):
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. La key de Gemini es `GEMINI_API_KEY` **sin**
 `VITE_` (solo la lee `api/gemini.ts` en Vercel); con `VITE_` quedaría pública en el bundle.
-`.env.example` todavía muestra `VITE_GEMINI_API_KEY`: está mal y ningún código la usa.
+Nunca poner un secreto detrás de `VITE_`.
 
 ## Flujo de trabajo entre computadoras (LEER SIEMPRE)
 

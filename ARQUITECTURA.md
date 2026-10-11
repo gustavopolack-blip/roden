@@ -23,7 +23,7 @@ Vercel sirve el output de `vite build`. No hay servidor Node corriendo. Cualquie
 - En Vite, las variables expuestas al cliente **deben tener el prefijo `VITE_`**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Variables sin ese prefijo no están disponibles en el browser — solo en Serverless Functions.
 - `supabaseClient.ts` lee con `import.meta.env.VITE_*`, no con `process.env.*`.
-- **La key de Gemini NO lleva `VITE_`**: vive en Vercel como `GEMINI_API_KEY` y solo la lee la función `api/gemini.ts` (`process.env`). `geminiService.ts` no tiene key: llama a `${BASE_URL}api/gemini`. Ponerle `VITE_` la publicaría dentro del bundle. (`.env.example` todavía muestra `VITE_GEMINI_API_KEY`: ninguna línea de código la usa.)
+- **La key de Gemini NO lleva `VITE_`**: vive en Vercel como `GEMINI_API_KEY` y solo la lee la función `api/gemini.ts` (`process.env`). `geminiService.ts` no tiene key: llama a `${BASE_URL}api/gemini`. Ponerle `VITE_` la publicaría dentro del bundle.
 
 **3. Routing SPA**
 Vercel no sabe que es una SPA. Sin configuración, rutas como `/projects` devuelven 404 en refresh.
