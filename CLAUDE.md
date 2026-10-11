@@ -59,7 +59,9 @@ Supabase. Hay funciones serverless en `api/` (gemini.ts) y un `server.ts` experi
 
 Variables de entorno (prefijo `VITE_` obligatorio, acceder con `import.meta.env.VITE_*`,
 NUNCA `process.env.*` en código de cliente):
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_GEMINI_API_KEY`.
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. La key de Gemini es `GEMINI_API_KEY` **sin**
+`VITE_` (solo la lee `api/gemini.ts` en Vercel); con `VITE_` quedaría pública en el bundle.
+`.env.example` todavía muestra `VITE_GEMINI_API_KEY`: está mal y ningún código la usa.
 
 ## Flujo de trabajo entre computadoras (LEER SIEMPRE)
 
@@ -83,7 +85,7 @@ cualquiera de estos archivos. Resumen de lo crítico:
 - `fetchData()` recarga las tablas completas; todo handler CRUD termina llamándolo.
 - Auth = 3 piezas coordinadas: `checkInitialSession`, `onAuthStateChange`,
   `isFetchingProfileRef` (mutex). Modificar una obliga a revisar las tres.
-- Safety timeout = 30 s (cold start de Supabase). NO bajar.
+- Safety timeout global y timeout de `fetchData` = 60 s (cold start de Supabase). NO bajar.
 - `currentUserRef` es espejo de `currentUser`; actualizar juntos.
 - Login se muestra con `!session`, NO con `!isAuthLoading`.
 
@@ -143,7 +145,7 @@ por trigger `on_auth_user_created` — NO insertar manualmente. Roles en DB: `AD
 ## Deuda técnica conocida (no refactorizar por gusto)
 
 App.tsx y CostEstimator.tsx son archivos enormes; candidatos a split pero sensibles.
-`fetchData()` recarga TODO (acoplado a Realtime sync). Dos archivos de tipos
+`fetchData()` recarga TODO (no hay canal Realtime general: solo el de notificaciones). Dos archivos de tipos
 (`types.ts` raíz = usar; `src/types.ts` = ignorar). `alert()`/`confirm()` en varias
 páginas (no agregar más). Múltiples SQL de migración sueltos en la raíz, sin sistema
 formal de migraciones — riesgo de divergencia entre entornos.

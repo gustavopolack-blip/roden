@@ -86,7 +86,7 @@
 |---|---|---|
 | **Motor único de costos** | La única función que calcula plata. Planilla, comparativa y presupuesto la usan igual. | `computeItemFinancials(item, snapshot, override)` |
 | **Config real** | El módulo tal como se va a fabricar (cores reales, mezcla MDP+MDF). Es lo que se cotiza. | `override = null` → `realConfig` |
-| **Escenario** | El mismo ítem recalculado con materiales forzados, para comparar. Son **14**: 4 melamina (blanca/color × MDP/MDF), 8 estructura + frentes laqueados/enchapados, todo laqueado y todo enchapado. | `getRecalculatedItemPrices()`, `scenarioPrices` (`ARQUITECTURA.md` todavía dice 6: está desactualizado) |
+| **Escenario** | El mismo ítem recalculado con materiales forzados, para comparar. Son **14**: 4 melamina (blanca/color × MDP/MDF), 8 estructura + frentes laqueados/enchapados, todo laqueado y todo enchapado. | `getRecalculatedItemPrices()`, `scenarioPrices` |
 | **Costo directo** | Placas + tapacanto + herrajes + extras + fijos (tornillos, cola) + terminación + mano de obra. | `costoDirecto` |
 | **Mano de obra** | Operarios × días × costo del día. | `labor.workers × labor.days × costLaborDay` |
 | **Margen taller** | Recargo sobre el costo directo (35 % por defecto). | `margins.workshop` → `precioTaller` |

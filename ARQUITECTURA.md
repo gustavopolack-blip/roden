@@ -1,4 +1,6 @@
 # ARQUITECTURA DEL SISTEMA — rødën Sistema Operativo
+> Verificado contra el código el 2026-10-11. Si encontrás algo que no coincide, el código manda: corregí este archivo.
+
 **Pegá este documento completo al inicio de cada sesión en AI Studio antes de describir el problema.**
 
 ---
@@ -18,19 +20,19 @@ Vercel sirve el output de `vite build`. No hay servidor Node corriendo. Cualquie
 
 **2. Variables de entorno**
 - Las variables de entorno van en el dashboard de Vercel, **no en archivos `.env` commiteados**.
-- En Vite, las variables expuestas al cliente **deben tener el prefijo `VITE_`**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_KEY`.
+- En Vite, las variables expuestas al cliente **deben tener el prefijo `VITE_`**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 - Variables sin ese prefijo no están disponibles en el browser — solo en Serverless Functions.
-- `supabaseClient.ts` y `geminiService.ts` deben leer con `import.meta.env.VITE_*`, no con `process.env.*`.
+- `supabaseClient.ts` lee con `import.meta.env.VITE_*`, no con `process.env.*`.
+- **La key de Gemini NO lleva `VITE_`**: vive en Vercel como `GEMINI_API_KEY` y solo la lee la función `api/gemini.ts` (`process.env`). `geminiService.ts` no tiene key: llama a `${BASE_URL}api/gemini`. Ponerle `VITE_` la publicaría dentro del bundle. (`.env.example` todavía muestra `VITE_GEMINI_API_KEY`: ninguna línea de código la usa.)
 
 **3. Routing SPA**
 Vercel no sabe que es una SPA. Sin configuración, rutas como `/projects` devuelven 404 en refresh.
-Requiere `vercel.json` en la raíz con:
-```json
-{
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
-}
-```
-**Si este archivo no existe, el deploy funciona pero la navegación directa a cualquier ruta falla.**
+La app se sirve bajo **`/os/`** (`base: '/os/'` en `vite.config.ts`). `vercel.json` tiene dos rewrites, en este orden:
+1. `/os/:path*` → `/:path*` (el proxy de rodenmobel.com/os llega acá con el prefijo).
+2. `/((?!api/).*)` → `/index.html` (fallback de SPA, sin pisar `/api/*`).
+
+Además define headers de seguridad (HSTS, `X-Frame-Options: DENY`, etc.).
+**Si se rompen los rewrites, el deploy funciona pero la navegación directa a cualquier ruta (o `/api/gemini`) falla.**
 
 **4. Sin filesystem**
 No se puede escribir en disco. Cualquier "guardado de archivo" debe ir a Supabase Storage o generarse en el cliente (blob download). Los archivos temporales no persisten entre requests.
@@ -40,7 +42,7 @@ Si se agregan funciones en `/api/`, tienen cold start. No usarlas para operacion
 
 **6. Tamaño del bundle**
 Vercel tiene límite de 50MB por función y recomienda bundles de cliente bajo 1MB.
-`CostEstimator.tsx` con 4200 líneas es un candidato a code splitting si el bundle crece.
+`CostEstimator.tsx` (~4950 líneas) es un candidato a code splitting si el bundle crece.
 Verificar con `vite build --report` antes de cada deploy importante.
 
 **7. CORS**
@@ -59,15 +61,19 @@ Si se agrega un dominio custom, hay que agregarlo en Supabase → Settings → A
 ## MAPA DE ARCHIVOS
 
 ```
-App.tsx                          ← Raíz. Estado global + auth + routing + todos los handlers CRUD
+App.tsx                          ← Raíz. Estado global + auth + routing (react-router) + handlers CRUD
 types.ts                         ← Tipos TypeScript de todo el sistema (fuente de verdad)
+constants.ts                     ← PAGE_PERMISSIONS (qué roles ven cada página) y otras constantes
+translations.ts                  ← Labels en español de estados (proyecto, cliente, etc.)
 db_schema.sql                    ← Schema de Supabase
+GLOSSARY.md                      ← Lenguaje del dominio y su nombre en el código
+api/gemini.ts                    ← Función serverless: único lugar con la key de Gemini
 
 pages/
   Dashboard.tsx                  ← Panel de control
   Clients.tsx                    ← Gestión de clientes
   Projects.tsx                   ← Gestión de proyectos
-  CostEstimator.tsx              ← Estimador de costos (4200 líneas — el más complejo)
+  CostEstimator.tsx              ← Estimador de costos (~4950 líneas — el más complejo; la UI)
   Production.tsx                 ← Vista de taller para operarios
   Tasks.tsx                      ← Gestión de tareas
   SupplierPayments.tsx           ← Proveedores y pagos
@@ -78,19 +84,30 @@ pages/
   Archive.tsx                    ← Archivo de obras finalizadas
   AIAssistant.tsx                ← Chat libre con IA (chat persistido en Supabase)
   Login.tsx                      ← Pantalla de login
+  Marketing.tsx                  ← Marketing
 
 components/
   Sidebar.tsx                    ← Navegación lateral
-  RodenAIButton.tsx              ← Botón puente de IA contextual (nuevo)
+  RodenAIButton.tsx              ← Botón puente de IA contextual
   MetricCard.tsx                 ← Tarjeta de métricas para Dashboard
+  BottomNav.tsx, NotificationBell.tsx, NotasGestion.tsx, ErrorBoundary.tsx
+  estimator3d/                   ← Constructor 3D (Builder3D, Viewer3D; carga lazy)
 
 services/
   supabaseClient.ts              ← Instancia única de Supabase
-  geminiService.ts               ← Servicio de IA (Gemini API)
+  geminiService.ts               ← Servicio de IA (llama a api/gemini, sin key en el cliente)
 
 utils/
-  costEngine.ts                  ← Motor de cálculo de costos (4 capas)
+  estimatorEngine.ts             ← MOTOR DEL ESTIMADOR: despiece, cantidades, precios,
+                                   computeItemFinancials (motor único de costos), escenarios
+  specialModules.ts              ← Plantillas de módulos especiales (Botinero, Biblioteca, …)
+  furniture3d/                   ← Geometría 3D + export FBX/OBJ (ver CONSTRUCTOR_3D.md)
   cutOptimizer.ts                ← Optimizador de corte de placas
+  useNotifications.ts            ← Notificaciones (único canal Realtime activo)
+  costEngine.ts                  ← CÓDIGO MUERTO: nadie lo importa. No usar ni "arreglar".
+
+tests/
+  estimatorEngine.test.ts        ← Compara el motor contra tests/fixtures/engine.baseline.json
 ```
 
 ---
@@ -100,32 +117,34 @@ utils/
 
 ### App.tsx
 - **Es el único lugar con estado global.** Nunca mover estado a componentes hijos sin consenso explícito.
-- **`fetchData()` recarga las 10 tablas completas.** Todo handler CRUD termina con `fetchData()`. No romper este patrón — puede parecer ineficiente pero es el contrato de consistencia del sistema.
+- **`fetchData()` recarga las 12 tablas completas** (clients, projects, budgets, suppliers, supplier_payments, tasks, users, reports, production_orders, saved_estimates, estimates, price_lists). Todo handler CRUD termina con `fetchData()`. No romper este patrón — puede parecer ineficiente pero es el contrato de consistencia del sistema.
 - **El flujo de auth tiene 3 piezas coordinadas que no se tocan por separado:**
   - `checkInitialSession` — maneja la sesión al arrancar
   - `onAuthStateChange` — escucha cambios posteriores
   - `isFetchingProfileRef` — mutex para evitar fetch paralelos de perfil
   - **Si se modifica una, hay que revisar las tres.**
-- **El safety timeout está en 30 segundos.** No bajarlo — Supabase puede tardar en responder en cold start.
+- **Timeouts de carga:** `globalSafetyTimeout` (desbloquea la UI) y el timeout de `fetchData` están en **60 segundos**; el fetch de perfil en 20 s. No bajarlos — Supabase puede tardar en responder en cold start.
 - **`currentUserRef`** es un ref espejo de `currentUser` para uso dentro de callbacks de auth donde el estado React no está disponible. Siempre actualizarlos juntos.
 - **El login se muestra con `!session`**, no con `!isAuthLoading`. Cambiar esa condición rompe el flujo de carga.
 
 ### CostEstimator.tsx
-- **Es el archivo más grande (4200 líneas).** Cualquier cambio requiere leer el contexto circundante — nunca editar una función aislada.
-- **`calculateModuleParts()`** es la función base de todo el motor de piezas. Si se modifica, impacta: listado de corte, optimizador, reporte técnico, y cálculo de materiales. **No tocar sin revisar las 4 dependencias.**
-- **`calculateFinancialsForScenario()`** llama a `costEngine.ts`. No duplicar lógica de costos en CostEstimator — todo cálculo de costo va al engine.
-- **Los 6 escenarios** (whiteAglo, whiteMDF, colorAglo, colorMDF, lacquer, veneer) se calculan al crear un Item, no al guardar. Están pre-calculados en `item.scenarioPrices`.
-- **`priceHistory`** ahora se persiste en Supabase (tabla `price_lists`). No volver a `useState` local.
-- **Los presupuestos tienen `phase`** (QUOTING/APPROVED/ARCHIVED). Los en phase=APPROVED son inmutables — no agregar lógica que los modifique.
+- **Es el archivo más grande (~4950 líneas).** Cualquier cambio requiere leer el contexto circundante — nunca editar una función aislada.
+- **La lógica de cálculo vive en `utils/estimatorEngine.ts`**, no en este archivo (se extrajo textualmente; `npm test` la compara contra una foto). CostEstimator es la UI.
+- **`calculateModuleParts()`** (en el engine) es la función base de todo el motor de piezas. Si se modifica, impacta: listado de corte, optimizador, reporte técnico, cálculo de materiales y Constructor 3D. **No tocar sin revisar esas dependencias y regenerar la foto explicando el cambio.**
+- **Motor único de costos: `computeItemFinancials(item, snapshot, override)`.** `override=null` = config REAL del módulo (cores mixtos MDP+MDF, con extras y fijos). Planilla, comparativa y presupuesto lo usan igual. No duplicar lógica de costos en CostEstimator. `calculateFinancialsForScenario()` sigue en el archivo pero está **deprecada, sin llamadas**.
+- **Los 14 escenarios** (4 melamina blanca/color × MDP/MDF, 8 estructura melamina + frentes laqueados/enchapados, todo laqueado, todo enchapado) más la config real se calculan con `getRecalculatedItemPrices()` al crear el ítem (o al editarlo en el 3D) y se guardan en `item.scenarioPrices`.
+- **Redondeo a placa entera por material (+20 % desperdicio) es intencional**: siempre costea de más, nunca de menos. No "arreglarlo".
+- **`priceHistory`** se persiste en Supabase (tabla `price_lists`). No volver a `useState` local.
+- **Presupuestos aprobados son inmutables.** No existe un campo `phase`: cuando `commercialStatus` es `APPROVED`, `IN_PRODUCTION` o `FINISHED` (`FREEZE_STATUSES`), el presupuesto guarda una foto de precios en `quoteData.frozenPrices` y ya no se recalcula (ni por cambios del motor ni de la lista). Re-cotizar = versión nueva (`handleGenerateNewVersion`, nace sin foto). No agregar lógica que modifique uno congelado.
 
 ### types.ts
 - **Es la fuente de verdad de tipos.** Existe también un `/src/types.ts` con definiciones distintas — **siempre importar desde `../types` (raíz), nunca desde `../src/types`.**
 - **`BusinessData`** es la interfaz que recibe la IA. Si se agregan entidades al sistema, agregarlas acá también.
 
-### costEngine.ts
-- **4 capas en orden fijo:** Layer1 (geometría) → Layer2 (validación de materiales) → Layer3 (costos técnicos) → Layer4 (precio comercial con márgenes).
-- **Regla de negocio irrompible:** LACQUER y VENEER requieren `frontsCore = 'MDF'`. El engine auto-corrige pero CostEstimator también valida en UI.
-- **No agregar lógica de negocio en CostEstimator que duplique lo que hace el engine.**
+### estimatorEngine.ts
+- **Regla de negocio irrompible:** LACQUER y VENEER requieren frentes MDF. El despiece lo garantiza por material (frentes laqueados → `18mm_MDFCrudo`, enchapados → `18mm_Kiri`) y la UI de CostEstimator fija `frontsCore: 'MDF'` al elegir esas terminaciones.
+- **Los nombres de pieza son contrato:** `isVisibleFrontPiece()` decide el tapacanto visible por el prefijo `Frente`/`Puerta`. Renombrar una pieza cambia costos.
+- **`costEngine.ts` (el viejo motor "de 4 capas") es código muerto.** No importarlo ni replicar sus reglas.
 
 ### supabaseClient.ts
 - **Instancia única.** Nunca crear una segunda instancia de Supabase en otro archivo.
@@ -134,7 +153,8 @@ utils/
 ### geminiService.ts
 - **`askRodenAI()`** — función legacy para el chat libre de AIAssistant.tsx. No modificar su firma.
 - **`runContextualAnalysis()`** — función nueva para RodenAIButton. Recibe `{ mode, data }`.
-- **Ambas funciones usan el mismo `RODEN_SYSTEM_INSTRUCTION`.** Si se actualiza el prompt, impacta los dos flujos.
+- **Cada función arma su propio `systemInstruction`** (texto duplicado, no hay una constante compartida). Si se cambia el tono o las reglas de rødën AI, **actualizar los dos**.
+- Ninguna tiene la API key: ambas llaman a `api/gemini.ts` vía `callGemini()`.
 
 ### RodenAIButton.tsx
 - **Es de solo lectura.** No agregar lógica que modifique datos del sistema desde este componente.
@@ -154,11 +174,11 @@ Páginas / Componentes
 App.tsx handlers (handleAdd*, handleUpdate*, handleDelete*)
     ↓ (supabase.from(...).insert/update/delete)
 Supabase DB
-    ↓ (Realtime channel — debounce 800ms)
+    ↓ (el handler llama a fetchData)
 fetchData() → actualiza estado global
 ```
 
-**Realtime**: el canal `db-changes` escucha todos los cambios en `public` y dispara `fetchData` con debounce de 800ms. Esto sincroniza entre múltiples usuarios. **No eliminar este canal.**
+**Realtime**: hoy **no hay** un canal general de sincronización. El canal `db-changes` (con debounce de 800 ms) que describía este documento ya no existe en `App.tsx`. El único canal Realtime activo es `notifications-feed` (`utils/useNotifications.ts`, tabla `notifications`). Consecuencia: los cambios de otro usuario no aparecen solos; se ven en el próximo `fetchData()` (CRUD propio o recarga). Si se reintroduce un canal general, documentarlo acá.
 
 ---
 
@@ -170,7 +190,7 @@ fetchData() → actualiza estado global
 | `gerente_taller` | Proyectos, Taller, Tareas, Clientes |
 | `operario_taller` | Solo vista de Taller y sus Tareas asignadas |
 
-**El routing por rol está en `renderContent()` dentro de App.tsx.** Si se agrega una página nueva, agregar el case correspondiente con la validación de rol.
+**El routing usa `react-router-dom`** (`<Routes>` en `renderProtectedRoutes()` de App.tsx). El permiso por rol sale de **`PAGE_PERMISSIONS` en `constants.ts`**, que usan tanto App.tsx (bloquea la ruta) como `Sidebar.tsx` (oculta el link). Si se agrega una página nueva: agregar su `<Route>` y su entrada en `PAGE_PERMISSIONS`.
 
 ---
 
@@ -221,23 +241,20 @@ ai_chat_history            ← historial del chat IA por usuario
 
 ## DEUDA TÉCNICA CONOCIDA — NO TOCAR SIN CONSENSO
 
-1. **App.tsx tiene 936 líneas** — mezcla auth, CRUD, estado y routing. Refactor pendiente.
-2. **`fetchData()` recarga todo** — debería actualizarse solo la entidad modificada. No cambiar sin probar impacto en Realtime.
+1. **App.tsx tiene ~1650 líneas** — mezcla auth, CRUD, estado y routing. Refactor pendiente.
+2. **`fetchData()` recarga todo** — debería actualizarse solo la entidad modificada. No cambiar sin probar el impacto en todas las páginas.
 3. **Dos archivos de tipos** — `types.ts` (raíz, usar este) y `src/types.ts` (ignorar).
 4. **`alert()` y `confirm()`** en múltiples páginas — pendiente migrar a sistema de modales.
-5. **CostEstimator.tsx con 4200 líneas** — candidato a dividir en submódulos, no todavía.
-6. **`handleGenerateNewVersion()`** en CostEstimator es código legado que convive con el nuevo `handleNewVersion()`. El nuevo es el correcto.
+5. **CostEstimator.tsx con ~4950 líneas** — candidato a dividir en submódulos, no todavía. El motor ya se extrajo a `utils/estimatorEngine.ts`.
+6. **Código muerto conocido:** `utils/costEngine.ts` y `calculateFinancialsForScenario()`. (Antes este punto decía que `handleGenerateNewVersion()` era legado frente a un `handleNewVersion()`: ese segundo no existe; `handleGenerateNewVersion()` es el que usa la UI.)
+7. **Sin sincronización Realtime general** (ver Flujo de datos).
+8. **SQL de migración sueltos en la raíz**, sin sistema formal de migraciones — riesgo de divergencia entre entornos.
 
 ---
 
 ## MÓDULOS RECIENTEMENTE MODIFICADOS
-*Al trabajar en estos archivos, tener especial cuidado — los cambios son frescos y pueden tener interacciones no testeadas.*
 
-- **`App.tsx`** — fix de bucle de auth (initialSessionHandled), botón hamburguesa móvil, case 'ai' en router
-- **`CostEstimator.tsx`** — sistema de listas de precios persistente, flujo de aprobación con phase/approvedVariants, modal de aprobación, estética unificada
-- **`geminiService.ts`** — agregado `runContextualAnalysis()` con 8 modes, system instruction actualizado
-- **`RodenAIButton.tsx`** — componente nuevo, no tiene dependencias excepto geminiService
-- **`migration_trazabilidad.sql`** — requiere ejecutarse en Supabase antes de usar las features de listas de precios y aprobación
+Esta lista se desactualizaba (nombraba un `migration_trazabilidad.sql` que no está en el repo). Para ver qué cambió hace poco, la fuente de verdad es git: `git log --oneline -20` o `git log -- <archivo>`.
 
 ---
 
