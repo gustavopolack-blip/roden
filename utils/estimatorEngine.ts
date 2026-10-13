@@ -266,6 +266,50 @@ export const normalizeCabinet = (mod: ExtendedCabinetModule): ExtendedCabinetMod
   : isColumn(mod) ? { ...mod, width: COLUMN_WIDTH, cntDoors: (mod.cntDrawers || 0) > 0 ? 0 : 1, cntFlaps: 0, internalDrawers: 0, insetFronts: false, fullHeightSides: false }
   : mod;
 
+/**
+ * Conversión de un módulo guardado con una plantilla vieja (ficha anterior, `legacy`) a la variante
+ * del estándar que la reemplaza. Mismas medidas y cantidad; frentes "tal cual" (decisión de
+ * Gustavo, 13/10/2026). null = no tiene equivalente. Herrajes: se activan bisagras/guías cuando
+ * hay puertas/cajones (la plantilla vieja los contaba sola; sin esto la conversión cotiza de menos).
+ * Las plantillas viejas se costeaban como melamina (moduleType 'SPECIAL'): se convierten a melamina.
+ */
+export const legacyToVariant = (mod: ExtendedCabinetModule): ExtendedCabinetModule | null => {
+    const m: any = mod;
+    if (!m.isSpecialModule) return null;
+    const o = m.specialOptions || {};
+    const H = mod.height || 0;
+    let over: Partial<ExtendedCabinetModule> | null = null;
+    switch (m.specialTemplateId) {
+        case 'MODULO_ABIERTO':     over = { cabinetType: 'ABIERTO', backingType: o.backingType || '18MM_STRUCTURE' }; break;
+        case 'BIBLIOTECA':         over = { cabinetType: 'BIBLIOTECA' }; break;
+        case 'BOTINERO_EXTRAIBLE': over = { cabinetType: 'BOTINERO_EXTRAIBLE', calculateSlides: true }; break;
+        case 'BOTINERO_FIJO':      over = { cabinetType: 'BOTINERO_FIJO' }; break;
+        case 'ESQUINERO':          over = { cabinetType: 'ESQUINERO', cornerSide: 'LEFT', neighborDepth: undefined }; break;
+        case 'MODULO_HORIZONTAL': {
+            const n = Math.max(1, parseInt(o.numPanels || '2', 10));
+            over = o.frontType === 'DRAWERS'
+                ? { cabinetType: 'HORIZONTAL', cntDrawers: n, cntDoors: 0, cntFlaps: 0 }
+                : { cabinetType: 'HORIZONTAL', cntDoors: n, cntDrawers: 0, cntFlaps: 0 };
+            break;
+        }
+        case 'MODULO_BAJO_MESADA':
+            over = o.interior === 'CAJONES'
+                ? { cabinetType: 'BAJO', cntDrawers: Math.max(1, Math.floor(Math.max(180, H - 118) / 180)), cntDoors: 0, cntFlaps: 0 }
+                : { cabinetType: 'BAJO', cntDrawers: 0, cntFlaps: 0 };   // puertas: las que tenía cargadas
+            break;
+    }
+    if (!over) return null;
+    const out: any = {
+        ...mod, ...over,
+        moduleType: m.moduleType === 'SPECIAL' ? 'MELAMINE_FULL' : mod.moduleType,
+        isSpecialModule: false, specialTemplateId: undefined, specialOptions: undefined,
+        specialParts: undefined, specialHardware: undefined, specialLaborDays: undefined,
+    };
+    if ((out.cntDoors || 0) > 0) out.calculateHinges = true;
+    if ((out.cntDrawers || 0) > 0) out.calculateSlides = true;
+    return out;
+};
+
 export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedPart[] => {
       const mod = normalizeCabinet(rawMod);
       // Módulo manual (ej. "Base hierro cromado"): NO genera placas ni tapacanto.

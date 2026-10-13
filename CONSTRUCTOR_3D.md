@@ -90,6 +90,7 @@ inferior, horno, microondas y superior apilados sobre la base.
 
 Pendientes (la app los lista en *Validación → Supuestos de dibujo*):
 
-- Plantillas especiales: todavía usan sus medidas de fondo y frentes anteriores a la ficha.
+- Módulos guardados con plantillas viejas: conservan el despiece de la ficha anterior hasta que se
+  convierten ("Convertir a ficha nueva" en Módulos pendientes).
 - Bandejas inclinadas del botinero: dibujadas horizontales.
 - Geometría de Módulo horizontal, Bajo mesada, esquineros y paneles.

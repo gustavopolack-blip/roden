@@ -92,7 +92,7 @@ export interface Assembly {
 // Reglas de dibujo que el sistema NO define y se asumieron solo para la vista 3D.
 export const PENDING_RULES: string[] = [
   // El módulo estándar y las variantes de cocina siguen la ficha del taller (CATALOGO_PIEZAS.md, 13/10/2026).
-  'Plantillas especiales (Módulo abierto, Biblioteca, Botineros…): todavía usan sus medidas de fondo y frentes anteriores a la ficha del módulo estándar.',
+  'Módulos guardados con plantillas viejas (Módulo abierto, Horizontal, Bajo mesada, Esquinero, Biblioteca, Botineros): conservan el despiece de la ficha anterior. En el estimador se pasan a la ficha nueva con "Convertir a ficha nueva".',
   'Zócalo estructural: el módulo se eleva 100 mm; el zócalo se carga aparte como pieza y se ubica solo debajo del primer módulo con esa base.',
   'Bandejas inclinadas del botinero: se dibujan horizontales.',
   'Geometría de Módulo horizontal y paneles: sin definir (se muestran como volumen).',

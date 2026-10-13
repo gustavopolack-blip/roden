@@ -1,9 +1,10 @@
 /**
- * Clasificación de plantillas en los botones del estimador: Módulos (cajas) y Piezas (sueltas).
+ * Clasificación de plantillas en los botones del estimador: Módulos (cajas) y Piezas (sueltas),
+ * y conversión de las plantillas viejas a la ficha nueva.
  */
 import { describe, it, expect } from 'vitest';
 import { SPECIAL_MODULE_TEMPLATES, getTemplate, floatingShelfBrackets, floatingShelfBracketLength } from '../utils/specialModules';
-import { calculateItemQuantities, hwPriceFor, bracketLabel } from '../utils/estimatorEngine';
+import { calculateItemQuantities, hwPriceFor, bracketLabel, legacyToVariant, calculateModuleParts } from '../utils/estimatorEngine';
 
 const ids = (g: string) => SPECIAL_MODULE_TEMPLATES.filter(t => t.group === g).map(t => t.id).sort();
 
@@ -55,5 +56,52 @@ describe('estante 36mm flotante (ménsulas metálicas ocultas)', () => {
     expect(hwPriceFor(bracketLabel(250), 6, S)).toBe(30000);
     expect(hwPriceFor(bracketLabel(150), 6, S)).toBe(18000);
     expect(hwPriceFor(bracketLabel(250), 6, {})).toBe(0);
+  });
+});
+
+describe('conversión de plantillas viejas a la ficha nueva (legacyToVariant)', () => {
+  const legacy = (id: string, opts: any = {}, over: any = {}) => {
+    const t = getTemplate(id)!;
+    const dims = { width: 900, height: 740, depth: 560 };
+    const r = t.calculate(dims, opts);
+    return { id: 'x', name: 'viejo', quantity: 2, ...dims, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, extras: [],
+      moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: id, specialOptions: opts,
+      specialParts: r.parts, specialHardware: r.hardware, specialLaborDays: r.laborDays,
+      isWhiteStructure: true, backingType: '3MM_WHITE', edgeCategory: 'PVC_045', ...over } as any;
+  };
+  it('cada plantilla vieja pasa a su variante, con las mismas medidas y cantidad', () => {
+    const cases: [string, any, any, string][] = [
+      ['MODULO_ABIERTO', { backingType: '55_COLOR' }, {}, 'ABIERTO'],
+      ['BIBLIOTECA', {}, {}, 'BIBLIOTECA'],
+      ['BOTINERO_EXTRAIBLE', {}, {}, 'BOTINERO_EXTRAIBLE'],
+      ['BOTINERO_FIJO', {}, {}, 'BOTINERO_FIJO'],
+      ['ESQUINERO', {}, {}, 'ESQUINERO'],
+      ['MODULO_HORIZONTAL', { frontType: 'DRAWERS', numPanels: '3' }, {}, 'HORIZONTAL'],
+      ['MODULO_BAJO_MESADA', { interior: 'ESTANTE' }, { cntDoors: 2 }, 'BAJO'],
+    ];
+    cases.forEach(([id, opts, over, type]) => {
+      const v = legacyToVariant(legacy(id, opts, over))!;
+      expect(v.cabinetType).toBe(type);
+      expect(v).toMatchObject({ width: 900, height: 740, depth: 560, quantity: 2, isSpecialModule: false, moduleType: 'MELAMINE_FULL' });
+      expect((v as any).specialParts).toBeUndefined();
+    });
+  });
+  it('frentes tal cual: horizontal con 3 cajones, bajo con sus puertas; los herrajes se cobran', () => {
+    const h = legacyToVariant(legacy('MODULO_HORIZONTAL', { frontType: 'DRAWERS', numPanels: '3' }))!;
+    expect([h.cntDrawers, h.cntDoors, h.calculateSlides]).toEqual([3, 0, true]);
+    const b = legacyToVariant(legacy('MODULO_BAJO_MESADA', { interior: 'ESTANTE' }, { cntDoors: 2 }))!;
+    expect([b.cntDoors, b.calculateHinges]).toEqual([2, true]);
+    // el bajo viejo cobraba bisagras sin puertas; convertido lleva las 2 puertas en el despiece
+    expect(calculateModuleParts(b).filter(p => p.name === 'Puerta')).toEqual([expect.objectContaining({ quantity: 2 })]);
+    const c = legacyToVariant(legacy('MODULO_BAJO_MESADA', { interior: 'CAJONES' }))!;
+    expect(c.cntDrawers).toBe(3);   // (740 − 118) / 180 → 3, la misma cantidad que tenía
+    const e = legacyToVariant(legacy('ESQUINERO'))!;
+    expect([e.cornerSide, e.neighborDepth]).toEqual(['LEFT', undefined]);
+    expect(legacyToVariant(legacy('MODULO_ABIERTO', { backingType: '55_COLOR' }))!.backingType).toBe('55_COLOR');
+  });
+  it('sin equivalente: piezas, columna vieja y módulos estándar quedan como están', () => {
+    expect(legacyToVariant(legacy('ESTANTE_18MM'))).toBeNull();
+    expect(legacyToVariant(legacy('COLUMNA'))).toBeNull();
+    expect(legacyToVariant({ id: 's', width: 600, height: 720, depth: 560, quantity: 1 } as any)).toBeNull();
   });
 });
