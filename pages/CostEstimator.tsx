@@ -239,6 +239,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   // Estado módulos especiales
   const [moduleKind, setModuleKind] = useState<'STANDARD' | 'SPECIAL' | 'MANUAL'>('STANDARD');
+  // Solo de pantalla: los botones Módulos y Piezas son ambos moduleKind 'SPECIAL' y filtran
+  // las plantillas por su `group`.
+  const [specialGroup, setSpecialGroup] = useState<'MODULO' | 'PIEZA'>('MODULO');
   const [specialTemplateId, setSpecialTemplateId] = useState<string>('');
   const [specialOptions, setSpecialOptions] = useState<Record<string, string>>({});
   const [manualItems, setManualItems] = useState<ManualItem[]>([]);
@@ -3384,28 +3387,32 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             {/* Selector Tipo de Módulo */}
                             <div className="flex gap-2 items-center">
                                 <span className="text-[10px] text-gray-500 uppercase font-bold">Tipo:</span>
-                                {[
-                                    { id: 'STANDARD', label: 'Estándar' },
-                                    { id: 'SPECIAL',  label: 'Especial' },
-                                    { id: 'MANUAL',   label: 'Manual'   },
-                                ].map(k => (
+                                {([
+                                    { id: 'STANDARD', kind: 'STANDARD', group: null,     label: 'Estándar' },
+                                    { id: 'MODULO',   kind: 'SPECIAL',  group: 'MODULO', label: 'Módulos'  },
+                                    { id: 'PIEZA',    kind: 'SPECIAL',  group: 'PIEZA',  label: 'Piezas'   },
+                                    { id: 'MANUAL',   kind: 'MANUAL',   group: null,     label: 'Manual'   },
+                                ] as const).map(k => {
+                                    const active = moduleKind === k.kind && (!k.group || specialGroup === k.group);
+                                    return (
                                     <button
                                         key={k.id}
                                         type="button"
-                                        onClick={() => { setModuleKind(k.id as any); setSpecialTemplateId(''); setSpecialOptions({}); }}
-                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${moduleKind === k.id ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
+                                        onClick={() => { setModuleKind(k.kind); if (k.group) setSpecialGroup(k.group); setSpecialTemplateId(''); setSpecialOptions({}); }}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${active ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
                                     >
                                         {k.label}
                                     </button>
-                                ))}
+                                    );
+                                })}
                                 {moduleKind === 'SPECIAL' && (
                                     <select
                                         className="border p-1.5 rounded text-xs bg-white ml-2"
                                         value={specialTemplateId}
                                         onChange={e => { setSpecialTemplateId(e.target.value); setSpecialOptions({}); }}
                                     >
-                                        <option value="">— Elegir template —</option>
-                                        {SPECIAL_MODULE_TEMPLATES.map(t => (
+                                        <option value="">{specialGroup === 'PIEZA' ? '— Elegir pieza —' : '— Elegir módulo —'}</option>
+                                        {SPECIAL_MODULE_TEMPLATES.filter(t => t.group === specialGroup).map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>

@@ -45,6 +45,8 @@ export interface SpecialModuleTemplate {
   id: string;
   name: string;
   description: string;
+  // Botón del estimador donde aparece: 'MODULO' (caja) o 'PIEZA' (pieza suelta que se agrega sola).
+  group: 'MODULO' | 'PIEZA';
   params: Array<'width' | 'height' | 'depth'>;
   extraOptions?: SpecialModuleExtraOption[];
   // Es función porque algunos templates cambian su espesor según una extraOption
@@ -86,6 +88,7 @@ const hingesPerDoor = (height: number): number => height > 1500 ? 4 : height > 9
 
 const BOTINERO_EXTRAIBLE: SpecialModuleTemplate = {
   id: 'BOTINERO_EXTRAIBLE',
+  group: 'MODULO',
   name: 'Botinero c/ Extraíbles',
   description: 'Bandejas extraíbles con guías telescópicas (1 cada 20cm de altura)',
   params: ['width', 'height', 'depth'],
@@ -129,6 +132,7 @@ const BOTINERO_EXTRAIBLE: SpecialModuleTemplate = {
 
 const BOTINERO_FIJO: SpecialModuleTemplate = {
   id: 'BOTINERO_FIJO',
+  group: 'MODULO',
   name: 'Botinero c/ Bandejas Fijas',
   description: 'Bandejas fijas inclinadas 30° con frentín de 5cm (1 cada 20cm de altura)',
   params: ['width', 'height', 'depth'],
@@ -177,6 +181,7 @@ const BOTINERO_FIJO: SpecialModuleTemplate = {
 
 const BIBLIOTECA: SpecialModuleTemplate = {
   id: 'BIBLIOTECA',
+  group: 'MODULO',
   name: 'Biblioteca',
   description: 'Estantes fijos (1 cada 32cm de altura)',
   params: ['width', 'height', 'depth'],
@@ -217,6 +222,7 @@ const BIBLIOTECA: SpecialModuleTemplate = {
 
 const PANEL_LISO: SpecialModuleTemplate = {
   id: 'PANEL_LISO',
+  group: 'PIEZA',
   name: 'Panel de Revestimiento Liso',
   description: 'Placa 18mm con bastidor trasero de 5cm retirado del perímetro',
   params: ['width', 'height'],
@@ -274,6 +280,7 @@ const PANEL_LISO: SpecialModuleTemplate = {
 
 const PANEL_ENLISTONADO: SpecialModuleTemplate = {
   id: 'PANEL_ENLISTONADO',
+  group: 'PIEZA',
   name: 'Panel de Revestimiento Enlistonado',
   description: 'Placa 18mm base + listones 18×18mm cada 36mm (listón + separación)',
   params: ['width', 'height'],
@@ -350,6 +357,7 @@ const PANEL_ENLISTONADO: SpecialModuleTemplate = {
 
 const MODULO_ABIERTO: SpecialModuleTemplate = {
   id: 'MODULO_ABIERTO',
+  group: 'MODULO',
   name: 'Módulo Abierto',
   description: 'Sin frentes. Laterales, piso, techo y fondo (18mm estructura, o fondo 3mm/5.5mm)',
   params: ['width', 'height', 'depth'],
@@ -408,6 +416,7 @@ const MODULO_ABIERTO: SpecialModuleTemplate = {
 
 const ESTANTE_FLOTANTE: SpecialModuleTemplate = {
   id: 'ESTANTE_FLOTANTE',
+  group: 'PIEZA',
   name: 'Estante Flotante',
   description: 'Estante mural 36mm — dos placas 18mm superpuestas. Solo ancho y profundidad.',
   params: ['width', 'depth'],   // height no aplica: espesor fijo 36mm
@@ -452,6 +461,7 @@ const ESTANTE_FLOTANTE: SpecialModuleTemplate = {
 
 const MODULO_HORIZONTAL: SpecialModuleTemplate = {
   id: 'MODULO_HORIZONTAL',
+  group: 'MODULO',
   name: 'Módulo Horizontal',
   description: 'Módulo bajo: puertas o cajones. Divisores = cantidad − 1. Cajones en mel. blanca 15mm.',
   params: ['width', 'height', 'depth'],
@@ -596,6 +606,7 @@ const MODULO_HORIZONTAL: SpecialModuleTemplate = {
 
 const TAPA_HORIZONTAL: SpecialModuleTemplate = {
   id: 'TAPA_HORIZONTAL',
+  group: 'PIEZA',
   name: 'Tapa Horizontal',
   description: 'Placa 18mm. Con regrueso: agrega faja perimetral 50mm (total 36mm de espesor).',
   params: ['width', 'depth'],
@@ -660,6 +671,7 @@ const TAPA_HORIZONTAL: SpecialModuleTemplate = {
 
 const DIVISOR_VERTICAL: SpecialModuleTemplate = {
   id: 'DIVISOR_VERTICAL',
+  group: 'PIEZA',
   name: 'Divisor Vertical',
   description: 'Placa vertical 18mm interior — solo alto y profundidad.',
   params: ['height', 'depth'],
@@ -688,6 +700,7 @@ const DIVISOR_VERTICAL: SpecialModuleTemplate = {
 
 const LATERAL_APLICADO: SpecialModuleTemplate = {
   id: 'LATERAL_APLICADO',
+  group: 'PIEZA',
   name: 'Lateral Aplicado',
   description: 'Lateral 18mm aplicado sobre el costado de un módulo existente.',
   params: ['height', 'depth'],
@@ -717,6 +730,7 @@ const LATERAL_APLICADO: SpecialModuleTemplate = {
 
 const AJUSTE: SpecialModuleTemplate = {
   id: 'AJUSTE',
+  group: 'PIEZA',
   name: 'Ajuste',
   description: 'Placa 18mm de espesor × 100mm de profundidad. Solo se ingresa el largo.',
   params: ['width'],
@@ -747,6 +761,7 @@ const AJUSTE: SpecialModuleTemplate = {
 
 const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
   id: 'MODULO_BAJO_MESADA',
+  group: 'MODULO',
   name: 'Módulo Bajo Mesada',
   description: 'Sin tapa. Laterales, piso, faja frontal y trasera (100mm), fondo 3mm en ranuras.',
   params: ['width', 'height', 'depth'],
@@ -817,6 +832,7 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
 
 const ESQUINERO: SpecialModuleTemplate = {
   id: 'ESQUINERO',
+  group: 'MODULO',
   name: 'Esquinero',
   description: 'Bajo mesada para rincón. Panel fijo 620mm. Puerta = ancho − 620 − 4mm.',
   params: ['width', 'height', 'depth'],
@@ -852,6 +868,7 @@ const ESQUINERO: SpecialModuleTemplate = {
 
 const ESQUINERO_EN_L: SpecialModuleTemplate = {
   id: 'ESQUINERO_EN_L',
+  group: 'MODULO',
   name: 'Esquinero en L',
   description: 'Módulo esquinero en L. Dos laterales fijos 560mm. Brazo 1 = ancho, Brazo 2 = largo2.',
   params: ['width', 'height', 'depth'],
@@ -895,6 +912,7 @@ const ESQUINERO_EN_L: SpecialModuleTemplate = {
 
 const ZOCALO_APLICADO: SpecialModuleTemplate = {
   id: 'ZOCALO_APLICADO',
+  group: 'PIEZA',
   name: 'Zócalo Aplicado',
   description: 'Revestimiento de zócalo 18mm o 5.5mm — solo largo y alto.',
   params: ['width', 'height'],
@@ -936,6 +954,7 @@ const ZOCALO_APLICADO: SpecialModuleTemplate = {
 
 const ZOCALO_ESTRUCTURAL: SpecialModuleTemplate = {
   id: 'ZOCALO_ESTRUCTURAL',
+  group: 'PIEZA',
   name: 'Zócalo Estructural',
   description: 'Marco 18mm con refuerzos internos cada 500mm (0 ≤600mm; +1 cada 500mm adicionales).',
   params: ['width', 'height', 'depth'],
@@ -975,6 +994,7 @@ const ZOCALO_ESTRUCTURAL: SpecialModuleTemplate = {
 
 const PUERTA_18MM: SpecialModuleTemplate = {
   id: 'PUERTA_18MM',
+  group: 'PIEZA',
   name: 'Puerta 18mm',
   description: 'Puerta melamina 18mm. Bisagras automáticas: ≤900mm→2, ≤1500mm→3, >1500mm→4.',
   params: ['width', 'height'],
@@ -1022,6 +1042,7 @@ const PUERTA_18MM: SpecialModuleTemplate = {
 
 const ESTANTE_18MM: SpecialModuleTemplate = {
   id: 'ESTANTE_18MM',
+  group: 'PIEZA',
   name: 'Estante 18mm',
   description: 'Estante melamina 18mm. Espesor fijo. Solo ancho y profundidad.',
   params: ['width', 'depth'],

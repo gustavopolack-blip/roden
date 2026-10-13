@@ -42,6 +42,8 @@
 | **Módulo** | Caja o pieza constructiva de un ítem, con ancho × alto × profundidad (mm) y cantidad. | `ExtendedCabinetModule` (`width`, `height`, `depth`, `quantity`) |
 | **Módulo estándar** | Caja con tapa, base, laterales, fondo, estantes y frentes, calculada por fórmula. | `calculateModuleParts()` (rama general) |
 | **Módulo especial** | Plantilla con despiece propio: Botinero, Biblioteca, Módulo Abierto, Esquinero, Panel, Zócalo, Tapa Horizontal, Ajuste, etc. | `isSpecialModule`, `specialTemplateId`, `specialParts` (`utils/specialModules.ts`) |
+| **Módulo (botón Módulos)** | Plantilla especial que es una caja: Módulo Abierto, Horizontal, Bajo Mesada, Esquinero, Esquinero en L, Botineros, Biblioteca. | `group: 'MODULO'` en la plantilla |
+| **Pieza suelta (botón Piezas)** | Plantilla especial que es una placa o conjunto chico que se agrega solo: Puerta, Estantes, Paneles, Zócalos, Ajuste, Lateral Aplicado, Divisor, Tapa Horizontal. No confundir con **pieza** del despiece. | `group: 'PIEZA'` en la plantilla |
 | **Módulo manual** | Algo que solo aporta costo, sin placas (ej. "Base hierro cromado"). | `moduleType: 'MANUAL'` / `SPECIAL_MANUAL_ID` → no genera piezas |
 | **Extra** | Costo adicional por unidad de módulo (se multiplica por la cantidad del módulo). | `ModuleExtra`, `expandModuleExtras()` |
 
