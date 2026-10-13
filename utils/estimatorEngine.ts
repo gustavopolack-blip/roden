@@ -11,7 +11,7 @@
  * motor único de costos (computeItemFinancials) y escenarios (getRecalculatedItemPrices).
  */
 import { CabinetModule, CalculatedPart, CostSettings } from '../types';
-import { SPECIAL_MANUAL_ID, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET, drawerBoxHeightFor } from './specialModules';
+import { SPECIAL_MANUAL_ID, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET, drawerBoxHeightFor, getTemplate, OVEN_AXIS, MICROWAVE_AXIS_H } from './specialModules';
 export { drawerBoxHeightFor };
 
 export interface ModuleExtra {
@@ -52,7 +52,7 @@ export interface ExtendedCabinetModule extends CabinetModule {
     //  BOTINERO_EXTRAIBLE / BOTINERO_FIJO: sin frentes, 1 bandeja cada 200 mm.
     //  HORIZONTAL: N puertas o N cajones lado a lado, del mismo ancho, con divisiones verticales.
     //  VERTICAL: estante si H > 800 y uno más cada 350 mm.
-    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO' | 'ABIERTO' | 'BIBLIOTECA' | 'BOTINERO_EXTRAIBLE' | 'BOTINERO_FIJO' | 'HORIZONTAL' | 'VERTICAL';
+    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO' | 'ABIERTO' | 'BIBLIOTECA' | 'BOTINERO_EXTRAIBLE' | 'BOTINERO_FIJO' | 'HORIZONTAL' | 'VERTICAL' | 'COLUMNA';
     neighborDepth?: number;          // esquinero: profundidad del bajo que llega de costado (vacío = D)
     cornerSide?: 'LEFT' | 'RIGHT';   // esquinero: lado del rincón (frente fijo)
     microwaveFloor?: boolean;        // alacena = módulo microondas: abierto, fondo 18 mm y piso de 420 mm
@@ -184,6 +184,43 @@ export const shoeTraysFor = (h: number): number => Math.floor(h / SHOE_TRAY_STEP
 // Estantes de alacena según el alto: hasta 600 → 1; hasta 900 → 2; más de 900 → 3.
 export const wallCabinetShelves = (h: number): number => (h <= 600 ? 1 : h <= 900 ? 2 : 3);
 export const legsFor = (width: number): number => (width <= 900 ? 4 : 6);
+// Columna de cocina (ficha del 13/10/2026): un solo ítem con dos laterales aplicados hasta el
+// piso y, de abajo hacia arriba, base, módulo inferior (cajones o 1 puerta, alineado con los
+// bajos: 740), horno (613), microondas (403) y módulo superior de 1 puerta (el resto del alto).
+// El ancho es fijo: horno 613 + laterales aplicados 36. H = alto total (incluye la base).
+export const COLUMN_INNER_WIDTH = OVEN_AXIS + 18;          // 613
+export const COLUMN_WIDTH = COLUMN_INNER_WIDTH + 36;       // 649
+export const COLUMN_LOWER_HEIGHT = 740;                    // = caja del bajo mesada
+export const COLUMN_OVEN_HEIGHT = OVEN_AXIS + 18;          // 613
+export const COLUMN_MICROWAVE_HEIGHT = MICROWAVE_AXIS_H + 18; // 403
+export const columnUpperHeight = (H: number, hasBase: boolean): number =>
+    H - (hasBase ? BASE_HEIGHT : 0) - COLUMN_LOWER_HEIGHT - COLUMN_OVEN_HEIGHT - COLUMN_MICROWAVE_HEIGHT;
+const isColumn = (m: any): boolean => m?.cabinetType === 'COLUMNA' && !m?.isSpecialModule;
+/**
+ * Los módulos que forman la columna, en orden: laterales aplicados, inferior, horno, microondas,
+ * superior. Cada uno se calcula con sus propias reglas (estándar o plantilla). Los extras quedan
+ * en los laterales (se cuentan una vez) y la base en el inferior (las patas se cobran una vez:
+ * 4, igual que con el ancho de la columna). `columnInner` = no suma área de terminación.
+ */
+export const expandColumn = (rawMod: ExtendedCabinetModule): ExtendedCabinetModule[] => {
+    const col = normalizeCabinet(rawMod);
+    const H = col.height || 0, D = col.depth || 0, Wi = COLUMN_INNER_WIDTH;
+    const common: any = { ...col, cabinetType: undefined, baseType: undefined, extras: undefined, layout3d: undefined,
+                          cntDoors: 0, cntDrawers: 0, cntFlaps: 0, internalDrawers: 0, hasGasPistons: false };
+    const tpl = (id: string, dims: { width: number; height: number; depth: number }) => {
+        const r = getTemplate(id)!.calculate(dims, {});
+        return { ...common, ...dims, isSpecialModule: true, specialTemplateId: id, specialOptions: {},
+                 specialParts: r.parts, specialHardware: r.hardware, columnInner: id !== 'COLUMNA' };
+    };
+    const inner = (over: any) => ({ ...common, width: Wi, depth: D, cntFlaps: 0, columnInner: true, ...over });
+    return [
+        { ...tpl('COLUMNA', { width: COLUMN_WIDTH, height: H, depth: D }), extras: col.extras },
+        inner({ name: 'Inferior', height: COLUMN_LOWER_HEIGHT, baseType: col.baseType, cntDoors: col.cntDoors, cntDrawers: col.cntDrawers }),
+        tpl('HORNO_EMPOTRADO', { width: Wi, height: COLUMN_OVEN_HEIGHT, depth: D }),
+        tpl('MICROONDAS_COLUMNA', { width: Wi, height: COLUMN_MICROWAVE_HEIGHT, depth: D }),
+        inner({ name: 'Superior', height: Math.max(0, columnUpperHeight(H, !!col.baseType)), cntDoors: 1, cntDrawers: 0 }),
+    ];
+};
 // Veta: con veta → paralela al lado mayor; lisa → libre; sin dato (módulo anterior) → la de antes.
 const grainOf = (hasGrain: boolean | undefined, w: number, h: number, legacy: CalculatedPart['grain']) =>
     hasGrain === undefined ? legacy : hasGrain ? (w >= h ? 'horizontal' : 'vertical') : 'free';
@@ -226,6 +263,7 @@ export const normalizeCabinet = (mod: ExtendedCabinetModule): ExtendedCabinetMod
   : OPEN_CABINETS.includes(mod.cabinetType || '') ? { ...mod, cntDoors: 0, cntDrawers: 0, cntFlaps: 0,
       ...(mod.cabinetType?.startsWith('BOTINERO') ? { internalDrawers: 0 } : {}) }
   : mod.cabinetType === 'BAJO_HORNO' ? { ...mod, width: OVEN_BASE_WIDTH, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, internalDrawers: 0, backingType: 'NONE' }
+  : isColumn(mod) ? { ...mod, width: COLUMN_WIDTH, cntDoors: (mod.cntDrawers || 0) > 0 ? 0 : 1, cntFlaps: 0, internalDrawers: 0, insetFronts: false, fullHeightSides: false }
   : mod;
 
 export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedPart[] => {
@@ -236,6 +274,7 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
       if ((mod as any).specialTemplateId === SPECIAL_MANUAL_ID || mod.moduleType === 'MANUAL') {
           return [];
       }
+      if (isColumn(mod)) return expandColumn(mod).flatMap(calculateModuleParts);
       const parts: CalculatedPart[] = [];
       const W = mod.width || 0;
       const H = mod.height || 0;
@@ -526,7 +565,8 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
     const detailedMaterialsArea: Record<string, number> = {};
     const detailedHardware: Record<string, number> = {};
 
-    currentModules.forEach(rawMod => {
+    // La columna se cuenta por sus módulos (herrajes, patas y estantes de cada uno).
+    currentModules.flatMap(m => isColumn(m) ? expandColumn(m) : [m]).forEach(rawMod => {
         const mod = normalizeCabinet({ ...rawMod, ...scenarioOverride } as ExtendedCabinetModule);
         const qty = mod.quantity || 1;
         const parts = calculateModuleParts(mod);
@@ -628,8 +668,12 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
         if (mType.includes('LACQUER')) modComplexity = 1.3;
         else if (mType.includes('VENEER')) modComplexity = 1.5;
 
-        totalComplexityFactor += modComplexity * modArea * qty;
-        totalAreaForComplexity += modArea * qty;
+        // Módulos de adentro de la columna: el área exterior ya la cuentan los laterales (W × H × D).
+        const inColumn = !!(mod as any).columnInner;
+        if (!inColumn) {
+            totalComplexityFactor += modComplexity * modArea * qty;
+            totalAreaForComplexity += modArea * qty;
+        }
 
         // Área de terminación según tipo + coeficiente de seguridad 1.15
         // MELAMINE_STRUCT_LACQUER/VENEER → solo frentes (W×H)
@@ -642,7 +686,9 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
         const finishArea = baseFinishArea * FINISH_SAFETY;
 
         const isGloss = (mod as any).finishSheen === 'GLOSS';
-        if (mType && mType.includes('LACQUER')) {
+        if (inColumn) {
+            // sin área propia de terminación (ver arriba)
+        } else if (mType && mType.includes('LACQUER')) {
             lacquerArea += finishArea * qty;
             if (isGloss) lacquerGlossArea += finishArea * qty;
         } else if (mType && mType.includes('VENEER')) {

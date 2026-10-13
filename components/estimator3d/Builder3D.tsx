@@ -380,6 +380,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   <p className="font-bold text-sm text-indigo-900">{selPiece.name}</p>
                   {selPiece.role === 'hardware' ? (
                     <p><span className="text-gray-500">Herraje:</span> <span className="font-mono">Ø {fmt(selPiece.partSize.width)} × {fmt(selPiece.partSize.height)} mm</span> (no va al despiece)</p>
+                  ) : selPiece.role === 'obra' ? (
+                    <p><span className="text-gray-500">Obra:</span> <span className="font-mono">{fmt(selPiece.partSize.width)} × {fmt(selPiece.partSize.height)} × {selPiece.thickness} mm</span> (no se cobra)</p>
                   ) : (<>
                   <p><span className="text-gray-500">Placa:</span> {selPiece.boardLabel}</p>
                   <p><span className="text-gray-500">Medidas:</span> <span className="font-mono">{fmt(selPiece.partSize.width)} × {fmt(selPiece.partSize.height)} × {selPiece.thickness} mm</span></p>
