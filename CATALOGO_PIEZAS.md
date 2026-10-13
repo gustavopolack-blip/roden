@@ -195,11 +195,11 @@ Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código ante
 | Caja de cajón | Interior según el frente: < 160 → 80; 160–239 → 120; 240–339 → 200; ≥ 340 → 300 mm. Con frente embutido la caja es 18 mm más corta (y la guía se elige con esa profundidad). |
 | Frentes combinados | El formulario no deja cargar nuevos; los presupuestos guardados se siguen calculando igual. |
 
-**Implementado** (13/10/2026) en el despiece, los herrajes, el formulario y el 3D. Supuesto mío
-a confirmar: caja de cajón 18 mm más corta con frente embutido.
+**Implementado** (13/10/2026) en el despiece, los herrajes, el formulario y el 3D. Confirmado
+(13/10/2026): caja de cajón 18 mm más corta con frente embutido.
 
-Pendientes: **cajón interno** (solo la caja, sin frente): falta su alto y cómo se combina con la
-caja del frente. Patas: se dibujan y se exportan en 3D (13/10/2026).
+**Cajón interno** (solo la caja, sin frente, 80 mm): solo si se tilda en el formulario; va **arriba**,
+debajo de la tapa (13/10/2026). Patas: se dibujan y se exportan en 3D (13/10/2026).
 Módulos de cocina: ver abajo.
 
 ## Módulos de cocina — 13/10/2026
@@ -331,8 +331,8 @@ la columna ya lo incluye.
 | Cajón interno | Solo la caja, 80 mm de alto; con sus guías. |
 
 **Implementado:** estantes de alacena, módulo microondas de alacena (sin faja trasera: el fondo
-de 18 mm la reemplaza — supuesto mío), microondas de columna y cajón interno (en 3D se apilan
-desde el piso cada 120 mm — supuesto de dibujo).
+de 18 mm la reemplaza — confirmado), microondas de columna y cajón interno (arriba, debajo de la
+tapa — confirmado).
 
 ### Cuarta ronda (13/10)
 
@@ -366,9 +366,9 @@ Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y p
 | Biblioteca | Como el módulo abierto, con 1 estante fijo cada 320 mm de alto. | **Implementado** (`BIBLIOTECA`) |
 | Botinero con estantes extraíbles | Sin puertas. Bandejas de la profundidad de un estante; ancho = interior libre − 26; faja delantera de 36 mm; guías telescópicas simples. 1 bandeja cada 200 mm. | **Implementado** (`BOTINERO_EXTRAIBLE`) |
 | Botinero con bandejas fijas inclinadas | Sin puertas. Bandejas sobre colizas ocultas, **inclinadas 30°** (el frente más bajo; en 3D, apoyadas atrás contra el fondo; la medida de corte no cambia); frentín (50 mm) con canto en los 4 lados. 1 cada 200 mm. | **Implementado** (`BOTINERO_FIJO`) |
-| Módulo horizontal | N cajones o N puertas lado a lado, del mismo ancho. Cajones: división entre cada par, frente de todo el alto, caja por hueco con la regla del frente. Puertas: N − 1 divisiones si mide más de 900 mm (supuesto mío: sin divisiones hasta 900). | **Implementado** (variante `HORIZONTAL`) |
+| Módulo horizontal | N cajones o N puertas lado a lado, del mismo ancho. Cajones: división entre cada par, frente de todo el alto, caja por hueco con la regla del frente. Puertas: N − 1 divisiones si mide más de 900 mm; hasta 900, sin divisiones (confirmado). | **Implementado** (variante `HORIZONTAL`) |
 | Módulo vertical | Tapa y base sobre laterales o laterales enteros (opción); fondo 5,5 o 18; estante si H > 800 y uno más cada 350; puertas; apoyado o colgado. | **Implementado** (variante `VERTICAL`) |
-| Panel liso | Correcto como está; canto en los 4 lados. | **Implementado** |
+| Panel liso | Canto en los 4 lados. Bastidor retirado 50 mm: horizontales enteros (W − 100) y verticales **entre ellos** (H − 200) — corregido el 13/10/2026 (antes H − 100: se pisaban en las esquinas). | **Implementado** |
 | Panel enlistonado | Listones de 18 mm con canto en el frente; separación de 18 mm. | Ya era así |
 | Puerta suelta | Correcta. | — |
 | Zócalos aplicados | **No llevan canto.** | **Implementado** |
@@ -378,7 +378,8 @@ Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y p
 | Frente abatible suelto | 2 bisagras y 1 pistón. | **Implementado** (pieza `FRENTE_ABATIBLE_SUELTO`) |
 
 Confirmado por Gustavo (13/10/2026): las colizas **no se cotizan**.
-Supuestos míos: la faja de la bandeja extraíble es de estructura y en 3D va arriba de la bandeja,
-adelante; 1 bandeja cada 200 mm (regla anterior).
+Confirmado (13/10/2026): la faja de la bandeja extraíble es de estructura y va arriba de la
+bandeja, adelante; 1 bandeja cada 200 mm. Botinero fijo: frentín perpendicular a la bandeja
+inclinada, bandeja apoyada atrás, **alto mínimo 500 mm** (el formulario no deja cargar menos).
 Las plantillas viejas de módulo abierto, biblioteca y botineros quedan ocultas (`legacy`).
 

@@ -19,7 +19,7 @@ import {
     ModuleExtra, ExtendedCabinetModule, EstimatorItem,
     HINGE_LABELS, SLIDE_LABELS, getSheetSize, getSheetArea, getStandardSlideLength,
     expandModuleExtras, sumModuleExtras, getFrontLayout, calculateModuleParts, isVisibleFrontPiece,
-    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice, COLUMN_WIDTH, columnUpperHeight, legacyToVariant,
+    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice, COLUMN_WIDTH, columnUpperHeight, legacyToVariant, SHOE_FIXED_MIN_HEIGHT,
     buildFinishLines, finishDescription, computeItemFinancials, getBoardLabel, getRecalculatedItemPrices,
     scenarioPricesFromRecalc, detailsFromRecalc,
 } from '../utils/estimatorEngine';
@@ -1386,7 +1386,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   const handleAddModule = (e: React.FormEvent) => {
       e.preventDefault();
-      if (combinedFrontsBlocked) return;
+      if (combinedFrontsBlocked || shoeRackTooLow) return;
       if (activeVariant) {
           // Variante de cocina: módulo estándar con su construcción (cabinetType).
           const variantMod = {
@@ -1477,6 +1477,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   const isStandardLike = moduleKind === 'STANDARD' || !!activeVariant;
   const combinedFrontsBlocked = isStandardLike
       && [moduleForm.cntDoors, moduleForm.cntDrawers, moduleForm.cntFlaps].filter(n => (n || 0) > 0).length > 1;
+  // Botinero con bandejas fijas inclinadas: alto mínimo de 500 mm (regla del taller).
+  const shoeRackTooLow = activeVariant?.cabinetType === 'BOTINERO_FIJO' && (moduleForm.height || 0) < SHOE_FIXED_MIN_HEIGHT;
 
   const handleInputChange = (field: keyof ExtendedCabinetModule, value: any) => {
       setModuleForm(prev => {
@@ -3632,9 +3634,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         </span>
                                     )}
                                     {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && activeVariant?.cabinetType !== 'COLUMNA' && !activeVariant?.cabinetType?.startsWith('BOTINERO') && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
-                                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
-                                            <span>Cajones internos (80 mm)</span>
-                                            <input type="number" min={0} className="border p-1 rounded text-xs w-14 text-center" value={(moduleForm as ExtendedCabinetModule).internalDrawers ?? 0} onChange={e => handleInputChange('internalDrawers', Math.max(0, Math.round(Number(e.target.value))) || undefined)}/>
+                                        <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
+                                            {/* Cajón interno: solo si se tilda; va arriba, 80 mm (ficha del 13/10/2026) */}
+                                            <input type="checkbox" className="w-4 h-4" checked={((moduleForm as ExtendedCabinetModule).internalDrawers || 0) > 0} onChange={e => handleInputChange('internalDrawers', e.target.checked ? 1 : undefined)}/>
+                                            <span>Cajón interno (arriba, 80 mm)</span>
                                         </label>
                                     )}
                                     {([
@@ -3879,7 +3882,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     {combinedFrontsBlocked && (
                                         <span className="text-[11px] text-red-600 font-bold max-w-[260px] leading-tight">Un módulo lleva un solo tipo de frente: puertas, cajones o abatibles.</span>
                                     )}
-                                    <button type="submit" disabled={combinedFrontsBlocked} className="disabled:opacity-40 disabled:cursor-not-allowed bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
+                                    {shoeRackTooLow && (
+                                        <span className="text-[11px] text-red-600 font-bold max-w-[260px] leading-tight">El botinero con bandejas inclinadas mide como mínimo {SHOE_FIXED_MIN_HEIGHT} mm de alto.</span>
+                                    )}
+                                    <button type="submit" disabled={combinedFrontsBlocked || shoeRackTooLow} className="disabled:opacity-40 disabled:cursor-not-allowed bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
                                         {editingId ? <Save size={16}/> : <Plus size={16}/>} {editingId ? 'Actualizar' : 'Agregar'}
                                     </button>
                                 </div>
