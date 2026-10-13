@@ -19,7 +19,7 @@ describe('grupos de plantillas', () => {
   });
   it('plantillas reemplazadas por variantes del estándar: ocultas en el formulario', () => {
     expect(SPECIAL_MODULE_TEMPLATES.filter(t => t.legacy).map(t => t.id).sort()).toEqual(
-      ['BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL']);
+      ['BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL']);
   });
   it('Piezas: las piezas sueltas', () => {
     expect(ids('PIEZA')).toEqual([
