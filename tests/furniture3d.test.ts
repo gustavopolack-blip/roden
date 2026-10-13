@@ -90,6 +90,7 @@ describe('correspondencia entre modelo 3D y despiece', () => {
     expect(Object.keys(MODULE_PLACERS)).toEqual(expect.arrayContaining([
       'STANDARD', 'MODULO_ABIERTO', 'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'ESTANTE_18MM', 'PUERTA_18MM',
       'LATERAL_APLICADO', 'DIVISOR_VERTICAL', 'AJUSTE', 'ZOCALO_APLICADO', 'TAPA_HORIZONTAL', 'ESTANTE_FLOTANTE',
+      'PANEL_ENLISTONADO', 'ZOCALO_ESTRUCTURAL', 'FRENTE_CAJON_SUELTO',
     ]));
   });
 
@@ -409,5 +410,42 @@ describe('botinero fijo: bandejas inclinadas 30°', () => {
     const t0 = boxCenter(trays[0].box), f0 = boxCenter(frentines[0].box);
     expect(f0[2]).toBeGreaterThan(t0[2]);
     expect(f0[1]).toBeLessThan(t0[1] + 50);
+  });
+});
+
+describe('piezas con 3D nuevo: panel enlistonado, zócalo estructural, frente de cajón suelto', () => {
+  const special = (id: string, dims: any, opts: any = {}) => {
+    const t = SPECIAL_MODULE_TEMPLATES.find(x => x.id === id)!;
+    const d = { ...dims, ...(t.fixedDims ? t.fixedDims(opts) : {}) };
+    const r = t.calculate(d, opts);
+    return mod({ id, ...d, moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: id, specialOptions: opts, specialParts: r.parts, specialHardware: r.hardware });
+  };
+  it('panel enlistonado: base atrás, listones adelante cada 36 mm, centrados', () => {
+    const pl = placeModule(special('PANEL_ENLISTONADO', { width: 600, height: 2000 }, { orientation: 'vertical' }));
+    expect(pl.status).toBe('placed');
+    const l = pl.pieces.filter(p => /^Listón/.test(p.name));
+    expect(l).toHaveLength(16);                                   // floor(600 / 36)
+    expect(l[1].box.min[0] - l[0].box.min[0]).toBe(36);
+    expect(l[0].box.min[0]).toBeCloseTo(600 - l[15].box.max[0], 6);   // centrado
+    l.forEach(p => { expect(p.box.min[2]).toBe(18); expect(p.box.max[2]).toBe(36); });
+    const h = placeModule(special('PANEL_ENLISTONADO', { width: 1200, height: 400 }, { orientation: 'horizontal' }));
+    expect(h.pieces.filter(p => /^Listón/.test(p.name)).every(p => boxSize(p.box)[0] === 1200)).toBe(true);
+  });
+  it('zócalo estructural: tapa, base, laterales y refuerzos entre los laterales', () => {
+    const pl = placeModule(special('ZOCALO_ESTRUCTURAL', { width: 1800, height: 100, depth: 500 }));
+    expect(pl.status).toBe('placed');
+    const ref = pl.pieces.filter(p => /^Refuerzo/.test(p.name));
+    expect(ref).toHaveLength(3);                                  // (1800 − 600) / 500 → 2 + 1
+    ref.forEach(p => { expect(p.box.min[0]).toBeGreaterThan(18); expect(p.box.max[0]).toBeLessThan(1782); });
+    expect(findPieceOverlaps(pl.pieces)).toEqual([]);
+  });
+  it('frente de cajón suelto: frente delante del hueco y caja detrás', () => {
+    const pl = placeModule(special('FRENTE_CAJON_SUELTO', { width: 596, height: 196, depth: 560 }));
+    expect(pl.status).toBe('placed');
+    const f = pl.pieces.find(p => p.name === 'Frente Cajón')!;
+    expect(f.box).toEqual({ min: [0, 0, 560], max: [596, 196, 578] });
+    const lat = pl.pieces.filter(p => p.name === 'Lateral Cajón');
+    lat.forEach(p => { expect(p.box.max[2]).toBe(560); expect(boxSize(p.box)[2]).toBe(540); });
+    expect(findPieceOverlaps(pl.pieces)).toEqual([]);
   });
 });
