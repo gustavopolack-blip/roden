@@ -183,3 +183,30 @@ describe('bajo mesada para horno', () => {
     expect(findPieceOverlaps(pieces)).toEqual([]);
   });
 });
+
+describe('bajo mesada esquinero en L', () => {
+  const L = () => {
+    const tpl = getTemplate('ESQUINERO_EN_L')!;
+    const opts = { largo2: '1000', prof2: '560' };
+    const r = tpl.calculate({ width: 1200, height: 740, depth: 560 }, opts);
+    return mod({ id: 'L', width: 1200, height: 740, depth: 560, moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: 'ESQUINERO_EN_L',
+      specialOptions: opts, specialParts: r.parts, specialHardware: r.hardware });
+  };
+  it('despiece: columna de rincón 80 × 80, piso y estante en dos rectángulos, dos puertas', () => {
+    const p = calculateModuleParts(L() as any);
+    expect(size(p, 'Piso brazo 1')).toEqual([1182, 560, 1]);
+    expect(size(p, 'Piso brazo 2')).toEqual([422, 560, 1]);
+    expect(size(p, 'Faja columna rincón 80')).toEqual([80, 722, 1]);
+    expect(size(p, 'Faja columna rincón 62')).toEqual([62, 722, 1]);
+    expect(size(p, 'Puerta brazo 1')).toEqual([615, 736, 1]);
+    expect(size(p, 'Puerta brazo 2')).toEqual([415, 736, 1]);
+    expect(calculateItemQuantities([L() as any]).totalHinges).toBe(4);
+  });
+  it('3D: todas las piezas ubicadas, sin choques', () => {
+    const { pieces, status } = placeModule(L());
+    expect(status).toBe('placed');
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+    const a = buildAssembly('x', [L()]);
+    expect([a.size.w, a.size.d]).toEqual([1200, 1000]);
+  });
+});

@@ -297,5 +297,19 @@ desde el piso cada 120 mm — supuesto de dibujo).
 | Bajo mesada para horno | 595 entre ejes de laterales (613 de ancho). Construcción de bajo, **sin fondo**. Estante fijo de apoyo, (W − 36) × (D − 10), que deja **600 mm libres** hasta la mesada. **Faja inferior de material de frente**, (W − 4) × (H − 600 − 4). **Implementado.** |
 | Esquinero en L | Pisos: A a lo largo de todo el brazo 1; B desde donde termina la profundidad de A. Puertas abren hacia afuera del rincón. Rigidez: **dos fajas verticales en L de 80 × 80 mm por la altura total** ("columna" en el ángulo). |
 
-Pendiente: esquinero en L — ubicación de la columna de 80 × 80 (rincón contra las paredes,
-encuentro de las puertas o ambos) y material de las fajas.
+Columna del esquinero en L: **en el rincón contra las paredes**, fajas de **estructura**, piezas
+de 80 y 62 (exterior 80 × 80).
+
+**Esquinero en L implementado** (plantilla `ESQUINERO_EN_L`, reemplaza la versión sin frentes).
+Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y prof. del lado 2.
+
+| Pieza | Medida |
+|---|---|
+| Laterales (extremos) | D1 × H y D2 × H |
+| Piso A / B | (L1 − 18) × D1 / (L2 − D1 − 18) × D2 |
+| Columna de rincón | 80 × (H − 18) y 62 × (H − 18) — apoyada sobre el piso (supuesto mío) |
+| Fajas traseras (paradas) | (L1 − 98) × 100 / (L2 − 98) × 100 — desde la columna |
+| Fajas frontales (acostadas) | (L1 − 18 − D2) × 100 / (L2 − 18 − D1) × 100 |
+| Fondos 3 mm | (L1 − 32) × (H − 14) / (L2 − 35) × (H − 14) — A pasa en el rincón, B apoya |
+| Estante A / B (regulable) | (L1 − 41) × (D1 − 31) / (L2 − D1 − 10) × (D2 − 31) — **corregido** respecto de la propuesta (chocaba con el fondo del otro brazo) |
+| Puertas | (L1 − D2 − 25) × (H − 4) / (L2 − D1 − 25) × (H − 4); bisagras hacia afuera del rincón |

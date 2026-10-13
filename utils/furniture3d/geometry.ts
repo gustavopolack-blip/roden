@@ -94,7 +94,7 @@ export const PENDING_RULES: string[] = [
   'Base (banquina, zócalo estructural o patas): el módulo se eleva 100 mm, pero la base no se dibuja ni se exporta.',
   'Columna: los módulos de adentro se ubican a mano entre los laterales; la base de la columna no se aplica.',
   'Bandejas inclinadas del botinero: se dibujan horizontales.',
-  'Geometría de Módulo horizontal, esquinero en L y paneles: sin definir (se muestran como volumen).',
+  'Geometría de Módulo horizontal y paneles: sin definir (se muestran como volumen).',
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -492,7 +492,46 @@ const placeColumnSides: Placer = (mod, parts) => {
   };
 };
 
+/**
+ * Esquinero en L: rincón en (0, 0); brazo 1 sobre la pared A (eje x, largo = ancho, prof. D1 en z);
+ * brazo 2 sobre la pared B (eje z, largo L2, prof. D2 en x). Ver ESQUINERO_EN_L.
+ */
+const placeCornerL: Placer = (mod, parts) => {
+  const L1 = mod.width || 0, H = mod.height || 0, D1 = mod.depth || 0;
+  const L2 = Math.max(300, parseInt(mod.specialOptions?.largo2 || '900', 10));
+  const D2 = Math.max(200, parseInt(mod.specialOptions?.prof2 || '560', 10));
+  const at = (name: string) => parts.findIndex(p => p.name === name);
+  const pieces: Piece3D[] = [];
+  const put = (name: string, b: Box, role: PieceRole, extra: Partial<Piece3D> = {}) => {
+    const i = at(name); if (i < 0) return false;
+    pieces.push(makePiece(mod, parts, i, 0, b, role, extra)); return true;
+  };
+  const C = 80, yShelf = 18 + (H - 18) / 2 - 9;
+  const p = (name: string) => parts[at(name)] || { width: 0, height: 0 };
+  const ok = [
+    put('Lateral brazo 1', mkBox(L1 - 18, L1, 0, H, 0, D1), 'carcass'),
+    put('Lateral brazo 2', mkBox(0, D2, 0, H, L2 - 18, L2), 'carcass'),
+    put('Piso brazo 1', mkBox(0, L1 - 18, 0, 18, 0, D1), 'carcass'),
+    put('Piso brazo 2', mkBox(0, D2, 0, 18, D1, L2 - 18), 'carcass'),
+    put('Faja columna rincón 80', mkBox(0, C, 18, H, 0, 18), 'carcass'),
+    put('Faja columna rincón 62', mkBox(0, 18, 18, H, 18, C), 'carcass'),
+    put('Faja trasera brazo 1', mkBox(C, L1 - 18, H - 100, H, 0, 18), 'carcass'),
+    put('Faja trasera brazo 2', mkBox(0, 18, H - 100, H, C, L2 - 18), 'carcass'),
+    put('Faja frontal brazo 1', mkBox(D2, L1 - 18, H - 18, H, D1 - 100, D1), 'carcass'),
+    put('Faja frontal brazo 2', mkBox(D2 - 100, D2, H - 18, H, D1, L2 - 18), 'carcass'),
+    put('Fondo 3mm brazo 1', mkBox(18, 18 + p('Fondo 3mm brazo 1').width, 13, H - 1, 18, 21), 'back', { groove: true }),
+    put('Fondo 3mm brazo 2', mkBox(18, 21, 13, H - 1, 21, 21 + p('Fondo 3mm brazo 2').width), 'back', { groove: true }),
+    put('Estante brazo 1', mkBox(22, 22 + p('Estante brazo 1').width, yShelf, yShelf + 18, 21, 21 + p('Estante brazo 1').height), 'shelf'),
+    put('Estante brazo 2', mkBox(21, 21 + p('Estante brazo 2').height, yShelf, yShelf + 18, D1 - 10, D1 - 10 + p('Estante brazo 2').width), 'shelf'),
+    put('Puerta brazo 1', mkBox(L1 - p('Puerta brazo 1').width, L1, 2, H - 2, D1 + 3, D1 + 21), 'front', { hingeSide: 'right' }),
+    put('Puerta brazo 2', mkBox(D2 + 3, D2 + 21, 2, H - 2, L2 - p('Puerta brazo 2').width, L2), 'front'),
+  ];
+  if (ok.some(v => !v) || pieces.length !== parts.length) return null;
+  return { pieces, status: 'placed', notes: ['Puerta del brazo 2: bisagras hacia afuera del rincón (la marca de bisagra no se dibuja en esa orientación).'] };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
+  ESQUINERO_EN_L: placeCornerL,
   HORNO_EMPOTRADO: placeCarcass,
   MICROONDAS_COLUMNA: placeCarcass,
   COLUMNA: placeColumnSides,

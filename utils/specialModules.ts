@@ -894,42 +894,53 @@ const ESQUINERO: SpecialModuleTemplate = {
 // Dos laterales de 560mm fijos. Dos brazos: largo1 (= ancho) y largo2.
 // ─────────────────────────────────────────────────────────────
 
+// Esquinero en L (ficha de cocina del 13/10/2026). Ancho = largo del brazo 1 (L1), Prof. =
+// profundidad del lado 1 (D1); opciones: largo del brazo 2 (L2) y profundidad del lado 2 (D2).
+// Construcción de bajo mesada: laterales enteros solo en los extremos, sin tapa, fondo 3 mm en
+// ranura a 18 mm de atrás. En el rincón contra las paredes, una columna de dos fajas de
+// estructura en L (80 × 80 mm: piezas de 80 y 62) apoyada sobre el piso (alto H − 18). Piso y estante en L se
+// cotizan como dos rectángulos: A a lo largo de todo el brazo 1; B desde donde termina la
+// profundidad de A. Puertas: largo del brazo − profundidad del otro − 21 − 4.
+// Coordenadas (3D): rincón en (0, 0); brazo 1 sobre la pared A (eje x), brazo 2 sobre la pared B (eje z).
+export const ESQUINERO_L_COLUMN = 80;
 const ESQUINERO_EN_L: SpecialModuleTemplate = {
   id: 'ESQUINERO_EN_L',
   group: 'MODULO',
   name: 'Bajo mesada esquinero en L',
-  description: 'Módulo esquinero en L. Dos laterales fijos 560mm. Brazo 1 = ancho, Brazo 2 = largo2.',
+  description: 'Rincón en L: brazo 1 = ancho × prof., brazo 2 = largo 2 × prof. 2. Columna de rincón 80 × 80, piso y estante en dos rectángulos, dos puertas.',
   params: ['width', 'height', 'depth'],
   extraOptions: [
-    {
-      key:          'largo2',
-      label:        'Largo brazo 2 (mm)',
-      type:         'number',
-      min:          300,
-      max:          1200,
-      defaultValue: 600
-    }
+    { key: 'largo2', label: 'Largo brazo 2 (mm)', type: 'number', min: 300, max: 3000, defaultValue: 900 },
+    { key: 'prof2',  label: 'Prof. lado 2 (mm)',  type: 'number', min: 200, max: 800,  defaultValue: 560 },
   ],
-  calculate: ({ width: W, height: H, depth: D }, options = {}) => {
-    const largo2 = Math.max(300, parseInt(options.largo2 || '600', 10));
+  calculate: ({ width: L1, height: H, depth: D1 }, options = {}) => {
+    const L2 = Math.max(300, parseInt(options.largo2 || '900', 10));
+    const D2 = Math.max(200, parseInt(options.prof2 || '560', 10));
+    const C = ESQUINERO_L_COLUMN;
     const parts: CalculatedPart[] = [];
-
-    // Dos laterales de esquina 560mm
-    parts.push({ name: 'Lateral de esquina 560mm', width: 560, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical' });
-
-    // Brazo 1 (ancho = W)
-    const arm1W = Math.max(0, W - 560 - 18);
-    parts.push({ name: 'Piso brazo 1',        width: arm1W, height: D,                        material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
-    parts.push({ name: 'Faja frontal brazo 1', width: arm1W, height: 100,                      material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
-    parts.push({ name: 'Fondo 3mm brazo 1',   width: arm1W, height: Math.max(0, H - 110),     material: '3mm_White',    quantity: 1, grain: 'vertical'   });
-
-    // Brazo 2 (largo2)
-    const arm2W = Math.max(0, largo2 - 560 - 18);
-    parts.push({ name: 'Piso brazo 2',        width: arm2W, height: D,                        material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
-    parts.push({ name: 'Faja frontal brazo 2', width: arm2W, height: 100,                      material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
-    parts.push({ name: 'Fondo 3mm brazo 2',   width: arm2W, height: Math.max(0, H - 110),     material: '3mm_White',    quantity: 1, grain: 'vertical'   });
-
-    return { parts, hardware: {}, laborDays: 1.0 };
+    // Estructura
+    parts.push({ name: 'Lateral brazo 1', width: D1, height: H, material: '18mm_Carcass', quantity: 1, grain: 'vertical' });
+    parts.push({ name: 'Lateral brazo 2', width: D2, height: H, material: '18mm_Carcass', quantity: 1, grain: 'vertical' });
+    parts.push({ name: 'Piso brazo 1', width: Math.max(0, L1 - 18),      height: D1, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Piso brazo 2', width: Math.max(0, L2 - D1 - 18), height: D2, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja columna rincón 80', width: C,      height: Math.max(0, H - 18), material: '18mm_Carcass', quantity: 1, grain: 'vertical' });
+    parts.push({ name: 'Faja columna rincón 62', width: C - 18, height: Math.max(0, H - 18), material: '18mm_Carcass', quantity: 1, grain: 'vertical' });
+    parts.push({ name: 'Faja trasera brazo 1', width: Math.max(0, L1 - C - 18), height: 100, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja trasera brazo 2', width: Math.max(0, L2 - C - 18), height: 100, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja frontal brazo 1', width: Math.max(0, L1 - 18 - D2), height: 100, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Faja frontal brazo 2', width: Math.max(0, L2 - 18 - D1), height: 100, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    // Fondos 3 mm en ranura (laterales y piso), a 18 mm de las paredes; el fondo A pasa en el
+    // rincón y el B apoya contra él. Alto hasta el borde superior (como el bajo mesada).
+    parts.push({ name: 'Fondo 3mm brazo 1', width: Math.max(0, L1 - 32), height: Math.max(0, H - 14), material: '3mm_White', quantity: 1, grain: 'vertical' });
+    parts.push({ name: 'Fondo 3mm brazo 2', width: Math.max(0, L2 - 35), height: Math.max(0, H - 14), material: '3mm_White', quantity: 1, grain: 'vertical' });
+    // Estante regulable en dos rectángulos (1 mm de juego por lado; 10 mm retirado del frente).
+    parts.push({ name: 'Estante brazo 1', width: Math.max(0, L1 - 41),      height: Math.max(0, D1 - 31), material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Estante brazo 2', width: Math.max(0, L2 - D1 - 10), height: Math.max(0, D2 - 31), material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    // Puertas
+    const door1 = Math.max(0, L1 - D2 - 21 - 4), door2 = Math.max(0, L2 - D1 - 21 - 4);
+    parts.push({ name: 'Puerta brazo 1', width: door1, height: Math.max(0, H - 4), material: '18mm_Front', quantity: 1, grain: 'vertical' });
+    parts.push({ name: 'Puerta brazo 2', width: door2, height: Math.max(0, H - 4), material: '18mm_Front', quantity: 1, grain: 'vertical' });
+    return { parts, hardware: { hinges: 2 * hingesPerDoor(H - 4) }, laborDays: 1.0 };
   }
 };
 

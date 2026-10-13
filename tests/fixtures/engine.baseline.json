@@ -1411,17 +1411,65 @@
   ],
   "sp4": [
    {
-    "name": "Lateral de esquina 560mm",
+    "name": "Lateral brazo 1",
+    "width": 450,
+    "height": 720,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Lateral brazo 2",
     "width": 560,
     "height": 720,
     "material": "18mm_White",
-    "quantity": 2,
+    "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Piso brazo 1",
-    "width": 322,
+    "width": 882,
     "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Piso brazo 2",
+    "width": 432,
+    "height": 560,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja columna rincón 80",
+    "width": 80,
+    "height": 702,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Faja columna rincón 62",
+    "width": 62,
+    "height": 702,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Faja trasera brazo 1",
+    "width": 802,
+    "height": 100,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Faja trasera brazo 2",
+    "width": 802,
+    "height": 100,
     "material": "18mm_White",
     "quantity": 1,
     "grain": "horizontal"
@@ -1435,34 +1483,58 @@
     "grain": "horizontal"
    },
    {
-    "name": "Fondo 3mm brazo 1",
-    "width": 322,
-    "height": 610,
-    "material": "3mm_White",
-    "quantity": 1,
-    "grain": "vertical"
-   },
-   {
-    "name": "Piso brazo 2",
-    "width": 22,
-    "height": 450,
-    "material": "18mm_White",
-    "quantity": 1,
-    "grain": "horizontal"
-   },
-   {
     "name": "Faja frontal brazo 2",
-    "width": 22,
+    "width": 432,
     "height": 100,
     "material": "18mm_White",
     "quantity": 1,
     "grain": "horizontal"
    },
    {
-    "name": "Fondo 3mm brazo 2",
-    "width": 22,
-    "height": 610,
+    "name": "Fondo 3mm brazo 1",
+    "width": 868,
+    "height": 706,
     "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Fondo 3mm brazo 2",
+    "width": 865,
+    "height": 706,
+    "material": "3mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Estante brazo 1",
+    "width": 859,
+    "height": 419,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Estante brazo 2",
+    "width": 440,
+    "height": 529,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Puerta brazo 1",
+    "width": 315,
+    "height": 716,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical"
+   },
+   {
+    "name": "Puerta brazo 2",
+    "width": 425,
+    "height": 716,
+    "material": "18mm_White",
     "quantity": 1,
     "grain": "vertical"
    }
@@ -2065,10 +2137,19 @@
    "Melamina Blanca 18mm MDP",
    "Melamina Blanca 18mm MDP",
    "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Fondo Blanco 3mm",
    "Fondo Blanco 3mm",
    "Melamina Blanca 18mm MDP",
    "Melamina Blanca 18mm MDP",
-   "Fondo Blanco 3mm"
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP"
   ],
   "sp5": [
    "Melamina Color 18mm MDP",
@@ -2269,8 +2350,8 @@
    "boards15": 1,
    "backing55": 1,
    "backing3": 2,
-   "linearWhite22": 46,
-   "linearWhite45": 7,
+   "linearWhite22": 51,
+   "linearWhite45": 11,
    "linearColor22": 42,
    "linearColor45": 10,
    "linear2mm": 0,
@@ -2278,7 +2359,7 @@
    "veneerAreaM2": 0,
    "lacquerGlossAreaM2": 0,
    "veneerGlossAreaM2": 0,
-   "totalHinges": 4,
+   "totalHinges": 8,
    "totalPistons": 0,
    "totalSlides": 8,
    "totalExtrasCost": 0,
@@ -2294,7 +2375,7 @@
    },
    "detailedHardware": {
     "Guías Telescópicas (400mm)": 8,
-    "Bisagras Estándar": 2,
+    "Bisagras Estándar": 6,
     "Bisagras Push-Open": 2
    },
    "avgComplexity": 1
@@ -2403,15 +2484,15 @@
    "fixedCosts": 78000,
    "extrasCost": 0,
    "tPlacas": 1211300,
-   "tTapac": 99610,
-   "tHerrajes": 60400,
+   "tTapac": 106960,
+   "tHerrajes": 66800,
    "tFinish": 0,
    "finArea": 0,
    "finPrice": 0,
    "finishLines": [],
-   "costoDirecto": 1959310,
-   "precioTaller": 2645068.5,
-   "precioFinal": 3306335.625
+   "costoDirecto": 1973060,
+   "precioTaller": 2663631,
+   "precioFinal": 3329538.75
   },
   "con_manual": {
    "laborCost": 510000,
@@ -2494,25 +2575,25 @@
    "veneer": 6507405
   },
   "especiales": {
-   "whiteAglo": 2541138.7500000005,
-   "whiteMDF": 2771988.75,
-   "colorAglo": 2949513.75,
-   "colorMDF": 3220863.75,
-   "whiteLacqAglo": 5483328.75,
-   "whiteLacqMDF": 5714178.75,
-   "colorLacqAglo": 5846208.75,
-   "colorLacqMDF": 6117558.75,
-   "whiteVenrAglo": 5598416.25,
-   "whiteVenrMDF": 5829266.25,
-   "colorVenrAglo": 5961296.25,
-   "colorVenrMDF": 6232646.25,
-   "baseConfig": 2949513.75,
-   "totalDirectCost": 1747860,
-   "realConfig": 3306335.625,
-   "realConfigTaller": 2645068.5,
-   "realConfigDirect": 1959310,
-   "lacquer": 5483328.75,
-   "veneer": 5598416.25
+   "whiteAglo": 2720655,
+   "whiteMDF": 2989980,
+   "colorAglo": 3195247.5,
+   "colorMDF": 3511822.5,
+   "whiteLacqAglo": 5514091.875,
+   "whiteLacqMDF": 5744941.875,
+   "colorLacqAglo": 5881680,
+   "colorLacqMDF": 6153030,
+   "whiteVenrAglo": 5629179.375,
+   "whiteVenrMDF": 5860029.375,
+   "colorVenrAglo": 5996767.5,
+   "colorVenrMDF": 6268117.5,
+   "baseConfig": 3195247.5,
+   "totalDirectCost": 1893480,
+   "realConfig": 3329538.75,
+   "realConfigTaller": 2663631,
+   "realConfigDirect": 1973060,
+   "lacquer": 5514091.875,
+   "veneer": 5629179.375
   },
   "con_manual": {
    "whiteAglo": 1742411.25,
