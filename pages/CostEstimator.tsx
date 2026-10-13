@@ -71,7 +71,10 @@ const INITIAL_MODULE_FORM: Partial<ExtendedCabinetModule> = {
     hasGasPistons: false,
     extras: [],
     structureCore: 'AGLO',
-    frontsCore: 'AGLO'
+    frontsCore: 'AGLO',
+    // Melamina lisa por defecto (veta libre); "con veta" se tilda al lado del material.
+    structureHasGrain: false,
+    frontsHaveGrain: false,
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -93,6 +96,15 @@ const BACKING_OPTIONS = [
     { label: 'Fondo Blanco 3mm', value: '3MM_WHITE' },
     { label: 'Fondo Color 5.5mm', value: '55_COLOR' },
     { label: 'Sin Fondo', value: 'NONE' }
+];
+
+// Módulos de cocina armados sobre el módulo estándar (ficha del 13/10/2026). Aparecen en el
+// botón Módulos; reemplazan a las plantillas MODULO_BAJO_MESADA y ESQUINERO (legacy).
+const STANDARD_VARIANTS: { id: string; name: string; cabinetType: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO'; defaults: Partial<ExtendedCabinetModule> }[] = [
+    { id: 'VAR_BAJO',      name: 'Bajo mesada',                 cabinetType: 'BAJO',      defaults: { height: 740, depth: 560 } },
+    { id: 'VAR_ESQUINERO', name: 'Bajo mesada esquinero recto', cabinetType: 'ESQUINERO', defaults: { height: 740, depth: 560, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } },
+    { id: 'VAR_ALACENA',   name: 'Alacena',                     cabinetType: 'ALACENA',   defaults: { depth: 320 } },
+    { id: 'VAR_BAJO_HORNO', name: 'Bajo mesada para horno',     cabinetType: 'BAJO_HORNO', defaults: { width: 613, height: 740, depth: 560, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } },
 ];
 
 const BOARD_OPTIONS = [
@@ -239,6 +251,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   // Estado módulos especiales
   const [moduleKind, setModuleKind] = useState<'STANDARD' | 'SPECIAL' | 'MANUAL'>('STANDARD');
+  // Solo de pantalla: los botones Módulos y Piezas son ambos moduleKind 'SPECIAL' y filtran
+  // las plantillas por su `group`.
+  const [specialGroup, setSpecialGroup] = useState<'MODULO' | 'PIEZA'>('MODULO');
   const [specialTemplateId, setSpecialTemplateId] = useState<string>('');
   const [specialOptions, setSpecialOptions] = useState<Record<string, string>>({});
   const [manualItems, setManualItems] = useState<ManualItem[]>([]);
@@ -1361,6 +1376,28 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   const handleAddModule = (e: React.FormEvent) => {
       e.preventDefault();
+      if (combinedFrontsBlocked) return;
+      if (activeVariant) {
+          // Variante de cocina: módulo estándar con su construcción (cabinetType).
+          const variantMod = {
+              ...moduleForm,
+              ...(activeVariant.cabinetType === 'ESQUINERO' ? { cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } : {}),
+              ...(activeVariant.cabinetType === 'BAJO_HORNO' ? { width: 613, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } : {}),
+              cabinetType: activeVariant.cabinetType,
+              name: moduleForm.name || activeVariant.name,
+          } as ExtendedCabinetModule;
+          if (editingId) {
+              setPendingModules(prev => prev.map(m => m.id === editingId ? { ...variantMod, id: editingId } : m));
+              setEditingId(null);
+          } else {
+              setPendingModules(prev => [...prev, { ...variantMod, id: `m${Date.now()}` }]);
+          }
+          setModuleForm(INITIAL_MODULE_FORM);
+          setModuleKind('STANDARD');
+          setSpecialTemplateId('');
+          setSpecialOptions({});
+          return;
+      }
 
       if (moduleKind === 'SPECIAL' && specialTemplateId) {
           const template = getTemplate(specialTemplateId);
@@ -1423,6 +1460,13 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       setSpecialOptions({});
   };
 
+  // Ficha constructiva: un módulo estándar lleva un solo tipo de frente (los guardados con
+  // frentes combinados se siguen calculando igual, pero no se cargan nuevos).
+  const activeVariant = moduleKind === 'SPECIAL' ? STANDARD_VARIANTS.find(v => v.id === specialTemplateId) : undefined;
+  const isStandardLike = moduleKind === 'STANDARD' || !!activeVariant;
+  const combinedFrontsBlocked = isStandardLike
+      && [moduleForm.cntDoors, moduleForm.cntDrawers, moduleForm.cntFlaps].filter(n => (n || 0) > 0).length > 1;
+
   const handleInputChange = (field: keyof ExtendedCabinetModule, value: any) => {
       setModuleForm(prev => {
           const next = { ...prev, [field]: value };
@@ -1446,7 +1490,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
   const handleRemoveExtra = (id: string) => setModuleForm(prev => ({ ...prev, extras: prev.extras?.filter(e => e.id !== id) }));
   
   const handleCancelEdit = () => { setEditingId(null); setModuleForm(INITIAL_MODULE_FORM); };
-  const handleEditModule = (mod: ExtendedCabinetModule) => { setEditingId(mod.id); setModuleForm(mod); };
+  const handleEditModule = (mod: ExtendedCabinetModule) => {
+      setEditingId(mod.id); setModuleForm(mod);
+      // Variante de cocina: se edita desde el botón Módulos para ver sus campos propios.
+      const variant = STANDARD_VARIANTS.find(v => v.cabinetType === mod.cabinetType);
+      if (variant) { setModuleKind('SPECIAL'); setSpecialGroup('MODULO'); setSpecialTemplateId(variant.id); }
+  };
 
     const downloadEstimateFile = (estimate: SavedEstimate) => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(estimate, null, 2));
@@ -3283,6 +3332,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 <div className="space-y-2">
                                     <div><label className="text-xs block font-bold text-gray-400 mb-2">Otros</label></div>
                                     <div><label className="text-xs block">Pistón a gas</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGasPiston} onChange={e => setSettings({...settings, priceGasPiston: Number(e.target.value)})} /></div>
+                                    <div><label className="text-xs block">Pata regulable</label><input type="number" className="border p-1 w-full rounded" value={settings.priceLeg ?? ''} onChange={e => setSettings({...settings, priceLeg: Number(e.target.value) || undefined})} /></div>
+                                    <div><label className="text-xs block">Ménsula metálica estante 15cm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket15 ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket15: Number(e.target.value) || undefined})} /></div>
+                                    <div><label className="text-xs block">Ménsula metálica estante 25cm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket25 ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket25: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Lata cemento contacto 2.8kg</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGlueTin} onChange={e => setSettings({...settings, priceGlueTin: Number(e.target.value)})} /></div>
                                     <div><label className="text-xs block">Tornillería (Estimado)</label><input type="number" className="border p-1 w-full rounded" value={settings.priceScrews} onChange={e => setSettings({...settings, priceScrews: Number(e.target.value)})} /></div>
                                 </div>
@@ -3384,28 +3436,39 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                             {/* Selector Tipo de Módulo */}
                             <div className="flex gap-2 items-center">
                                 <span className="text-[10px] text-gray-500 uppercase font-bold">Tipo:</span>
-                                {[
-                                    { id: 'STANDARD', label: 'Estándar' },
-                                    { id: 'SPECIAL',  label: 'Especial' },
-                                    { id: 'MANUAL',   label: 'Manual'   },
-                                ].map(k => (
+                                {([
+                                    { id: 'STANDARD', kind: 'STANDARD', group: null,     label: 'Estándar' },
+                                    { id: 'MODULO',   kind: 'SPECIAL',  group: 'MODULO', label: 'Módulos'  },
+                                    { id: 'PIEZA',    kind: 'SPECIAL',  group: 'PIEZA',  label: 'Piezas'   },
+                                    { id: 'MANUAL',   kind: 'MANUAL',   group: null,     label: 'Manual'   },
+                                ] as const).map(k => {
+                                    const active = moduleKind === k.kind && (!k.group || specialGroup === k.group);
+                                    return (
                                     <button
                                         key={k.id}
                                         type="button"
-                                        onClick={() => { setModuleKind(k.id as any); setSpecialTemplateId(''); setSpecialOptions({}); }}
-                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${moduleKind === k.id ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
+                                        onClick={() => { setModuleKind(k.kind); if (k.group) setSpecialGroup(k.group); setSpecialTemplateId(''); setSpecialOptions({}); }}
+                                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${active ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-300 hover:border-black'}`}
                                     >
                                         {k.label}
                                     </button>
-                                ))}
+                                    );
+                                })}
                                 {moduleKind === 'SPECIAL' && (
                                     <select
                                         className="border p-1.5 rounded text-xs bg-white ml-2"
                                         value={specialTemplateId}
-                                        onChange={e => { setSpecialTemplateId(e.target.value); setSpecialOptions({}); }}
+                                        onChange={e => {
+                                            setSpecialTemplateId(e.target.value); setSpecialOptions({});
+                                            const v = STANDARD_VARIANTS.find(x => x.id === e.target.value);
+                                            if (v) setModuleForm(prev => ({ ...prev, ...v.defaults }));
+                                        }}
                                     >
-                                        <option value="">— Elegir template —</option>
-                                        {SPECIAL_MODULE_TEMPLATES.map(t => (
+                                        <option value="">{specialGroup === 'PIEZA' ? '— Elegir pieza —' : '— Elegir módulo —'}</option>
+                                        {specialGroup === 'MODULO' && STANDARD_VARIANTS.map(v => (
+                                            <option key={v.id} value={v.id}>{v.name}</option>
+                                        ))}
+                                        {SPECIAL_MODULE_TEMPLATES.filter(t => t.group === specialGroup && !t.legacy).map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>
@@ -3522,6 +3585,54 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     </div>
                                     <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700 border-l border-gray-300 pl-4"><input type="checkbox" className="w-4 h-4" checked={moduleForm.hasGasPistons} onChange={e => handleInputChange('hasGasPistons', e.target.checked)}/><span>Pistones Gas</span></label>
                                 </div>
+                                {isStandardLike && (
+                                <div className="flex flex-wrap items-center gap-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                                    <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase">Base:</span>
+                                        <select className="border p-1.5 rounded text-xs bg-white" value={(moduleForm as ExtendedCabinetModule).baseType || ''} onChange={e => handleInputChange('baseType', e.target.value || undefined)}>
+                                            <option value="">Sin base</option>
+                                            <option value="BANQUINA">Banquina (100 mm, obra)</option>
+                                            <option value="ZOCALO">Zócalo estructural (100 mm, cargar aparte)</option>
+                                            <option value="PATAS">Patas regulables (100 mm)</option>
+                                        </select>
+                                    </label>
+                                    {activeVariant?.cabinetType === 'ESQUINERO' && (<>
+                                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                                            <span>Prof. bajo vecino</span>
+                                            <input type="number" className="border p-1 rounded text-xs w-20 text-center" placeholder={String(moduleForm.depth || '')} value={(moduleForm as ExtendedCabinetModule).neighborDepth ?? ''} onChange={e => handleInputChange('neighborDepth', Number(e.target.value) || undefined)}/>
+                                        </label>
+                                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                                            <span>Rincón</span>
+                                            <select className="border p-1.5 rounded text-xs bg-white" value={(moduleForm as ExtendedCabinetModule).cornerSide || 'LEFT'} onChange={e => handleInputChange('cornerSide', e.target.value)}>
+                                                <option value="LEFT">A la izquierda</option>
+                                                <option value="RIGHT">A la derecha</option>
+                                            </select>
+                                        </label>
+                                    </>)}
+                                    {activeVariant?.cabinetType === 'ALACENA' && (
+                                        <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
+                                            <input type="checkbox" className="w-4 h-4" checked={!!(moduleForm as ExtendedCabinetModule).microwaveFloor} onChange={e => handleInputChange('microwaveFloor', e.target.checked)}/>
+                                            <span>Módulo microondas (abierto, fondo 18 mm, piso 420 mm)</span>
+                                        </label>
+                                    )}
+                                    {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
+                                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                                            <span>Cajones internos (80 mm)</span>
+                                            <input type="number" min={0} className="border p-1 rounded text-xs w-14 text-center" value={(moduleForm as ExtendedCabinetModule).internalDrawers ?? 0} onChange={e => handleInputChange('internalDrawers', Math.max(0, Math.round(Number(e.target.value))) || undefined)}/>
+                                        </label>
+                                    )}
+                                    {([
+                                        ['fullHeightSides',   'Laterales enteros'],
+                                        ['adjustableShelves', 'Estantes regulables'],
+                                        ['insetFronts',       'Frente embutido'],
+                                    ] as const).filter(([key]) => !(activeVariant && (activeVariant.cabinetType !== 'ALACENA') && key === 'fullHeightSides')).map(([key, label]) => (
+                                        <label key={key} className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
+                                            <input type="checkbox" className="w-4 h-4" checked={!!(moduleForm as ExtendedCabinetModule)[key]} onChange={e => handleInputChange(key, e.target.checked)}/>
+                                            <span>{label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                )}
 
                                 {/* Material Configuration Section — dos selectores independientes */}
                                 <div className="flex flex-wrap items-center gap-4 bg-amber-50 p-3 rounded-xl border border-amber-200">
@@ -3576,6 +3687,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="enchapad_gloss">Kiri lustre brillante (todo el mueble)</option>
                                             </optgroup>
                                         </select>
+                                        <label className="flex items-center gap-1.5 text-[10px] text-amber-800 cursor-pointer"><input type="checkbox" className="w-3.5 h-3.5" checked={!!(moduleForm as ExtendedCabinetModule).structureHasGrain} onChange={e => handleInputChange('structureHasGrain', e.target.checked)}/>Con veta (paralela al lado mayor)</label>
                                     </div>
 
                                     <div className="w-px h-10 bg-amber-300 self-center"></div>
@@ -3641,6 +3753,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="enchapad_gloss">Kiri lustre brillante</option>
                                             </optgroup>
                                         </select>
+                                        <label className="flex items-center gap-1.5 text-[10px] text-amber-800 cursor-pointer"><input type="checkbox" className="w-3.5 h-3.5" checked={!!(moduleForm as ExtendedCabinetModule).frontsHaveGrain} onChange={e => handleInputChange('frontsHaveGrain', e.target.checked)}/>Con veta (paralela al lado mayor)</label>
                                         {(moduleForm.moduleType === 'LACQUER_FULL' || moduleForm.moduleType === 'VENEER_FULL') && (
                                             <span className="text-[9px] text-amber-600 italic">Igual a estructura</span>
                                         )}
@@ -3746,8 +3859,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 )}
 
                             {/* Action Buttons */}
-                                <div className="flex gap-2">
-                                    <button type="submit" className="bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
+                                <div className="flex gap-2 items-center">
+                                    {combinedFrontsBlocked && (
+                                        <span className="text-[11px] text-red-600 font-bold max-w-[260px] leading-tight">Un módulo lleva un solo tipo de frente: puertas, cajones o abatibles.</span>
+                                    )}
+                                    <button type="submit" disabled={combinedFrontsBlocked} className="disabled:opacity-40 disabled:cursor-not-allowed bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
                                         {editingId ? <Save size={16}/> : <Plus size={16}/>} {editingId ? 'Actualizar' : 'Agregar'}
                                     </button>
                                 </div>

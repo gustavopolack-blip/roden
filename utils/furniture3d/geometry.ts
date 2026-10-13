@@ -17,7 +17,13 @@
  * dibujo) y en PENDING_RULES; no altera medidas ni costos.
  */
 import { CalculatedPart } from '../../types';
-import { calculateModuleParts, getFrontLayout, getBoardLabel, isVisibleFrontPiece } from '../estimatorEngine';
+import {
+  calculateModuleParts, getFrontLayout, getBoardLabel, isVisibleFrontPiece,
+  FRONT_GAP, FRONT_EDGE_GAP, FRONT_OFFSET, BACK3_GROOVE_FROM_BACK, BASE_HEIGHT, KITCHEN_FAJA, OVEN_FREE_HEIGHT, normalizeCabinet,
+} from '../estimatorEngine';
+
+/** Alacena sin posición guardada: base a 600 mm sobre la mesada (base 100 + bajo 740 + mesada 20 + 600). */
+export const WALL_CABINET_Y = 1460;
 import { SPECIAL_MANUAL_ID } from '../specialModules';
 
 export type Vec3 = [number, number, number];
@@ -83,14 +89,12 @@ export interface Assembly {
 
 // Reglas de dibujo que el sistema NO define y se asumieron solo para la vista 3D.
 export const PENDING_RULES: string[] = [
-  'Frentes: se dibujan delante de la profundidad D (se asume que D no incluye el frente).',
-  'Frentes combinados: orden de arriba hacia abajo = abatibles, cajones, puertas.',
-  'Estantes: distribución equidistante en el alto interior, apoyados contra el fondo.',
-  'Fondo 3mm: posición de la ranura respecto del canto trasero (se dibuja al ras atrás).',
-  'Caja de cajón: alto fijo 120mm (regla actual del despiece) y posición vertical centrada en su fila.',
-  'Fondo de cajón: altura de la ranura (se dibuja a 10mm de la base de la caja).',
-  'Fondo 5,5mm y fondo estructural 18mm: sus medidas (H − 18) no son coherentes con tapas sobre laterales (alto interior H − 36).',
-  'Sentido de apertura de puertas: por defecto bisagra izquierda (1 puerta) y pares hacia afuera (2 o más).',
+  // El módulo estándar y las variantes de cocina siguen la ficha del taller (CATALOGO_PIEZAS.md, 13/10/2026).
+  'Plantillas especiales (Módulo abierto, Biblioteca, Botineros…): todavía usan sus medidas de fondo y frentes anteriores a la ficha del módulo estándar.',
+  'Base (banquina, zócalo estructural o patas): el módulo se eleva 100 mm, pero la base no se dibuja ni se exporta.',
+  'Columna: los módulos de adentro se ubican a mano entre los laterales; la base de la columna no se aplica.',
+  'Bandejas inclinadas del botinero: se dibujan horizontales.',
+  'Geometría de Módulo horizontal y paneles: sin definir (se muestran como volumen).',
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -203,30 +207,57 @@ const placeCarcass: Placer = (mod, parts) => {
   const idxOf = (re: RegExp) => parts.map((p, i) => (re.test(p.name) ? i : -1)).filter(i => i >= 0);
 
   // Estructura
-  idxOf(/^Tapa superior/).forEach(i => pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(0, W, H - 18, H, 0, D), 'carcass')));
-  idxOf(/^Base inferior/).forEach(i => pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(0, W, 0, 18, 0, D), 'carcass')));
+  // Tapa y base sobre laterales (ancho W) o, con laterales enteros, entre laterales (W − 36):
+  // se centran según su ancho real del despiece.
+  // Profundidad según el despiece: el techo del horno va recortado atrás (al frente: D − prof … D);
+  // el piso de la alacena con microondas es más profundo y sobresale adelante (0 … prof).
+  idxOf(/^Tapa superior/).forEach(i => { const p = parts[i], x0 = (W - p.width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, H - 18, H, D - p.height, D), 'carcass')); });
+  idxOf(/^(Base inferior|Piso)/).forEach(i => { const p = parts[i], x0 = (W - p.width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, 0, 18, 0, p.height), 'carcass')); });
+  // Fajas de cocina: frontal acostada arriba (bajo); trasera parada contra la pared, arriba
+  // (bajo: al borde superior; alacena: debajo de la tapa).
+  idxOf(/^Faja frontal$/).forEach(i => { const p = parts[i], x0 = (W - p.width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, H - 18, H, D - p.height, D), 'carcass')); });
+  idxOf(/^Faja trasera$/).forEach(i => {
+    const p = parts[i], x0 = (W - p.width) / 2, top = mod.cabinetType === 'ALACENA' ? H - 18 : H;
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, top - KITCHEN_FAJA, top, 0, 18), 'carcass'));
+  });
   idxOf(/^Lateral$/).forEach(i => {
     const p = parts[i];
     const depth = p.width, height = p.height;
+    const y0 = (H - height) / 2;   // H − 36 → entre tapa y base; H → lateral entero
     for (let k = 0; k < (p.quantity || 1); k++) {
       const x0 = k % 2 === 0 ? 0 : W - 18;
-      pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + 18, 18, 18 + height, D - depth, D), 'carcass'));
+      pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + 18, y0, y0 + height, D - depth, D), 'carcass'));
     }
   });
 
   // Fondo del módulo (no el del cajón)
+  // Fondo de 3 mm en ranura a 18 mm del canto trasero; 5,5 mm en rebaje al ras atrás;
+  // 18 mm dentro de la caja, al ras atrás.
   let backFace = 0; // z interior del fondo
   idxOf(/^Fondo/).filter(i => !/caj/i.test(parts[i].name)).forEach(i => {
     const p = parts[i];
     const t = materialThickness(p.material);
-    const x0 = (W - p.width) / 2, y0 = (H - p.height) / 2;
-    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, y0, y0 + p.height, 0, t), 'back'));
-    backFace = Math.max(backFace, t);
-    if (t > 3) notes.push(`${p.name}: medida H − 18 incoherente con tapas sobre laterales (regla pendiente).`);
+    // Bajo mesada (sin tapa): el fondo llega al borde superior y entra en la ranura/rebaje del piso.
+    const isBase = mod.cabinetType === 'BAJO' || mod.cabinetType === 'ESQUINERO' || mod.cabinetType === 'BAJO_HORNO';
+    const x0 = (W - p.width) / 2, y0 = isBase ? H - p.height - (t === 3 ? 1 : 0) : (H - p.height) / 2;
+    const z0 = t === 3 ? BACK3_GROOVE_FROM_BACK : 0;
+    // groove: alojado en ranura (3 mm) o rebaje (5,5 mm) → el solape con la caja es intencional
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, y0, y0 + p.height, z0, z0 + t), 'back', t < 18 ? { groove: true } : {}));
+    backFace = Math.max(backFace, z0 + t);
+    if (t === 18 && p.height > H - 36 + 0.01) notes.push(`${p.name}: mide más que el hueco entre tapa y base (H − 36); la plantilla todavía usa la medida anterior.`);
   });
 
   // Estantes y bandejas: equidistantes en el alto interior (regla de separación pendiente)
-  const shelfIdx = idxOf(/^(Estante|Bandeja)/);
+  const shelfIdx = idxOf(/^(Estante|Bandeja)/).filter(i => !/apoyo horno/.test(parts[i].name));
+  // Bajo para horno: estante de apoyo fijo (cara superior a H − 600) y faja inferior al frente.
+  idxOf(/^Estante apoyo horno/).forEach(i => {
+    const p = parts[i], x0 = (W - p.width) / 2, top = H - OVEN_FREE_HEIGHT;
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, top - 18, top, 0, p.height), 'shelf'));
+  });
+  idxOf(/^Frente faja inferior horno/).forEach(i => {
+    const p = parts[i], x0 = (W - p.width) / 2;
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, FRONT_EDGE_GAP, FRONT_EDGE_GAP + p.height, D + FRONT_OFFSET, D + FRONT_OFFSET + 18), 'front'));
+  });
   const shelfCount = shelfIdx.reduce((a, i) => a + (parts[i].quantity || 1), 0);
   let shelfN = 0;
   const shelfTops: { y: number; zFront: number }[] = [];
@@ -242,7 +273,8 @@ const placeCarcass: Placer = (mod, parts) => {
       if (/inclinada/i.test(p.name)) { status = 'approximate'; }
     }
   });
-  if (shelfCount > 0) notes.push('Estantes/bandejas distribuidos en partes iguales (separación real pendiente).');
+  // Módulo estándar: equidistantes (regla del taller). Plantillas: separación propia sin definir.
+  if (shelfCount > 0 && mod.isSpecialModule) notes.push('Estantes/bandejas distribuidos en partes iguales (separación real pendiente).');
   if (status === 'approximate') notes.push('Bandejas inclinadas 30° dibujadas horizontales.');
   // Frentín de bandeja (botinero fijo): al frente de cada bandeja
   idxOf(/^Frent[ií]n/).forEach(i => {
@@ -261,10 +293,15 @@ const placeCarcass: Placer = (mod, parts) => {
   for (let k = 0; k < nFl; k++) rows.push({ kind: 'flap', h: layout.flapH });
   for (let k = 0; k < nDr; k++) rows.push({ kind: 'drawer', h: layout.drawerH });
   if (nDo > 0 && layout.doorH > 0) rows.push({ kind: 'door', h: layout.doorH });
-  let top = H - 3;
+  // Superpuestos: 2 mm al borde del módulo y separados 3 mm de la caja (profundidad total D + 21).
+  // Embutidos: dentro de la caja con 4 mm de luz, al ras del frente de la caja.
+  const inset = !!mod.insetFronts;
+  let top = inset ? H - 18 - FRONT_GAP : H - FRONT_EDGE_GAP;
   const rowY: { kind: string; y0: number; y1: number }[] = [];
-  rows.forEach(r => { rowY.push({ kind: r.kind, y0: top - r.h, y1: top }); top -= r.h + 4; });
-  const zF0 = D, zF1 = D + 18;
+  rows.forEach(r => { rowY.push({ kind: r.kind, y0: top - r.h, y1: top }); top -= r.h + FRONT_GAP; });
+  const zF0 = inset ? D - 18 : D + FRONT_OFFSET, zF1 = zF0 + 18;
+  const frontsX0 = inset ? 18 + FRONT_GAP : FRONT_EDGE_GAP;
+  const frontsWidth = W - 2 * frontsX0;
 
   const drawerRows = rowY.filter(r => r.kind === 'drawer');
   const flapRows = rowY.filter(r => r.kind === 'flap');
@@ -286,16 +323,34 @@ const placeCarcass: Placer = (mod, parts) => {
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, r.y0, r.y0 + p.height, zF0, zF1), 'front'));
     }
   });
-  idxOf(/^Puerta/).forEach(i => {
+  // Esquinero recto: frente fijo del lado del rincón y la puerta al lado, con bisagras del lado
+  // de afuera (abre alejándose del rincón).
+  const fixedIdx = idxOf(/^Frente fijo esquinero/)[0];
+  if (fixedIdx !== undefined) {
+    const fixed = parts[fixedIdx];
+    const doorIdx = idxOf(/^Puerta/)[0];
+    const y0 = doorRow ? doorRow.y0 : FRONT_EDGE_GAP;
+    const left = mod.cornerSide !== 'RIGHT';
+    const fx0 = left ? frontsX0 : W - frontsX0 - fixed.width;
+    pieces.push(makePiece(mod, parts, fixedIdx, nextCopy(fixedIdx), mkBox(fx0, fx0 + fixed.width, y0, y0 + fixed.height, zF0, zF1), 'front'));
+    if (doorIdx !== undefined) {
+      const d = parts[doorIdx];
+      const dx0 = left ? fx0 + fixed.width + FRONT_GAP : fx0 - FRONT_GAP - d.width;
+      pieces.push(makePiece(mod, parts, doorIdx, nextCopy(doorIdx), mkBox(dx0, dx0 + d.width, y0, y0 + d.height, zF0, zF1), 'front', { hingeSide: left ? 'right' : 'left' }));
+    }
+  }
+  idxOf(/^Puerta/).filter(() => fixedIdx === undefined).forEach(i => {
     const p = parts[i];
     const n = p.quantity || 1;
-    const gap = n > 1 ? (W - 6 - n * p.width) / (n - 1) : 0;
-    const y0 = doorRow ? doorRow.y0 : 3;
+    const gap = n > 1 ? (frontsWidth - n * p.width) / (n - 1) : 0;
+    const y0 = doorRow ? doorRow.y0 : frontsX0;
     for (let k = 0; k < n; k++) {
-      const x0 = n > 1 ? 3 + k * (p.width + gap) : (W - p.width) / 2;
+      const x0 = n > 1 ? frontsX0 + k * (p.width + gap) : (W - p.width) / 2;
+      // Apertura: 1 puerta → según su posición en el mueble (buildAssembly) o la elegida;
+      // 3 puertas → izquierda, derecha, derecha; 2 o 4+ → en pares izquierda/derecha.
       const hingeSide: 'left' | 'right' = n === 1
         ? (mod.doorHingeSide === 'RIGHT' ? 'right' : 'left')
-        : (k < n / 2 ? 'left' : 'right');
+        : n === 3 ? (k === 0 ? 'left' : 'right') : (k % 2 === 0 ? 'left' : 'right');
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, y0, y0 + p.height, zF0, zF1), 'front', { hingeSide }));
     }
   });
@@ -309,9 +364,9 @@ const placeCarcass: Placer = (mod, parts) => {
     const tSide = materialThickness(lat.material);
     const outerW = testa.width + 2 * tSide;
     const bx0 = (W - outerW) / 2;
-    const L = lat.width;                 // largo de la caja (D − 20)
-    const bz0 = D - L, bz1 = D;
-    const bh = lat.height;               // alto de caja (120)
+    const L = lat.width;                 // largo de la caja (D − 20; − 18 más con frentes embutidos)
+    const bz1 = inset ? D - 18 : D, bz0 = bz1 - L;
+    const bh = lat.height;               // alto de caja según el alto del frente (80/120/200/300)
     drawerRows.forEach(r => {
       let yb = (r.y0 + r.y1) / 2 - bh / 2;
       yb = Math.max(18, Math.min(yb, H - 18 - bh));
@@ -327,6 +382,37 @@ const placeCarcass: Placer = (mod, parts) => {
         pieces.push(makePiece(mod, parts, fondoIdx, nextCopy(fondoIdx), mkBox(fx0, fx0 + f.width, yb + 10, yb + 13, fz0, fz0 + f.height), 'drawer', { groove: true }));
       }
     });
+  }
+
+  // Cajones internos (solo la caja): apilados desde el piso, detrás de los frentes.
+  const intLat = idxOf(/^Lateral cajón interno/)[0];
+  const intTesta = idxOf(/^Contra\/Frente cajón interno/)[0];
+  const intFondo = idxOf(/^Fondo cajón interno/)[0];
+  if (intLat !== undefined && intTesta !== undefined) {
+    const lat = parts[intLat], testa = parts[intTesta];
+    const tSide = materialThickness(lat.material), tT = materialThickness(testa.material);
+    const outerW = testa.width + 2 * tSide, bx0 = (W - outerW) / 2;
+    const bz1 = inset ? D - 18 : D, bz0 = bz1 - lat.width, bh = lat.height;
+    const n = Math.round((lat.quantity || 2) / 2);
+    for (let k = 0; k < n; k++) {
+      const yb = 18 + 10 + k * (bh + 40);   // separación vertical entre cajas: supuesto de dibujo
+      pieces.push(makePiece(mod, parts, intLat, nextCopy(intLat), mkBox(bx0, bx0 + tSide, yb, yb + bh, bz0, bz1), 'drawer'));
+      pieces.push(makePiece(mod, parts, intLat, nextCopy(intLat), mkBox(bx0 + outerW - tSide, bx0 + outerW, yb, yb + bh, bz0, bz1), 'drawer'));
+      pieces.push(makePiece(mod, parts, intTesta, nextCopy(intTesta), mkBox(bx0 + tSide, bx0 + tSide + testa.width, yb, yb + bh, bz0, bz0 + tT), 'drawer'));
+      pieces.push(makePiece(mod, parts, intTesta, nextCopy(intTesta), mkBox(bx0 + tSide, bx0 + tSide + testa.width, yb, yb + bh, bz1 - tT, bz1), 'drawer'));
+      if (intFondo !== undefined) {
+        const f = parts[intFondo], fx0 = (W - f.width) / 2, fz0 = bz0 + (lat.width - f.height) / 2;
+        pieces.push(makePiece(mod, parts, intFondo, nextCopy(intFondo), mkBox(fx0, fx0 + f.width, yb + 10, yb + 13, fz0, fz0 + f.height), 'drawer', { groove: true }));
+      }
+    }
+  }
+
+  // Base (banquina, zócalo estructural o patas): el módulo se eleva 100 mm. La base no se dibuja:
+  // la banquina es obra, el zócalo se carga aparte como pieza y las patas son herraje.
+  if (mod.baseType && !mod.isSpecialModule) {
+    pieces.forEach(pc => { pc.box = { min: [pc.box.min[0], pc.box.min[1] + BASE_HEIGHT, pc.box.min[2]], max: [pc.box.max[0], pc.box.max[1] + BASE_HEIGHT, pc.box.max[2]] }; });
+    const label = mod.baseType === 'PATAS' ? 'patas' : mod.baseType === 'BANQUINA' ? 'banquina' : 'zócalo estructural';
+    notes.push(`Base de ${BASE_HEIGHT} mm (${label}): el módulo se dibuja elevado; la base no se dibuja.`);
   }
 
   // ¿Quedó alguna pieza del despiece sin ubicar? → el módulo no está resuelto
@@ -390,7 +476,65 @@ const placeStackedTop: Placer = (mod, parts) => {
  * agregar su id acá (reutilizando un ubicador o escribiendo uno propio).
  * Plantillas ausentes → se muestran sin ubicar (volumen + despiece en grilla).
  */
+/** Columna: dos laterales aplicados de la altura total, a los costados, hasta el plano de las puertas. */
+const placeColumnSides: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const i = parts.findIndex(p => /^Lateral aplicado columna/.test(p.name));
+  if (i < 0 || parts.length !== 1) return null;
+  const d = parts[i].width;
+  return {
+    pieces: [
+      makePiece(mod, parts, i, 0, mkBox(0, 18, 0, H, 0, d), 'carcass'),
+      makePiece(mod, parts, i, 1, mkBox(W - 18, W, 0, H, 0, d), 'carcass'),
+    ],
+    status: 'placed',
+    notes: ['Los módulos de adentro se cargan aparte y se ubican entre los laterales.'],
+  };
+};
+
+/**
+ * Esquinero en L: rincón en (0, 0); brazo 1 sobre la pared A (eje x, largo = ancho, prof. D1 en z);
+ * brazo 2 sobre la pared B (eje z, largo L2, prof. D2 en x). Ver ESQUINERO_EN_L.
+ */
+const placeCornerL: Placer = (mod, parts) => {
+  const L1 = mod.width || 0, H = mod.height || 0, D1 = mod.depth || 0;
+  const L2 = Math.max(300, parseInt(mod.specialOptions?.largo2 || '900', 10));
+  const D2 = Math.max(200, parseInt(mod.specialOptions?.prof2 || '560', 10));
+  const at = (name: string) => parts.findIndex(p => p.name === name);
+  const pieces: Piece3D[] = [];
+  const put = (name: string, b: Box, role: PieceRole, extra: Partial<Piece3D> = {}) => {
+    const i = at(name); if (i < 0) return false;
+    pieces.push(makePiece(mod, parts, i, 0, b, role, extra)); return true;
+  };
+  const C = 80, yShelf = 18 + (H - 18) / 2 - 9;
+  const p = (name: string) => parts[at(name)] || { width: 0, height: 0 };
+  const ok = [
+    put('Lateral brazo 1', mkBox(L1 - 18, L1, 0, H, 0, D1), 'carcass'),
+    put('Lateral brazo 2', mkBox(0, D2, 0, H, L2 - 18, L2), 'carcass'),
+    put('Piso brazo 1', mkBox(0, L1 - 18, 0, 18, 0, D1), 'carcass'),
+    put('Piso brazo 2', mkBox(0, D2, 0, 18, D1, L2 - 18), 'carcass'),
+    put('Faja columna rincón 80', mkBox(0, C, 18, H, 0, 18), 'carcass'),
+    put('Faja columna rincón 62', mkBox(0, 18, 18, H, 18, C), 'carcass'),
+    put('Faja trasera brazo 1', mkBox(C, L1 - 18, H - 100, H, 0, 18), 'carcass'),
+    put('Faja trasera brazo 2', mkBox(0, 18, H - 100, H, C, L2 - 18), 'carcass'),
+    put('Faja frontal brazo 1', mkBox(D2, L1 - 18, H - 18, H, D1 - 100, D1), 'carcass'),
+    put('Faja frontal brazo 2', mkBox(D2 - 100, D2, H - 18, H, D1, L2 - 18), 'carcass'),
+    put('Fondo 3mm brazo 1', mkBox(18, 18 + p('Fondo 3mm brazo 1').width, 13, H - 1, 18, 21), 'back', { groove: true }),
+    put('Fondo 3mm brazo 2', mkBox(18, 21, 13, H - 1, 21, 21 + p('Fondo 3mm brazo 2').width), 'back', { groove: true }),
+    put('Estante brazo 1', mkBox(22, 22 + p('Estante brazo 1').width, yShelf, yShelf + 18, 21, 21 + p('Estante brazo 1').height), 'shelf'),
+    put('Estante brazo 2', mkBox(21, 21 + p('Estante brazo 2').height, yShelf, yShelf + 18, D1 - 10, D1 - 10 + p('Estante brazo 2').width), 'shelf'),
+    put('Puerta brazo 1', mkBox(L1 - p('Puerta brazo 1').width, L1, 2, H - 2, D1 + 3, D1 + 21), 'front', { hingeSide: 'right' }),
+    put('Puerta brazo 2', mkBox(D2 + 3, D2 + 21, 2, H - 2, L2 - p('Puerta brazo 2').width, L2), 'front'),
+  ];
+  if (ok.some(v => !v) || pieces.length !== parts.length) return null;
+  return { pieces, status: 'placed', notes: ['Puerta del brazo 2: bisagras hacia afuera del rincón (la marca de bisagra no se dibuja en esa orientación).'] };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
+  ESQUINERO_EN_L: placeCornerL,
+  HORNO_EMPOTRADO: placeCarcass,
+  MICROONDAS_COLUMNA: placeCarcass,
+  COLUMNA: placeColumnSides,
   STANDARD: placeCarcass,
   MODULO_ABIERTO: placeCarcass,
   BIBLIOTECA: placeCarcass,
@@ -432,7 +576,7 @@ export const placeModule = (mod: any): { pieces: Piece3D[]; status: PlacementSta
   const parts = calculateModuleParts(mod);
   const tpl = templateIdOf(mod);
   const placer = MODULE_PLACERS[tpl || 'STANDARD'];
-  const res = placer ? placer(mod, parts) : null;
+  const res = placer ? placer(normalizeCabinet(mod), parts) : null;
   if (!res) {
     return {
       pieces: [], status: 'unplaced', gridPieces: gridPieces(mod, parts),
@@ -466,8 +610,15 @@ export const resolveLayouts = (modules: any[]): ModuleLayout3D[] => {
       cursor = Math.max(cursor, end);
     }
   });
+  // Alacenas sin posición: fila propia, colgadas a WALL_CABINET_Y, desde x = 0.
+  let wallCursor = 0;
   return modules.map(m => {
     if (hasLayout(m)) return { x: m.layout3d.x, y: m.layout3d.y, z: m.layout3d.z, rotY: ([0, 90, 180, 270].includes(m.layout3d.rotY) ? m.layout3d.rotY : 0) as RotY };
+    if (m.cabinetType === 'ALACENA' && !m.isSpecialModule) {
+      const l: ModuleLayout3D = { x: wallCursor, y: WALL_CABINET_Y, z: 0, rotY: 0 };
+      wallCursor += (m.width || 0) * (m.quantity || 1);
+      return l;
+    }
     const l: ModuleLayout3D = { x: cursor, y: 0, z: 0, rotY: 0 };
     if (!isManualModule(m)) cursor += (m.width || 0) * (m.quantity || 1);
     return l;
@@ -479,9 +630,11 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   const placed: PlacedModule[] = [];
   const issues: AssemblyIssue[] = [];
 
-  modules.forEach((mod, mi) => {
+  modules.forEach((rawMod, mi) => {
+    const mod = normalizeCabinet(rawMod);   // ej. bajo para horno: ancho fijo de 613
     if (isManualModule(mod)) return;
     const W = mod.width || 0, H = mod.height || 0, D = mod.depth || 0;
+    const legH = mod.baseType && !templateIdOf(mod) ? BASE_HEIGHT : 0;   // base: se suma a H
     const base = placeModule(mod);
     const qty = Math.max(1, mod.quantity || 1);
     const label = mod.name || `Módulo ${mi + 1}`;
@@ -508,12 +661,12 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
       const rekey = (p: Piece3D) => ({ ...p, key: `${key}/${p.key.split('/').pop()}` });
       const pieces = base.pieces.map(rekey);
       const gridPieces = base.gridPieces.map(rekey);
-      const volume = mkBox(0, W, 0, H, 0, D);
+      const volume = mkBox(0, W, 0, H + legH, 0, D);
       const localBox = pieces.length ? unionBox([volume, ...pieces.map(p => p.box)]) : volume;
       placed.push({
         key, moduleId: mod.id, moduleIndex: mi, instance: inst,
         name: qty > 1 ? `${label} (${inst + 1}/${qty})` : label,
-        templateId: templateIdOf(mod), dims: { w: W, h: H, d: D }, layout,
+        templateId: templateIdOf(mod), dims: { w: W, h: H + legH, d: D }, layout,
         status: base.status, notes: base.notes, pieces, gridPieces, localBox,
         worldBox: transformBox(localBox, layout),
       });
@@ -529,6 +682,8 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   const carcassWorld = (pm: PlacedModule) => transformBox(mkBox(0, pm.dims.w, 0, pm.dims.h, 0, pm.dims.d), pm.layout);
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
+      // La columna es un contenedor: los módulos van entre sus laterales (no es choque).
+      if (placed[i].templateId === 'COLUMNA' || placed[j].templateId === 'COLUMNA') continue;
       const a = carcassWorld(placed[i]), b = carcassWorld(placed[j]);
       const v = overlapVolume(a, b);
       if (v > 0) {
@@ -560,6 +715,18 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
 
   const bbox = unionBox(placed.map(p => p.worldBox));
   const s = boxSize(bbox);
+
+  // Apertura de puerta única sin lado elegido: bisagras del lado del eje del mueble en que
+  // queda el módulo (a la izquierda del eje → izquierda). Módulo girado 180°: se invierte.
+  const axisX = boxCenter(bbox)[0];
+  placed.forEach(pm => {
+    const mod = modules[pm.moduleIndex];
+    const hinged = pm.pieces.filter(pc => pc.hingeSide);
+    if (mod.doorHingeSide || mod.cabinetType === 'ESQUINERO' || hinged.length !== 1 || (pm.layout.rotY !== 0 && pm.layout.rotY !== 180)) return;
+    const worldLeft = boxCenter(pm.worldBox)[0] <= axisX;
+    const localLeft = pm.layout.rotY === 180 ? !worldLeft : worldLeft;
+    hinged[0].hingeSide = localLeft ? 'left' : 'right';
+  });
   return { name, modules: placed, bbox, size: { w: s[0], h: s[1], d: s[2] }, issues };
 };
 
@@ -570,6 +737,7 @@ export const findPieceOverlaps = (pieces: Piece3D[]): [Piece3D, Piece3D][] => {
     for (let j = i + 1; j < pieces.length; j++) {
       const a = pieces[i], b = pieces[j];
       if ((a.groove && b.role === 'drawer') || (b.groove && a.role === 'drawer')) continue;
+      if ((a.groove && a.role === 'back' && b.role === 'carcass') || (b.groove && b.role === 'back' && a.role === 'carcass')) continue;
       if (overlapVolume(a.box, b.box) > 0) out.push([a, b]);
     }
   }

@@ -124,7 +124,8 @@ es **intencional** (así siempre costea de más, no de menos) — NO "arreglarlo
 **Dónde vive el motor:** `utils/estimatorEngine.ts` (despiece, cantidades, precios,
 `computeItemFinancials`, escenarios). Se extrajo textualmente de `CostEstimator.tsx`;
 `tests/estimatorEngine.test.ts` lo compara contra una foto (`tests/fixtures/engine.baseline.json`).
-Si cambiás una regla de cálculo a propósito, regenerá la foto y explicá el cambio.
+Si cambiás una regla de cálculo a propósito, regenerá la foto (`npx tsx tests/fixtures/regenerateBaseline.ts`)
+y explicá el cambio en el commit.
 
 **Pruebas:** `npm test` (vitest). Correrlas antes de pushear cambios del estimador.
 

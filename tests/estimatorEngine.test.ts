@@ -2,7 +2,8 @@
  * Preservación de las reglas de costos.
  * tests/fixtures/engine.baseline.json se generó con el código ANTERIOR a extraer el motor
  * (commit 4fee4d4, funciones dentro de pages/CostEstimator.tsx). Si alguna regla de despiece,
- * cantidades o precios cambia, estas pruebas fallan.
+ * cantidades o precios cambia, estas pruebas fallan. Regenerada a propósito con
+ * tests/fixtures/regenerateBaseline.ts: 13/10/2026 (ficha constructiva del módulo estándar).
  */
 import { describe, it, expect } from 'vitest';
 import baseline from './fixtures/engine.baseline.json';
@@ -18,9 +19,9 @@ const modules = [...buildStandardModules(), ...buildSpecialModules(SPECIAL_MODUL
 const items = buildItems(SPECIAL_MODULE_TEMPLATES);
 
 describe('motor del estimador: idéntico a la foto previa a la extracción', () => {
-  it('cubre la matriz completa (estándar, 19 plantillas especiales y manual)', () => {
+  it('cubre la matriz completa (estándar, 22 plantillas especiales y manual)', () => {
     expect(modules.length).toBe(Object.keys(baseline.parts).length);
-    expect(SPECIAL_MODULE_TEMPLATES.length).toBe(19);
+    expect(SPECIAL_MODULE_TEMPLATES.length).toBe(22);
   });
 
   it.each(modules.map(m => [m.id, m] as const))('despiece y etiquetas de placa de %s', (id, mod) => {

@@ -35,6 +35,27 @@ export interface ExtendedCabinetModule extends CabinetModule {
     flapFrontHeight?: number;
     // Brillo de la laca / lustre del módulo (vacío = semi mate)
     finishSheen?: 'SEMI' | 'GLOSS';
+    // Ficha constructiva del módulo estándar (CATALOGO_PIEZAS.md, 13/10/2026)
+    fullHeightSides?: boolean;   // laterales enteros: laterales H × D, tapa y base entre laterales
+    adjustableShelves?: boolean; // estantes regulables: W − 38 y 4 soportes por estante (sin costo)
+    insetFronts?: boolean;       // frentes embutidos: entre laterales/tapa/base, al ras de la caja
+    // Base del módulo: eleva la caja 100 mm (BASE_HEIGHT). Banquina = obra (sin costo);
+    // zócalo estructural = se carga aparte como pieza; patas = herraje (4 o 6 por módulo).
+    baseType?: 'BANQUINA' | 'ZOCALO' | 'PATAS';
+    // Variante constructiva del módulo estándar (vacío = estándar). Ficha de cocina 13/10/2026.
+    //  BAJO: bajo mesada (laterales enteros, piso entre laterales, sin tapa, fajas de 100 mm).
+    //  ESQUINERO: bajo mesada esquinero recto (frente fijo de rincón + 1 puerta).
+    //  ALACENA: estándar + faja trasera superior de 100 mm; opción piso de microondas (420 mm).
+    //  BAJO_HORNO: bajo mesada para horno (613 de ancho, sin fondo, estante de apoyo y faja inferior).
+    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO';
+    neighborDepth?: number;          // esquinero: profundidad del bajo que llega de costado (vacío = D)
+    cornerSide?: 'LEFT' | 'RIGHT';   // esquinero: lado del rincón (frente fijo)
+    microwaveFloor?: boolean;        // alacena = módulo microondas: abierto, fondo 18 mm y piso de 420 mm
+    internalDrawers?: number;        // cajones internos (solo la caja, 80 mm de alto, sin frente)
+    // Veta del material. undefined = módulo anterior a la regla (veta fija por pieza, como antes);
+    // false = melamina lisa (veta libre); true = con veta → paralela al lado mayor de la pieza.
+    structureHasGrain?: boolean;
+    frontsHaveGrain?: boolean;
     // Constructor 3D (solo dibujo; no intervienen en despiece ni costos)
     layout3d?: { x: number; y: number; z: number; rotY: 0 | 90 | 180 | 270 }; // posición en el mueble (mm)
     doorHingeSide?: 'LEFT' | 'RIGHT';                                       // apertura de puerta única
@@ -75,6 +96,13 @@ export const HINGE_LABELS: Record<string, string> = {
     'SOFT_CLOSE': 'Bisagras Cierre Suave',
     'PUSH': 'Bisagras Push-Open'
 };
+
+// Herraje del estante 36mm flotante (template ESTANTE_FLOTANTE), en dos largos.
+// Precio: priceFloatingBracket15 / priceFloatingBracket25.
+export const bracketLabel = (length: 150 | 250): string => `Ménsula metálica oculta ${length / 10}cm`;
+// Patas regulables del módulo estándar (precio priceLeg) y soportes de estante regulable (sin precio).
+export const LEG_LABEL = 'Pata regulable';
+export const SHELF_SUPPORT_LABEL = 'Soporte de estante (sin costo)';
 
 export const SLIDE_LABELS: Record<string, string> = {
     'TELESCOPIC': 'Guías Telescópicas',
@@ -127,12 +155,38 @@ export const sumModuleExtras = (modules: any[] = []): number =>
   //   cargado (las puertas siempre toman su parte del resto).
   // Antes, con cajones, las puertas no se generaban (ni se cobraban), y abatibles +
   // puertas ocupaban ambos el alto completo (frentes duplicados).
+// ── Ficha constructiva del módulo estándar (CATALOGO_PIEZAS.md) ──
+export const FRONT_GAP = 4;        // luz entre frentes (vertical y horizontal) y, embutidos, contra la caja
+export const FRONT_EDGE_GAP = 2;   // frente superpuesto: luz al borde del módulo (2 + 2 = 4 entre módulos)
+export const FRONT_OFFSET = 3;     // frente superpuesto separado 3 mm de la caja → profundidad total D + 21
+export const BACK3_GROOVE_FROM_BACK = 18; // ranura del fondo de 3 mm: a 18 mm del canto trasero, 5 mm de profundidad
+export const SHELF_FRONT_SETBACK = 10;    // estante retirado 10 mm del frente
+export const BASE_HEIGHT = 100;           // banquina, zócalo estructural o patas: se suman al alto H
+export const KITCHEN_FAJA = 100;          // fajas de bajos y faja trasera de alacena
+export const MICROWAVE_FLOOR_DEPTH = 420; // alacena con microondas convencional: piso de 420 mm
+export const INTERNAL_DRAWER_HEIGHT = 80; // cajón interno: solo la caja
+// Bajo mesada para horno: 595 mm entre ejes de laterales (613 exterior); el horno apoya en un
+// estante fijo que deja 600 mm libres hasta la mesada; debajo, faja inferior de frente.
+export const OVEN_BASE_WIDTH = 613;
+export const OVEN_FREE_HEIGHT = 600;
+// Estantes de alacena según el alto: hasta 600 → 1; hasta 900 → 2; más de 900 → 3.
+export const wallCabinetShelves = (h: number): number => (h <= 600 ? 1 : h <= 900 ? 2 : 3);
+export const legsFor = (width: number): number => (width <= 900 ? 4 : 6);
+// Alto interior de la caja de cajón (alto del lateral de 15 mm) según el alto del frente.
+export const drawerBoxHeightFor = (frontH: number): number =>
+    frontH < 160 ? 80 : frontH < 240 ? 120 : frontH < 340 ? 200 : 300;
+// Veta: con veta → paralela al lado mayor; lisa → libre; sin dato (módulo anterior) → la de antes.
+const grainOf = (hasGrain: boolean | undefined, w: number, h: number, legacy: CalculatedPart['grain']) =>
+    hasGrain === undefined ? legacy : hasGrain ? (w >= h ? 'horizontal' : 'vertical') : 'free';
+
 export const getFrontLayout = (mod: ExtendedCabinetModule) => {
       const H = mod.height || 0;
       const nDr = mod.cntDrawers || 0;
       const nFl = mod.cntFlaps || 0;
       const nDo = mod.cntDoors || 0;
-      const total = Math.max(0, H - 6);
+      // Luz de 4 mm entre frentes. Superpuesto: 2 mm por lado al borde del módulo (frente H − 4).
+      // Embutido: hueco interior H − 36 con 4 mm contra la caja (H − 44).
+      const total = Math.max(0, mod.insetFronts ? H - 36 - 2 * FRONT_GAP : H - 2 * FRONT_EDGE_GAP);
       const rows = nDr + nFl + (nDo > 0 ? 1 : 0);
       const avail = Math.max(0, total - Math.max(0, rows - 1) * 4);
       const groups = (nDr > 0 ? 1 : 0) + (nFl > 0 ? 1 : 0) + (nDo > 0 ? 1 : 0);
@@ -155,7 +209,16 @@ export const getFrontLayout = (mod: ExtendedCabinetModule) => {
       };
   };
 
-export const calculateModuleParts = (mod: ExtendedCabinetModule): CalculatedPart[] => {
+// Esquinero recto: siempre 1 puerta (más el frente fijo de rincón), sin cajones ni abatibles.
+// Módulo microondas de alacena: abierto (sin frentes) y con fondo estructural de 18 mm.
+export const normalizeCabinet = (mod: ExtendedCabinetModule): ExtendedCabinetModule =>
+    mod.cabinetType === 'ESQUINERO' ? { ...mod, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 }
+  : mod.cabinetType === 'ALACENA' && mod.microwaveFloor ? { ...mod, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: '18MM_STRUCTURE' }
+  : mod.cabinetType === 'BAJO_HORNO' ? { ...mod, width: OVEN_BASE_WIDTH, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, internalDrawers: 0, backingType: 'NONE' }
+  : mod;
+
+export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedPart[] => {
+      const mod = normalizeCabinet(rawMod);
       // Módulo manual (ej. "Base hierro cromado"): NO genera placas ni tapacanto.
       // Solo aporta su costo via extras (se cuentan aparte). Sin este guard, un item
       // manual con medidas generaba un cajón de melamina fantasma (placa entera espuria).
@@ -219,76 +282,134 @@ export const calculateModuleParts = (mod: ExtendedCabinetModule): CalculatedPart
           );
       }
 
-      // 1. Tapas y Bases: van SOBRE los laterales → pasan completas (sin descuentos)
-      // Ancho = Ancho_exterior, Profundidad = Profundidad_exterior
-      parts.push({ name: 'Tapa superior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
-      parts.push({ name: 'Base inferior', width: W, height: D, material: carcassMat, quantity: 1, grain: 'horizontal' });
-      
-      // 2. Laterales: van ENTRE tapa y base → Alto = Alto_exterior − 36mm
-      //    (antes salían a alto completo: el módulo armado quedaba 36mm más alto)
-      // SI fondo = 3mm: Profundidad = Profundidad_exterior
-      // SI fondo = 5.5mm o 18mm: Profundidad = Profundidad_exterior - 18mm
-      let lateralDepth = D;
-      if (backingType === '55_COLOR' || backingType === '18MM_STRUCTURE') {
-          lateralDepth = D - 18;
+      // Reglas del taller: CATALOGO_PIEZAS.md → "Ficha constructiva — Módulo estándar".
+      // `frontEdge` = lado de la pieza que da al frente (largo de tapacanto), independiente de la veta.
+      const sG = mod.structureHasGrain, fG = mod.frontsHaveGrain;
+      const carcass = (name: string, w: number, h: number, qty: number, frontEdge: 'width' | 'height', legacyGrain: 'horizontal' | 'vertical'): CalculatedPart =>
+          ({ name, width: w, height: h, material: carcassMat, quantity: qty, grain: grainOf(sG, w, h, legacyGrain), frontEdge });
+
+      // 1. Tapa, base y laterales. Por defecto tapa y base van SOBRE los laterales; con
+      //    "laterales enteros" los laterales van de piso a techo y tapa/base entre ellos.
+      //    Los laterales van siempre a profundidad D (los fondos de 5,5 y 18 mm van dentro).
+      const kind = mod.cabinetType;
+      const isBase = kind === 'BAJO' || kind === 'ESQUINERO' || kind === 'BAJO_HORNO';
+      const innerW = Math.max(0, W - 36);
+      if (isBase) {
+          // Bajo mesada: laterales enteros, piso entre laterales, sin tapa (va la mesada):
+          // faja frontal acostada y faja trasera parada de 100 mm (fija el módulo a la pared).
+          parts.push(carcass('Lateral', D, H, 2, 'height', 'vertical'));
+          parts.push(carcass('Piso', innerW, D, 1, 'width', 'horizontal'));
+          parts.push(carcass('Faja frontal', innerW, KITCHEN_FAJA, 1, 'width', 'horizontal'));
+          parts.push(carcass('Faja trasera', innerW, KITCHEN_FAJA, 1, 'width', 'horizontal'));
+      } else if (mod.fullHeightSides) {
+          parts.push(carcass('Tapa superior', Math.max(0, W - 36), D, 1, 'width', 'horizontal'));
+          parts.push(carcass('Base inferior', Math.max(0, W - 36), D, 1, 'width', 'horizontal'));
+          parts.push(carcass('Lateral', D, H, 2, 'height', 'vertical'));
+      } else {
+          parts.push(carcass('Tapa superior', W, D, 1, 'width', 'horizontal'));
+          // Alacena con microondas convencional: solo el piso es más profundo (420 mm).
+          const baseD = kind === 'ALACENA' && mod.microwaveFloor ? Math.max(D, MICROWAVE_FLOOR_DEPTH) : D;
+          parts.push(carcass('Base inferior', W, baseD, 1, 'width', 'horizontal'));
+          parts.push(carcass('Lateral', D, Math.max(0, H - 36), 2, 'height', 'vertical'));
       }
-      parts.push({ name: 'Lateral', width: lateralDepth, height: Math.max(0, H - 36), material: carcassMat, quantity: 2, grain: 'vertical' });
-      
-      // 3. Fondos
+      if (kind === 'ALACENA' && !mod.microwaveFloor) {
+          // Faja trasera superior de 100 mm, detrás del fondo, para fijar a la pared
+          // (el módulo microondas lleva fondo de 18 mm, que ya cumple esa función).
+          parts.push(carcass('Faja trasera', innerW, KITCHEN_FAJA, 1, 'width', 'horizontal'));
+      }
+
+      // 2. Fondo
+      //  - 3 mm: en ranura de 5 mm en tapa, base y laterales (a 18 mm del canto trasero),
+      //    1 mm de juego por lado → (W − 28) × (H − 28).
+      //  - 5,5 mm: en rebaje trasero, 5 mm hacia adentro de cada borde → (W − 10) × (H − 10).
+      //  - 18 mm estructural: dentro de la caja, entre laterales y entre tapa y base → (W − 36) × (H − 36).
+      let backDepth = 0; // profundidad que ocupa el fondo desde atrás (para el estante)
+      //  Bajo mesada (sin tapa): el fondo llega al borde superior → 3 mm (W − 28) × (H − 14)
+      //  (ranura de 5 mm en el piso, 1 mm de juego); 5,5 mm (W − 10) × (H − 5); 18 mm (W − 36) × (H − 18).
       if (backingType === '3MM_WHITE') {
-          // Ancho = Ancho_exterior - 36mm, Alto = Alto_exterior - descuento_ranura (usamos 38mm según ejemplo 850-812)
-          parts.push({ name: 'Fondo 3mm Blanco', width: Math.max(0, W - 36), height: Math.max(0, H - 38), material: '3mm_White', quantity: 1, grain: 'vertical' });
+          parts.push({ name: 'Fondo 3mm Blanco', width: Math.max(0, W - 28), height: Math.max(0, H - (isBase ? 14 : 28)), material: '3mm_White', quantity: 1, grain: 'vertical' });
+          backDepth = BACK3_GROOVE_FROM_BACK + 3;
       } else if (backingType === '18MM_STRUCTURE') {
-          // Ancho = Ancho_exterior - 36mm, Profundidad (Alto) = Profundidad_exterior - 18mm? No, Alto = H - 36?
-          // El prompt dice: Ancho = Ancho_exterior - 36mm, Profundidad = Profundidad_exterior - 18mm para el fondo.
-          // Asumimos que "Profundidad" en el fondo es su altura.
-          parts.push({ name: 'Fondo Estructural 18mm', width: Math.max(0, W - 36), height: Math.max(0, H - 18), material: carcassMat, quantity: 1, grain: 'vertical' });
+          parts.push(carcass('Fondo Estructural 18mm', Math.max(0, W - 36), Math.max(0, H - (isBase ? 18 : 36)), 1, 'width', 'vertical'));
+          backDepth = 18;
       } else if (backingType === '55_COLOR') {
-          parts.push({ name: 'Fondo 5.5mm Color', width: Math.max(0, W - 36), height: Math.max(0, H - 18), material: '5.5mm_Color', quantity: 1, grain: 'vertical' });
+          parts.push({ name: 'Fondo 5.5mm Color', width: Math.max(0, W - 10), height: Math.max(0, H - (isBase ? 5 : 10)), material: '5.5mm_Color', quantity: 1, grain: 'vertical' });
+          backDepth = 5.5;
       }
       // 'NONE' (Sin fondo): no se genera pieza.
 
-      // 4. Estantes (si cantidad > 0)
-      // Ancho = Ancho_exterior - 36mm, Profundidad = Profundidad_exterior - 45mm
+      // 3. Estantes: 1 si H > 850 y uno más cada 350 mm. Profundidad = D − fondo − 10 mm de
+      //    retiro (− 18 más con frentes embutidos). Regulables: 2 mm más angostos.
+      //    Bajos: 1 estante regulable si llevan puertas (el esquinero, siempre).
       let extraShelves = 0;
-      if (H > 850) {
-          extraShelves = Math.floor((H - 850) / 350) + 1; 
-      } 
+      if (isBase) {
+          extraShelves = cntDoors > 0 ? 1 : 0;
+      } else if (kind === 'ALACENA') {
+          extraShelves = mod.microwaveFloor ? 0 : wallCabinetShelves(H);
+      } else if (H > 850) {
+          extraShelves = Math.floor((H - 850) / 350) + 1;
+      }
+      const adjustable = mod.adjustableShelves || isBase;
       if (extraShelves > 0) {
-          parts.push({ name: 'Estante Interno', width: Math.max(0, W - 36), height: Math.max(0, D - 45), material: carcassMat, quantity: extraShelves, grain: 'horizontal' });
+          const shelfW = Math.max(0, W - 36 - (adjustable ? 2 : 0));
+          const shelfD = Math.max(0, D - backDepth - SHELF_FRONT_SETBACK - (mod.insetFronts ? 18 : 0));
+          parts.push(carcass('Estante Interno', shelfW, shelfD, extraShelves, 'width', 'horizontal'));
       }
 
-      // 5. Frentes (puertas/cajones)
-      // Ancho = Ancho_exterior - 6mm, Veta = HORIZONTAL
-      const frontWidth = Math.max(0, W - 6);
+      // 4. Frentes: luz de 4 mm entre frentes; superpuestos con 2 mm al borde del módulo,
+      //    embutidos con 4 mm contra la caja.
+      const frontsW = mod.insetFronts ? Math.max(0, W - 36 - 2 * FRONT_GAP) : Math.max(0, W - 2 * FRONT_EDGE_GAP);
       const layout = getFrontLayout(mod);
+      const front = (name: string, w: number, h: number, qty: number): CalculatedPart =>
+          ({ name, width: w, height: h, material: frontMat, quantity: qty, grain: grainOf(fG, w, h, 'horizontal') });
 
       if (cntDrawers > 0) {
-          parts.push({ name: 'Frente Cajón', width: frontWidth, height: layout.drawerH, material: frontMat, quantity: cntDrawers, grain: 'horizontal' });
+          parts.push(front('Frente Cajón', frontsW, layout.drawerH, cntDrawers));
       }
-
-      if (cntDoors > 0 && layout.doorH > 0) {
-          const finalDoorWidth = cntDoors >= 2 ? (W - 10) / cntDoors : frontWidth;
-          parts.push({ name: 'Puerta', width: finalDoorWidth, height: layout.doorH, material: frontMat, quantity: cntDoors, grain: 'horizontal' });
+      if (kind === 'BAJO_HORNO') {
+          // Estante fijo de apoyo del horno: su cara superior deja 600 mm libres hasta la mesada.
+          // Debajo, faja inferior de material de frente (tapacanto visible), con 2 mm de luz al
+          // borde del módulo y al horno.
+          parts.push(carcass('Estante apoyo horno', innerW, Math.max(0, D - SHELF_FRONT_SETBACK), 1, 'width', 'horizontal'));
+          const fajaH = Math.max(0, H - OVEN_FREE_HEIGHT - 2 * FRONT_EDGE_GAP);
+          parts.push(front('Frente faja inferior horno', frontsW, fajaH, 1));
       }
-
+      if (kind === 'ESQUINERO') {
+          // Frente fijo de rincón = profundidad del bajo vecino + 21 + 4 de luz; la puerta, el resto.
+          const fixedW = (mod.neighborDepth || D) + FRONT_OFFSET + 18 + FRONT_GAP;
+          parts.push(front('Frente fijo esquinero', fixedW, layout.doorH, 1));
+          parts.push(front('Puerta', Math.max(0, frontsW - fixedW - FRONT_GAP), layout.doorH, 1));
+      } else if (cntDoors > 0 && layout.doorH > 0) {
+          const doorW = (frontsW - (cntDoors - 1) * FRONT_GAP) / cntDoors;
+          parts.push(front('Puerta', doorW, layout.doorH, cntDoors));
+      }
       if (cntFlaps > 0) {
-          parts.push({ name: 'Frente Abatible', width: frontWidth, height: layout.flapH, material: frontMat, quantity: cntFlaps, grain: 'horizontal' });
+          parts.push(front('Frente Abatible', frontsW, layout.flapH, cntFlaps));
       }
 
-      // 6. Interiores de Cajón
-      // Hueco = W − 36 (entre laterales). Correderas 12,5mm por lado → caja exterior = hueco − 25.
-      // Antes contra/frente y fondo medían W − 26: más que el hueco, la caja no entraba.
+      // 5. Caja de cajón (melamina blanca 15 mm). Hueco = W − 36; correderas 12,5 mm por lado →
+      //    caja exterior = hueco − 25. Alto interior según el alto del frente (80/120/200/300).
+      //    Largo D − 20 (− 18 más con frentes embutidos: el frente ocupa esa profundidad).
       if (cntDrawers > 0) {
-          const drawerHeight = 120;
+          const drawerHeight = drawerBoxHeightFor(layout.drawerH);
+          const boxL = Math.max(0, D - 20 - (mod.insetFronts ? 18 : 0));
           const boxOuterW = Math.max(0, W - 36 - SLIDE_GAP_TOTAL);          // W − 61
           const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);   // W − 91
-          // LATERALES: Ancho = Profundidad_módulo - 20mm, Alto = Alto_cajón
-          parts.push({ name: 'Lateral Cajón', width: Math.max(0, D - 20), height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
+          parts.push({ name: 'Lateral Cajón', width: boxL, height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
           // FRENTE Y TRASERO: entre los laterales de la caja
           parts.push({ name: 'Contra/Frente Cajón', width: boxInnerW, height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
           // FONDO: en ranura en las 4 caras → caja exterior − 4mm por lado
-          parts.push({ name: 'Fondo Cajón', width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, D - 20 - 2 * DRAWER_BOTTOM_INSET), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
+          parts.push({ name: 'Fondo Cajón', width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, boxL - 2 * DRAWER_BOTTOM_INSET), material: '3mm_White', quantity: 1 * cntDrawers, grain: 'free' });
+      }
+      // 6. Cajones internos: solo la caja (80 mm), misma construcción que la caja de cajón.
+      const nInternal = Math.max(0, Math.round(mod.internalDrawers || 0));
+      if (nInternal > 0) {
+          const boxL = Math.max(0, D - 20 - (mod.insetFronts ? 18 : 0));
+          const boxOuterW = Math.max(0, W - 36 - SLIDE_GAP_TOTAL);
+          const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);
+          parts.push({ name: 'Lateral cajón interno', width: boxL, height: INTERNAL_DRAWER_HEIGHT, material: '15mm_White', quantity: 2 * nInternal, grain: 'free' });
+          parts.push({ name: 'Contra/Frente cajón interno', width: boxInnerW, height: INTERNAL_DRAWER_HEIGHT, material: '15mm_White', quantity: 2 * nInternal, grain: 'free' });
+          parts.push({ name: 'Fondo cajón interno', width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, boxL - 2 * DRAWER_BOTTOM_INSET), material: '3mm_White', quantity: nInternal, grain: 'free' });
       }
 
       return parts;
@@ -311,6 +432,8 @@ export const visibleEdgeLength = (p: CalculatedPart): number => {
     if (isVisibleFrontPiece(p.name)) return (w + h) * 2;
     if ((p.material || '').includes('15mm')) return w;
     if (/^Fondo/.test(p.name || '')) return 0;
+    if (p.frontEdge === 'width') return w;
+    if (p.frontEdge === 'height') return h;
     if (p.grain === 'vertical') return h;
     if (p.grain === 'horizontal') return w;
     return Math.max(w, h);
@@ -355,7 +478,7 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
     const detailedHardware: Record<string, number> = {};
 
     currentModules.forEach(rawMod => {
-        const mod = { ...rawMod, ...scenarioOverride };
+        const mod = normalizeCabinet({ ...rawMod, ...scenarioOverride } as ExtendedCabinetModule);
         const qty = mod.quantity || 1;
         const parts = calculateModuleParts(mod);
         
@@ -400,9 +523,25 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
             detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (sh.hinges * qty);
             modHinges += sh.hinges;
         }
+        // Patas regulables (base del módulo estándar): 4 hasta 900 mm de ancho, 6 a partir de ahí.
+        // Las opciones del estándar no aplican a plantillas (el formulario las conserva al cambiar de tipo).
+        const isStandard = !(mod as any).isSpecialModule;
+        if (isStandard && mod.baseType === 'PATAS') {
+            detailedHardware[LEG_LABEL] = (detailedHardware[LEG_LABEL] || 0) + (legsFor(mod.width || 0) * qty);
+        }
+        // Estantes regulables: 4 soportes por estante. Se cuentan pero no se cobran (costo despreciable).
+        if (isStandard && (mod.adjustableShelves || mod.cabinetType === 'BAJO' || mod.cabinetType === 'ESQUINERO')) {
+            const shelves = parts.filter(p => /^Estante/.test(p.name)).reduce((a, p) => a + (p.quantity || 1), 0);
+            if (shelves > 0) detailedHardware[SHELF_SUPPORT_LABEL] = (detailedHardware[SHELF_SUPPORT_LABEL] || 0) + (4 * shelves * qty);
+        }
+        if (sh.brackets > 0) {
+            const bracketName = bracketLabel(sh.bracketLength);
+            detailedHardware[bracketName] = (detailedHardware[bracketName] || 0) + (sh.brackets * qty);
+        }
         if (mod.calculateSlides && !templateSlides) {
-            modSlides += (mod.cntDrawers || 0);
-            const slideLen = getStandardSlideLength(d);
+            modSlides += (mod.cntDrawers || 0) + (isStandard ? Math.max(0, Math.round(mod.internalDrawers || 0)) : 0);
+            // Con frentes embutidos la caja es 18 mm más corta: la guía se elige con esa profundidad.
+            const slideLen = getStandardSlideLength(mod.insetFronts ? d - 18 : d);
             const slideName = `${SLIDE_LABELS[mod.slideType || 'TELESCOPIC']} (${slideLen}mm)`;
             if (modSlides > 0) detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (modSlides * qty);
         }
@@ -613,6 +752,8 @@ export const hwPriceFor = (name: string, qty: number, S: any): number => {
     else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
     else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
     else if (n.includes('guías') || n.includes('guia')) unitPrice = resolveSlidePrice(name, S).price;
+    else if (n.includes('pata regulable'))                          unitPrice = S.priceLeg || 0;
+    else if (n.includes('ménsula'))                                 unitPrice = (n.includes('25cm') ? S.priceFloatingBracket25 : S.priceFloatingBracket15) || 0;
     return unitPrice * qty;
 };
 
