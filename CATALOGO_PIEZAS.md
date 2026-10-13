@@ -191,7 +191,6 @@ Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código ante
 | Apertura | 4 o más puertas: en pares (izquierda/derecha). Módulo de 1 puerta en el centro del mueble: indistinto (izquierda). |
 | Cajones | El alto de interior (alto del lateral de la caja, 15 mm) depende del alto del frente: 80 / 120 / 200 / 300 mm. Puede haber cajón interno detrás de un frente. Fondo de cajón a 10 mm de abajo en todos los altos. |
 | Patas | Opcionales. 4 hasta 900 mm de ancho; 6 a partir de ahí. Altura de 120 mm que **se suma a H**. Herraje "Pata regulable" en la lista de precios. |
-
 | Profundidad del estante | Fondo 3 mm → D − 31; 5,5 mm → D − 15,5; 18 mm → D − 28; sin fondo → D − 10 (− 18 más con frente embutido). |
 | Caja de cajón | Interior según el frente: < 160 → 80; 160–239 → 120; 240–339 → 200; ≥ 340 → 300 mm. Con frente embutido la caja es 18 mm más corta (y la guía se elige con esa profundidad). |
 | Frentes combinados | El formulario no deja cargar nuevos; los presupuestos guardados se siguen calculando igual. |
@@ -201,4 +200,48 @@ a confirmar: caja de cajón 18 mm más corta con frente embutido.
 
 Pendientes: **cajón interno** (solo la caja, sin frente): falta su alto y cómo se combina con la
 caja del frente. Patas: se cobran y elevan el módulo en 3D, pero todavía no se dibujan.
-Módulos de cocina: por definir.
+Módulos de cocina: ver abajo.
+
+## Módulos de cocina — 13/10/2026
+
+Hallazgo previo (verificado con el motor): el **Bajo mesada actual no genera puertas**. Con
+puertas cargadas cobra las bisagras, pero no la placa ni el tapacanto de las puertas (cotiza
+por debajo). El **Esquinero en L** no tiene ningún frente.
+
+### Bajos (bajo mesada y esquineros)
+
+| # | Tema | Regla del taller | Hoy |
+|---|---|---|---|
+| 1 | Tapa | Sin tapa (va la mesada). Faja frontal y faja trasera de 100 mm. | Igual |
+| 2 | Laterales | Enteros (H × D); piso entre laterales. | Igual |
+| 3 | Alturas | Caja 740, zócalo 100, mesada 20 (total 860). Base: **banquina, zócalo estructural o patas regulables**; en los tres casos puede llevar **zócalo aplicado** o no. | Sin base |
+| 4 | Profundidad | **581 con frentes** (caja 560 + 21). La mesada (600) vuela. | — |
+| 5 | Fondo 3 mm | En ranura en laterales y piso, a 18 mm de atrás. Faja trasera superior de 100 mm (para fijar a la pared y rigidizar). | (W − 36) × (H − 110), sin ranura |
+| 6 | Puertas | Mismas reglas que el estándar. | **No se generan** |
+| 7 | Cajones | Mismas reglas que el estándar; la cantidad la carga el usuario. | Automáticos, 1 cada 180 mm, sin luces |
+| 8 | Variantes | No hay (bacha y anafe se arman igual). | — |
+| 9 | Esquinero recto | Panel fijo = **profundidad del bajo que llega de costado + 21 + luz**. Puerta = resto. | Panel fijo de 620 |
+| 10 | Esquinero recto | Solo un estante. | Sin estante |
+| 11 | Esquinero en L | **Dos puertas separadas**, brazos de medida variable, lleva estante. | Sin frentes ni estante |
+
+### Alacena
+
+| # | Tema | Regla del taller |
+|---|---|---|
+| 12 | Construcción | Tapa y base sobre laterales (como el estándar). |
+| 13 | Profundidad | 320 mm + frente. |
+| 14 | Fondo | 3 mm en ranura a 18 mm de atrás + faja trasera superior de 100 mm. |
+| 15 | Colgadores | No lleva. |
+| 16 | Frentes | Puertas o abatibles (un solo tipo). |
+| 17 | Altura | Base a 600 mm sobre la mesada (860 + 600 = 1460 mm del piso). |
+
+### Columna, horno y microondas
+
+| # | Tema | Regla del taller |
+|---|---|---|
+| 18 | Columna | Módulos apilados + **dos laterales aplicados** de la altura total, que avanzan 21 mm (al ras de las puertas). |
+| 19 | Horno | Va dentro de la columna. 595 mm "entre ejes" de laterales y entre base y techo. |
+| 20 | Horno | Sin fondo; techo con 300 mm recortados atrás para ventilar. |
+| 21 | Microondas | En columna (de empotrar): mismo ancho libre que el horno, 385 mm "entre ejes" de piso y techo. En alacena (convencional): piso de 420 mm mínimo, 580 de ancho libre y 350 de alto libre. |
+
+Pendientes: repreguntas de cocina (13/10).
