@@ -274,7 +274,21 @@ Supuestos míos a confirmar:
 - Columna: el ancho es el exterior total; los módulos de adentro miden ancho − 36. La base de la
   columna todavía no se aplica (se dibuja en el piso).
 
-Pendientes: esquinero en L (falta cómo se cotiza el piso en L: ¿rectángulo envolvente o dos
-rectángulos?); microondas de columna (¿lleva fondo?); horno en bajo mesada (¿qué lleva debajo?);
-alacena con piso de microondas y frentes (el piso de 420 choca con el frente: ¿el hueco del
-microondas va abierto?).
+### Tercera ronda (13/10)
+
+| Tema | Regla |
+|---|---|
+| Supuestos 1, 2, 4 y 5 | Confirmados. |
+| Estantes de alacena | Hasta 600 mm de alto → 1; hasta 900 → 2; más de 900 → 3. |
+| Módulo microondas (alacena) | Módulo abierto (sin frentes), fondo de 18 mm, piso de 420 mm que sobresale 100 mm hacia adelante. |
+| Esquinero en L | Se cotiza como dos rectángulos (piso y estante). |
+| Microondas de columna (de empotrar) | Sin fondo. 613 × 403 (mismo ancho que el horno; 385 entre ejes de piso y techo). |
+| Horno en bajo mesada | Lleva faja inferior. |
+| Cajón interno | Solo la caja, 80 mm de alto; con sus guías. |
+
+**Implementado:** estantes de alacena, módulo microondas de alacena (sin faja trasera: el fondo
+de 18 mm la reemplaza — supuesto mío), microondas de columna y cajón interno (en 3D se apilan
+desde el piso cada 120 mm — supuesto de dibujo).
+
+Pendientes de definir: despiece del esquinero en L y del bajo mesada para horno (propuestas
+enviadas a Gustavo el 13/10).

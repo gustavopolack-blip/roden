@@ -14,7 +14,7 @@ describe('grupos de plantillas', () => {
   it('Módulos: las cajas', () => {
     expect(ids('MODULO')).toEqual([
       'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L',
-      'HORNO_EMPOTRADO', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
+      'HORNO_EMPOTRADO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
     ]);
   });
   it('bajo mesada y esquinero recto viejos: ocultos (los reemplazan variantes del estándar)', () => {

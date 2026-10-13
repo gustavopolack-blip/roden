@@ -127,3 +127,39 @@ describe('horno empotrado y columna', () => {
     expect(buildAssembly('x', [c, h]).issues.filter(i => i.code === 'MODULE_OVERLAP')).toEqual([]);
   });
 });
+
+describe('repreguntas de cocina (13/10)', () => {
+  const ala = (over: any = {}) => mod({ cabinetType: 'ALACENA', width: 600, height: 700, depth: 320, cntDoors: 2, ...over });
+  const shelves = (h: number) => (calculateModuleParts(ala({ height: h }) as any).find(p => p.name === 'Estante Interno')?.quantity || 0);
+  it('alacena: 1 estante hasta 600 mm de alto, 2 hasta 900, 3 si es más alta', () => {
+    expect([shelves(600), shelves(700), shelves(900), shelves(901), shelves(1200)]).toEqual([1, 2, 2, 3, 3]);
+  });
+  it('módulo microondas de alacena: abierto, fondo 18 mm, piso de 420 que sobresale 100 mm', () => {
+    const p = calculateModuleParts(ala({ microwaveFloor: true, cntFlaps: 1 }) as any);
+    expect(p.some(x => /^(Puerta|Frente)/.test(x.name))).toBe(false);
+    expect(size(p, 'Fondo Estructural 18mm')).toEqual([564, 664, 1]);
+    expect(p.some(x => x.name === 'Faja trasera' || x.name === 'Estante Interno')).toBe(false);
+    const { pieces } = placeModule(ala({ microwaveFloor: true }));
+    expect(pieces.find(x => x.name === 'Base inferior')!.box.max[2]).toBe(420);
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+  });
+  it('microondas de empotrar (columna): 613 × 403, sin fondo', () => {
+    const m = special('MICROONDAS_COLUMNA', { width: 600, height: 400, depth: 560 });
+    expect([m.width, m.height]).toEqual([613, 403]);
+    const p = calculateModuleParts(m as any);
+    expect(size(p, 'Lateral')).toEqual([560, 367, 2]);
+    expect(p.some(x => /^Fondo/.test(x.name))).toBe(false);
+    expect(placeModule(m).status).toBe('placed');
+  });
+  it('cajón interno: solo la caja de 80 mm, con sus guías y sin frente', () => {
+    const m = mod({ width: 600, height: 720, depth: 580, cntDoors: 2, internalDrawers: 2 });
+    const p = calculateModuleParts(m as any);
+    expect(size(p, 'Lateral cajón interno')).toEqual([560, 80, 4]);
+    expect(size(p, 'Contra/Frente cajón interno')).toEqual([509, 80, 4]);
+    expect(p.some(x => x.name === 'Frente Cajón')).toBe(false);
+    expect(calculateItemQuantities([m as any]).totalSlides).toBe(2);
+    const { pieces } = placeModule(m);
+    expect(pieces.filter(x => x.name === 'Lateral cajón interno').length).toBe(4);
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+  });
+});

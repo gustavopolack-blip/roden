@@ -1819,6 +1819,32 @@
     "grain": "vertical"
    }
   ],
+  "sp21": [
+   {
+    "name": "Tapa superior",
+    "width": 613,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Base inferior",
+    "width": 613,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 367,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical"
+   }
+  ],
   "man": []
  },
  "labels": {
@@ -2116,6 +2142,11 @@
   "sp20": [
    "Melamina Blanca 18mm MDP"
   ],
+  "sp21": [
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF"
+  ],
   "man": []
  },
  "quantities": {
@@ -2240,7 +2271,7 @@
    "backing3": 2,
    "linearWhite22": 46,
    "linearWhite45": 7,
-   "linearColor22": 40,
+   "linearColor22": 42,
    "linearColor45": 10,
    "linear2mm": 0,
    "lacquerAreaM2": 0,
@@ -2372,15 +2403,15 @@
    "fixedCosts": 78000,
    "extrasCost": 0,
    "tPlacas": 1211300,
-   "tTapac": 97630,
+   "tTapac": 99610,
    "tHerrajes": 60400,
    "tFinish": 0,
    "finArea": 0,
    "finPrice": 0,
    "finishLines": [],
-   "costoDirecto": 1957330,
-   "precioTaller": 2642395.5,
-   "precioFinal": 3302994.375
+   "costoDirecto": 1959310,
+   "precioTaller": 2645068.5,
+   "precioFinal": 3306335.625
   },
   "con_manual": {
    "laborCost": 510000,
@@ -2463,25 +2494,25 @@
    "veneer": 6507405
   },
   "especiales": {
-   "whiteAglo": 2539012.5000000005,
-   "whiteMDF": 2769862.5,
-   "colorAglo": 2946172.5,
-   "colorMDF": 3217522.5,
-   "whiteLacqAglo": 5259802.5,
-   "whiteLacqMDF": 5452177.5,
-   "colorLacqAglo": 5566455,
-   "colorLacqMDF": 5792580,
-   "whiteVenrAglo": 5374890,
-   "whiteVenrMDF": 5567265,
-   "colorVenrAglo": 5681542.5,
-   "colorVenrMDF": 5907667.5,
-   "baseConfig": 2946172.5,
-   "totalDirectCost": 1745880,
-   "realConfig": 3302994.375,
-   "realConfigTaller": 2642395.5,
-   "realConfigDirect": 1957330,
-   "lacquer": 5259802.5,
-   "veneer": 5374890
+   "whiteAglo": 2541138.7500000005,
+   "whiteMDF": 2771988.75,
+   "colorAglo": 2949513.75,
+   "colorMDF": 3220863.75,
+   "whiteLacqAglo": 5483328.75,
+   "whiteLacqMDF": 5714178.75,
+   "colorLacqAglo": 5846208.75,
+   "colorLacqMDF": 6117558.75,
+   "whiteVenrAglo": 5598416.25,
+   "whiteVenrMDF": 5829266.25,
+   "colorVenrAglo": 5961296.25,
+   "colorVenrMDF": 6232646.25,
+   "baseConfig": 2949513.75,
+   "totalDirectCost": 1747860,
+   "realConfig": 3306335.625,
+   "realConfigTaller": 2645068.5,
+   "realConfigDirect": 1959310,
+   "lacquer": 5483328.75,
+   "veneer": 5598416.25
   },
   "con_manual": {
    "whiteAglo": 1742411.25,

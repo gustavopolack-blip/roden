@@ -3610,7 +3610,13 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     {activeVariant?.cabinetType === 'ALACENA' && (
                                         <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
                                             <input type="checkbox" className="w-4 h-4" checked={!!(moduleForm as ExtendedCabinetModule).microwaveFloor} onChange={e => handleInputChange('microwaveFloor', e.target.checked)}/>
-                                            <span>Piso para microondas (420 mm)</span>
+                                            <span>Módulo microondas (abierto, fondo 18 mm, piso 420 mm)</span>
+                                        </label>
+                                    )}
+                                    {activeVariant?.cabinetType !== 'ESQUINERO' && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
+                                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                                            <span>Cajones internos (80 mm)</span>
+                                            <input type="number" min={0} className="border p-1 rounded text-xs w-14 text-center" value={(moduleForm as ExtendedCabinetModule).internalDrawers ?? 0} onChange={e => handleInputChange('internalDrawers', Math.max(0, Math.round(Number(e.target.value))) || undefined)}/>
                                         </label>
                                     )}
                                     {([

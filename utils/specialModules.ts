@@ -1142,6 +1142,25 @@ const COLUMNA: SpecialModuleTemplate = {
   }
 };
 
+// Microondas de empotrar (en la columna): mismo ancho que el horno (613 exterior), 385 mm
+// entre ejes de piso y techo (403 exterior). Sin fondo.
+export const MICROWAVE_AXIS_H = 385;
+const MICROONDAS_COLUMNA: SpecialModuleTemplate = {
+  id: 'MICROONDAS_COLUMNA',
+  group: 'MODULO',
+  name: 'Módulo microondas de empotrar (columna)',
+  description: 'Mismo ancho que el horno (613); 385 mm entre ejes de piso y techo (403 exterior). Sin fondo.',
+  params: ['depth'],
+  fixedDims: () => ({ width: OVEN_AXIS + 18, height: MICROWAVE_AXIS_H + 18 }),
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+    parts.push({ name: 'Tapa superior', width: W, height: D,                   material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Base inferior', width: W, height: D,                   material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Lateral',       width: D, height: Math.max(0, H - 36), material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
+    return { parts, hardware: {}, laborDays: 0 };
+  }
+};
+
 export const SPECIAL_MANUAL_ID = 'ESPECIAL_MANUAL';
 
 // No tiene template con calculate() — se maneja directamente
@@ -1178,6 +1197,7 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   // ── Cocina (al final: la matriz de pruebas numera las plantillas por posición) ──
   HORNO_EMPOTRADO,
   COLUMNA,
+  MICROONDAS_COLUMNA,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>

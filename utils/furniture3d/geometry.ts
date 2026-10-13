@@ -375,6 +375,29 @@ const placeCarcass: Placer = (mod, parts) => {
     });
   }
 
+  // Cajones internos (solo la caja): apilados desde el piso, detrás de los frentes.
+  const intLat = idxOf(/^Lateral cajón interno/)[0];
+  const intTesta = idxOf(/^Contra\/Frente cajón interno/)[0];
+  const intFondo = idxOf(/^Fondo cajón interno/)[0];
+  if (intLat !== undefined && intTesta !== undefined) {
+    const lat = parts[intLat], testa = parts[intTesta];
+    const tSide = materialThickness(lat.material), tT = materialThickness(testa.material);
+    const outerW = testa.width + 2 * tSide, bx0 = (W - outerW) / 2;
+    const bz1 = inset ? D - 18 : D, bz0 = bz1 - lat.width, bh = lat.height;
+    const n = Math.round((lat.quantity || 2) / 2);
+    for (let k = 0; k < n; k++) {
+      const yb = 18 + 10 + k * (bh + 40);   // separación vertical entre cajas: supuesto de dibujo
+      pieces.push(makePiece(mod, parts, intLat, nextCopy(intLat), mkBox(bx0, bx0 + tSide, yb, yb + bh, bz0, bz1), 'drawer'));
+      pieces.push(makePiece(mod, parts, intLat, nextCopy(intLat), mkBox(bx0 + outerW - tSide, bx0 + outerW, yb, yb + bh, bz0, bz1), 'drawer'));
+      pieces.push(makePiece(mod, parts, intTesta, nextCopy(intTesta), mkBox(bx0 + tSide, bx0 + tSide + testa.width, yb, yb + bh, bz0, bz0 + tT), 'drawer'));
+      pieces.push(makePiece(mod, parts, intTesta, nextCopy(intTesta), mkBox(bx0 + tSide, bx0 + tSide + testa.width, yb, yb + bh, bz1 - tT, bz1), 'drawer'));
+      if (intFondo !== undefined) {
+        const f = parts[intFondo], fx0 = (W - f.width) / 2, fz0 = bz0 + (lat.width - f.height) / 2;
+        pieces.push(makePiece(mod, parts, intFondo, nextCopy(intFondo), mkBox(fx0, fx0 + f.width, yb + 10, yb + 13, fz0, fz0 + f.height), 'drawer', { groove: true }));
+      }
+    }
+  }
+
   // Base (banquina, zócalo estructural o patas): el módulo se eleva 100 mm. La base no se dibuja:
   // la banquina es obra, el zócalo se carga aparte como pieza y las patas son herraje.
   if (mod.baseType && !mod.isSpecialModule) {
@@ -462,6 +485,7 @@ const placeColumnSides: Placer = (mod, parts) => {
 
 export const MODULE_PLACERS: Record<string, Placer> = {
   HORNO_EMPOTRADO: placeCarcass,
+  MICROONDAS_COLUMNA: placeCarcass,
   COLUMNA: placeColumnSides,
   STANDARD: placeCarcass,
   MODULO_ABIERTO: placeCarcass,
