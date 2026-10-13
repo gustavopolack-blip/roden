@@ -144,3 +144,34 @@ ancho W, alto H, profundidad D), **qué carga el usuario**, **herrajes** (cuále
 | Cajonera interior de placard | Módulos | ¿Lleva laterales propios o va entre los laterales del placard? Frentes: ¿18 mm de frente o 15 mm blanco interior? ¿Guías y alto de cajón? |
 | Frente de cajón suelto | Piezas | ¿Solo la placa de frente (4 cantos 45 mm) o incluye caja y guías? |
 | Frente abatible suelto | Piezas | ¿Lleva bisagras (¿cuántas?) y pistón? |
+
+---
+
+# Ficha constructiva (definida con Gustavo)
+
+Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código antes de aplicarlas.
+**[costo]** = cambia medidas de corte o herrajes (al implementarlo se regenera la foto de costos).
+
+## Módulo estándar — 13/10/2026
+
+| # | Tema | Regla del taller | Hoy | Impacto |
+|---|---|---|---|---|
+| 1 | Profundidad | Frentes delante de D, separados 3 mm del módulo. Profundidad total = D + 21 mm. | Frente pegado a D (D + 18) | 3D |
+| 2 | Tapa y base | Siempre sobre laterales. Opción **Laterales enteros** para casos especiales. | Solo sobre laterales | [costo] con la opción |
+| 3 | Fondo 3 mm | En ranura en tapa, base y laterales; ranura de 5 mm de profundidad en todo el perímetro. | (W − 36) × (H − 38), sin ranura | [costo] |
+| 4a | Fondo 5,5 mm | Rebaje atrás para que quede al ras. Medida = 5 mm hacia adentro desde los bordes del módulo. | (W − 36) × (H − 18), laterales D − 18 | [costo] |
+| 4b | Fondo estructural 18 mm | Entre laterales y entre tapa y base; atornillado a los cuatro. | (W − 36) × (H − 18), laterales D − 18 | [costo] |
+| 5 | Cantidad de estantes | H > 850 → 1 + 1 cada 350 mm. | Igual | — |
+| 6 | Estantes regulables | Opción **Estantes regulables**. | No existe | [costo] si llevan herraje |
+| 7 | Posición de estantes | Equidistantes. | Igual | — |
+| 8 | Profundidad del estante | D − espesor del fondo − 10 mm (retiro desde el frente). | D − 45 | [costo] |
+| 9 | Frentes | Superpuestos por defecto. Opción **Frente embutido**. | Solo superpuestos | [costo] con la opción |
+| 10 | Luces | 4 mm entre frentes, vertical y horizontal. | 4 mm vertical; entre puertas 4 mm (2 puertas) o 2 mm (3 puertas) | [costo] menor |
+| 11 | Veta | Melamina lisa: libre. Con veta: paralela al lado mayor de la pieza. | Fija por pieza (horizontal / vertical) | Optimizador y planilla |
+| 13 | Apertura | 1 puerta: bisagras del lado del eje del mueble en que está el módulo (izquierda del eje → izquierda). 2 puertas: izquierda / derecha. 3 puertas: izquierda, derecha, derecha. | 1 puerta: izquierda; 2+: hacia afuera | 3D |
+| 14 | Cajones | Interior estándar de 80 mm; también de 120, 200 o 300 mm. | Caja fija de 120 mm | [costo] |
+| 15 | Caja y guías | Caja D − 20; guía según profundidad (300/400/500). | Igual | — |
+| 16 | Fondo de cajón | En ranura en las 4 caras, a 10 mm de abajo, 4 mm menos por lado. | Igual | — |
+| 17 | Patas | Opcionales. | No existen | [costo] herraje |
+
+Pendientes del estándar: ver repreguntas (sesión del 13/10). Módulos de cocina: por definir.
