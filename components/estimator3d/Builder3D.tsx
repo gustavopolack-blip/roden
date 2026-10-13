@@ -378,9 +378,13 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
               {selPiece ? (
                 <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs space-y-1">
                   <p className="font-bold text-sm text-indigo-900">{selPiece.name}</p>
+                  {selPiece.role === 'hardware' ? (
+                    <p><span className="text-gray-500">Herraje:</span> <span className="font-mono">Ø {fmt(selPiece.partSize.width)} × {fmt(selPiece.partSize.height)} mm</span> (no va al despiece)</p>
+                  ) : (<>
                   <p><span className="text-gray-500">Placa:</span> {selPiece.boardLabel}</p>
                   <p><span className="text-gray-500">Medidas:</span> <span className="font-mono">{fmt(selPiece.partSize.width)} × {fmt(selPiece.partSize.height)} × {selPiece.thickness} mm</span></p>
                   <p><span className="text-gray-500">Veta:</span> {selPiece.grain === 'horizontal' ? 'horizontal (a lo ancho)' : selPiece.grain === 'vertical' ? 'vertical (a lo alto)' : 'libre'}</p>
+                  </>)}
                   {selPiece.hingeSide && <p><span className="text-gray-500">Bisagra:</span> {selPiece.hingeSide === 'left' ? 'izquierda' : 'derecha'}</p>}
                   {selPiece.groove && <p className="text-gray-500">Va en ranura.</p>}
                   <p className="text-gray-500">Módulo: {selectedPlaced?.name}</p>

@@ -26,6 +26,7 @@ export const materialColorFor = (label: string): [number, number, number] => {
   if (l.includes('kiri')) return [0.76, 0.6, 0.42];
   if (l.includes('blanc')) return [0.96, 0.96, 0.95];
   if (l.includes('volumen')) return [0.7, 0.75, 0.85];
+  if (l.includes('pata')) return [0.25, 0.25, 0.25];          // herraje: gris oscuro de referencia
   // color de melamina: tono estable derivado del nombre
   let h = 0;
   for (let i = 0; i < l.length; i++) h = (h * 31 + l.charCodeAt(i)) >>> 0;
@@ -57,12 +58,12 @@ const FACES: [Vec3, Vec3, Vec3][] = [
 ];
 const axisOf = (v: Vec3) => (v[0] !== 0 ? 0 : v[1] !== 0 ? 1 : 2);
 
-export interface BoxMesh { positions: Vec3[]; normals: Vec3[]; uvs: [number, number][]; quads: [number, number, number, number][] }
+export interface BoxMesh { positions: Vec3[]; normals: Vec3[]; uvs: [number, number][]; polys: number[][] }
 
 /** Caja centrada en el origen, tamaño `size` (mm). UV en metros, U siguiendo la veta. */
 export const boxMesh = (size: Vec3, grainAxis: 0 | 1 | 2 = 0): BoxMesh => {
   const h: Vec3 = [size[0] / 2, size[1] / 2, size[2] / 2];
-  const positions: Vec3[] = [], normals: Vec3[] = [], uvs: [number, number][] = [], quads: [number, number, number, number][] = [];
+  const positions: Vec3[] = [], normals: Vec3[] = [], uvs: [number, number][] = [], polys: number[][] = [];
   FACES.forEach(([nv, u, v]) => {
     const na = axisOf(nv), ua = axisOf(u), va = axisOf(v);
     const base = positions.length;
@@ -76,15 +77,46 @@ export const boxMesh = (size: Vec3, grainAxis: 0 | 1 | 2 = 0): BoxMesh => {
       const cu = (p[ua] + h[ua]) / 1000, cv = (p[va] + h[va]) / 1000;
       uvs.push(grainAxis === va ? [cv, cu] : [cu, cv]);
     });
-    quads.push([base, base + 1, base + 2, base + 3]);
+    polys.push([base, base + 1, base + 2, base + 3]);
   });
-  return { positions, normals, uvs, quads };
+  return { positions, normals, uvs, polys };
 };
+
+/** Cilindro vertical (eje y) centrado en el origen, inscripto en `size` (herrajes: patas). */
+export const cylinderMesh = (size: Vec3, segments = 24): BoxMesh => {
+  const rx = size[0] / 2, rz = size[2] / 2, hy = size[1] / 2;
+  const positions: Vec3[] = [], normals: Vec3[] = [], uvs: [number, number][] = [], polys: number[][] = [];
+  const ang = (k: number) => (2 * Math.PI * k) / segments;
+  // Lateral: un cuadrilátero por segmento, normal radial por vértice
+  for (let k = 0; k < segments; k++) {
+    const base = positions.length;
+    [k, k + 1].forEach(j => {
+      const c = Math.cos(ang(j)), s = Math.sin(ang(j));
+      [-hy, hy].forEach(y => { positions.push([rx * c, y, rz * s]); normals.push([c, 0, s]); uvs.push([j / segments, (y + hy) / 1000]); });
+    });
+    // orden (k,abajo) (k,arriba) (k+1,arriba) (k+1,abajo): antihorario visto desde afuera
+    polys.push([base, base + 1, base + 3, base + 2]);
+  }
+  // Tapas: un polígono cada una
+  [hy, -hy].forEach(y => {
+    const base = positions.length, up = y > 0;
+    for (let k = 0; k < segments; k++) {
+      const c = Math.cos(ang(k)), s = Math.sin(ang(k));
+      positions.push([rx * c, y, rz * s]); normals.push([0, up ? 1 : -1, 0]); uvs.push([(rx * c + rx) / 1000, (rz * s + rz) / 1000]);
+    }
+    const ring = Array.from({ length: segments }, (_, k) => base + k);
+    polys.push(up ? ring.reverse() : ring);
+  });
+  return { positions, normals, uvs, polys };
+};
+
+const meshFor = (m: { size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder' }): BoxMesh =>
+  m.shape === 'cylinder' ? cylinderMesh(m.size) : boxMesh(m.size, m.grainAxis);
 
 // ─────────────────────────────────────────────────────────────
 // Nodos comunes de la escena (los usan FBX y OBJ)
 // ─────────────────────────────────────────────────────────────
-interface MeshNode { name: string; material: string; translation: Vec3; size: Vec3; grainAxis: 0 | 1 | 2; props: Record<string, string> }
+interface MeshNode { name: string; material: string; translation: Vec3; size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder'; props: Record<string, string> }
 interface ModuleNode { name: string; translation: Vec3; rotY: number; meshes: MeshNode[] }
 
 const pieceProps = (p: Piece3D): Record<string, string> => ({
@@ -103,7 +135,7 @@ const collectNodes = (scene: FurnitureScene): ModuleNode[] => {
     const meshes: MeshNode[] = sm.pieces.map(sp => ({
       name: unique(safeName(`${mName}_${sp.piece.name}${sp.piece.hingeSide ? `_bisagra_${sp.piece.hingeSide === 'left' ? 'izq' : 'der'}` : ''}`)),
       material: safeName(sp.piece.boardLabel),
-      translation: boxCenter(sp.box), size: boxSize(sp.box), grainAxis: sp.piece.grainAxis,
+      translation: boxCenter(sp.box), size: boxSize(sp.box), grainAxis: sp.piece.grainAxis, shape: sp.piece.shape,
       props: pieceProps(sp.piece),
     }));
     if (sm.placeholder) {
@@ -174,17 +206,18 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
     m.meshes.forEach(mesh => {
       const gid = id(), oid = id();
       counts.geometry++; counts.model++;
-      const bm = boxMesh(mesh.size, mesh.grainAxis);
+      const bm = meshFor(mesh);
       const verts = bm.positions.flat().map(n).join(',');
-      const idx = bm.quads.map(q => `${q[0]},${q[1]},${q[2]},${-q[3] - 1}`).join(',');
-      const norms = bm.quads.flatMap(q => q.map(i => bm.normals[i])).flat().map(n).join(',');
+      const idx = bm.polys.map(q => q.map((i, k) => (k === q.length - 1 ? -i - 1 : i)).join(',')).join(',');
+      const nIdx = bm.polys.reduce((a, q) => a + q.length, 0);
+      const norms = bm.polys.flatMap(q => q.map(i => bm.normals[i])).flat().map(n).join(',');
       const uvs = bm.uvs.flat().map(n).join(',');
-      const uvIdx = bm.quads.flat().join(',');
+      const uvIdx = bm.polys.flat().join(',');
       objects.push(`\tGeometry: ${gid}, "Geometry::${mesh.name}", "Mesh" {
 \t\tVertices: *${bm.positions.length * 3} {
 \t\t\ta: ${verts}
 \t\t}
-\t\tPolygonVertexIndex: *${bm.quads.length * 4} {
+\t\tPolygonVertexIndex: *${nIdx} {
 \t\t\ta: ${idx}
 \t\t}
 \t\tGeometryVersion: 124
@@ -193,7 +226,7 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
 \t\t\tName: ""
 \t\t\tMappingInformationType: "ByPolygonVertex"
 \t\t\tReferenceInformationType: "Direct"
-\t\t\tNormals: *${bm.quads.length * 12} {
+\t\t\tNormals: *${nIdx * 3} {
 \t\t\t\ta: ${norms}
 \t\t\t}
 \t\t}
@@ -205,7 +238,7 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
 \t\t\tUV: *${bm.uvs.length * 2} {
 \t\t\t\ta: ${uvs}
 \t\t\t}
-\t\t\tUVIndex: *${bm.quads.length * 4} {
+\t\t\tUVIndex: *${nIdx} {
 \t\t\t\ta: ${uvIdx}
 \t\t\t}
 \t\t}
@@ -344,7 +377,7 @@ export const exportOBJ = (scene: FurnitureScene, mtlFileName = 'amoblamiento.mtl
 
   modules.forEach(m => {
     m.meshes.forEach(mesh => {
-      const bm = boxMesh(mesh.size, mesh.grainAxis);
+      const bm = meshFor(mesh);
       lines.push(`o ${mesh.name}`, `g ${root}/${m.name}/${mesh.name}`, `usemtl ${mesh.material}`);
       bm.positions.forEach(p => {
         const local: Vec3 = [p[0] + mesh.translation[0], p[1] + mesh.translation[1], p[2] + mesh.translation[2]];
@@ -353,7 +386,7 @@ export const exportOBJ = (scene: FurnitureScene, mtlFileName = 'amoblamiento.mtl
       });
       bm.uvs.forEach(uv => lines.push(`vt ${n(uv[0])} ${n(uv[1])}`));
       bm.normals.forEach(nv => { const r = rotateY(nv, m.rotY); lines.push(`vn ${n(r[0])} ${n(r[1])} ${n(r[2])}`); });
-      bm.quads.forEach(q => lines.push('f ' + q.map(i => `${i + vBase}/${i + vBase}/${i + vBase}`).join(' ')));
+      bm.polys.forEach(q => lines.push('f ' + q.map(i => `${i + vBase}/${i + vBase}/${i + vBase}`).join(' ')));
       vBase += bm.positions.length;
     });
   });

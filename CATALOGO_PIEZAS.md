@@ -190,7 +190,7 @@ Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código ante
 | Frentes combinados | **No se usan.** Un módulo lleva un solo tipo de frente. |
 | Apertura | 4 o más puertas: en pares (izquierda/derecha). Módulo de 1 puerta en el centro del mueble: indistinto (izquierda). |
 | Cajones | El alto de interior (alto del lateral de la caja, 15 mm) depende del alto del frente: 80 / 120 / 200 / 300 mm. Puede haber cajón interno detrás de un frente. Fondo de cajón a 10 mm de abajo en todos los altos. |
-| Patas | Opcionales. 4 hasta 900 mm de ancho; 6 a partir de ahí. Altura de 120 mm que **se suma a H**. Herraje "Pata regulable" en la lista de precios. |
+| Patas | Opcionales. 4 hasta 900 mm de ancho; 6 a partir de ahí. Altura de **100 mm** que **se suma a H**. Herraje "Pata regulable" en la lista de precios. Redondas de **Ø 40 mm**; centro a **40 mm** de los costados, del frente y de atrás de la estructura; con 6, el par extra va centrado en el ancho. El zócalo aplicado va delante de las patas delanteras. |
 | Profundidad del estante | Fondo 3 mm → D − 31; 5,5 mm → D − 15,5; 18 mm → D − 28; sin fondo → D − 10 (− 18 más con frente embutido). |
 | Caja de cajón | Interior según el frente: < 160 → 80; 160–239 → 120; 240–339 → 200; ≥ 340 → 300 mm. Con frente embutido la caja es 18 mm más corta (y la guía se elige con esa profundidad). |
 | Frentes combinados | El formulario no deja cargar nuevos; los presupuestos guardados se siguen calculando igual. |
@@ -199,7 +199,7 @@ Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código ante
 a confirmar: caja de cajón 18 mm más corta con frente embutido.
 
 Pendientes: **cajón interno** (solo la caja, sin frente): falta su alto y cómo se combina con la
-caja del frente. Patas: se cobran y elevan el módulo en 3D, pero todavía no se dibujan.
+caja del frente. Patas: se dibujan y se exportan en 3D (13/10/2026).
 Módulos de cocina: ver abajo.
 
 ## Módulos de cocina — 13/10/2026
