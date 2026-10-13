@@ -19,7 +19,7 @@ import {
     ModuleExtra, ExtendedCabinetModule, EstimatorItem,
     HINGE_LABELS, SLIDE_LABELS, getSheetSize, getSheetArea, getStandardSlideLength,
     expandModuleExtras, sumModuleExtras, getFrontLayout, calculateModuleParts, isVisibleFrontPiece,
-    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice, COLUMN_WIDTH, columnUpperHeight,
+    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice, COLUMN_WIDTH, columnUpperHeight, legacyToVariant,
     buildFinishLines, finishDescription, computeItemFinancials, getBoardLabel, getRecalculatedItemPrices,
     scenarioPricesFromRecalc, detailsFromRecalc,
 } from '../utils/estimatorEngine';
@@ -3918,8 +3918,17 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <span className="font-bold text-sm block">{mod.name}</span>
                                             <span className="text-xs text-gray-500 font-mono">({mod.quantity}u) {mod.width}x{mod.height}x{mod.depth}</span>
                                             {mod.extras && mod.extras.length > 0 && <span className="text-[10px] text-indigo-600 ml-2">+{mod.extras.length} extras</span>}
+                                            {legacyToVariant(mod) && <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 ml-2" title="Cargado con una plantilla anterior a la ficha del taller: despiece y costo con las reglas viejas">Ficha vieja</span>}
                                         </div>
                                         <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                            {legacyToVariant(mod) && (
+                                                <button
+                                                    onClick={() => setPendingModules(prev => prev.map((m, idx) => idx === i ? (legacyToVariant(m) || m) : m))}
+                                                    title="Pasar a la variante con la ficha nueva (mismas medidas y frentes). El costo nuevo se ve al crear el ítem; no se guarda hasta guardar el presupuesto."
+                                                    className="text-amber-700 hover:text-amber-900 px-2 py-1 bg-white rounded border border-amber-300 text-[11px] font-bold">
+                                                    Convertir a ficha nueva
+                                                </button>
+                                            )}
                                             <button onClick={() => handleEditModule(mod)} className="text-gray-400 hover:text-indigo-600 p-1 bg-white rounded border border-gray-200"><Pencil size={14}/></button>
                                             <button onClick={() => setPendingModules(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-red-500 p-1 bg-white rounded border border-gray-200"><Trash2 size={14}/></button>
                                         </div>

@@ -287,6 +287,25 @@ Implementado como variante del estándar (`cabinetType: 'COLUMNA'`, `expandColum
 cada módulo se calcula con sus propias reglas y los herrajes se cuentan una vez. La plantilla
 vieja `COLUMNA` queda oculta para los presupuestos guardados.
 
+### Conversión de presupuestos guardados con plantillas viejas (13/10/2026)
+
+Los módulos cargados con las plantillas viejas (Módulo abierto, Módulo horizontal, Bajo mesada,
+Esquinero recto, Biblioteca, Botineros) guardan el despiece de la ficha anterior. En Módulos
+pendientes llevan la marca **Ficha vieja** y el botón **Convertir a ficha nueva**, que los pasa a
+la variante equivalente con las mismas medidas y cantidad (`legacyToVariant`):
+
+| Plantilla vieja | Variante | Frentes |
+|---|---|---|
+| Módulo abierto | Módulo abierto | Sin frentes; mismo fondo |
+| Módulo horizontal | Módulo horizontal | Tal cual: N puertas o N cajones |
+| Bajo mesada | Bajo mesada | Estante: las puertas cargadas; Cajones: la misma cantidad que calculaba |
+| Esquinero recto | Esquinero recto | 1 puerta; prof. del bajo vecino = la del esquinero, rincón a la izquierda (corregir si hace falta) |
+| Biblioteca / Botineros | Biblioteca / Botineros | Sin frentes |
+
+Se convierten a melamina (las plantillas viejas se costeaban así) y con bisagras y guías activadas
+si hay puertas o cajones. No se convierte nada solo: lo decide quien edita, y se guarda como un
+presupuesto nuevo. La columna vieja no tiene conversión (sus módulos se cargaban aparte).
+
 ### Base: zócalo, banquina y patas (13/10/2026)
 
 | Tema | Regla del taller |
