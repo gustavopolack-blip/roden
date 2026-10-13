@@ -3,7 +3,7 @@
  * alacena, horno empotrado y columna. Despiece, herrajes y ubicación 3D.
  */
 import { describe, it, expect } from 'vitest';
-import { calculateModuleParts, calculateItemQuantities, SHELF_SUPPORT_LABEL } from '../utils/estimatorEngine';
+import { calculateModuleParts, calculateItemQuantities, SHELF_SUPPORT_LABEL, isVisibleFrontPiece, visibleEdgeLength } from '../utils/estimatorEngine';
 import { placeModule, buildAssembly, findPieceOverlaps, WALL_CABINET_Y } from '../utils/furniture3d/geometry';
 import { getTemplate, getFixedDims } from '../utils/specialModules';
 
@@ -208,5 +208,43 @@ describe('bajo mesada esquinero en L', () => {
     expect(findPieceOverlaps(pieces)).toEqual([]);
     const a = buildAssembly('x', [L()]);
     expect([a.size.w, a.size.d]).toEqual([1200, 1000]);
+  });
+});
+
+describe('módulos abiertos y tapacantos (ficha del 13/10)', () => {
+  const m = (cabinetType: string, over: any = {}) => mod({ cabinetType, width: 800, height: 1800, depth: 400, cntDoors: 2, ...over });
+  it('módulo abierto: sin frentes, estantes con la regla del estándar', () => {
+    const p = calculateModuleParts(m('ABIERTO') as any);
+    expect(p.some(x => /^(Puerta|Frente)/.test(x.name))).toBe(false);
+    expect(p.find(x => x.name === 'Estante Interno')!.quantity).toBe(3);   // (1800 − 850)/350 + 1
+  });
+  it('biblioteca: 1 estante fijo cada 320 mm', () => {
+    expect(calculateModuleParts(m('BIBLIOTECA') as any).find(x => x.name === 'Estante Interno')!.quantity).toBe(5);
+  });
+  it('botinero extraíble: bandeja = interior − 26, faja de 36, un par de guías simples por bandeja', () => {
+    const p = calculateModuleParts(m('BOTINERO_EXTRAIBLE') as any);
+    expect(size(p, 'Bandeja extraíble')).toEqual([738, 369, 9]);
+    expect(size(p, 'Faja bandeja')).toEqual([738, 36, 9]);
+    expect(p.some(x => x.name === 'Estante Interno')).toBe(false);
+    const q = calculateItemQuantities([m('BOTINERO_EXTRAIBLE', { calculateSlides: true, slideType: 'TELESCOPIC_SOFT' }) as any]);
+    expect(q.totalSlides).toBe(9);
+    expect(Object.keys(q.detailedHardware).filter(k => /Guías/.test(k))).toEqual(['Guías Telescópicas (350mm)']);
+  });
+  it('botinero fijo: bandejas inclinadas y frentín de frente con canto en los 4 lados', () => {
+    const p = calculateModuleParts(m('BOTINERO_FIJO') as any);
+    expect(size(p, 'Bandeja fija inclinada')).toEqual([764, 369, 9]);
+    const f = p.find(x => x.name === 'Frentín bandeja')!;
+    expect([f.width, f.height, f.quantity]).toEqual([764, 50, 9]);
+    expect(isVisibleFrontPiece(f.name)).toBe(true);
+    expect(visibleEdgeLength(f)).toBe((764 + 50) * 2);
+  });
+  it('panel liso: canto en los 4 lados; zócalo aplicado: sin canto', () => {
+    expect(isVisibleFrontPiece('Panel frontal 18mm')).toBe(true);
+    expect(visibleEdgeLength({ name: 'Zócalo aplicado 18mm', width: 2000, height: 100, material: '18mm_Carcass', grain: 'horizontal' })).toBe(0);
+  });
+  it('3D: módulos abiertos sin choques', () => {
+    for (const t of ['ABIERTO', 'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO']) {
+      expect([t, findPieceOverlaps(placeModule(m(t)).pieces)]).toEqual([t, []]);
+    }
   });
 });

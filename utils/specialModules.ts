@@ -94,6 +94,7 @@ const hingesPerDoor = (height: number): number => height > 1500 ? 4 : height > 9
 const BOTINERO_EXTRAIBLE: SpecialModuleTemplate = {
   id: 'BOTINERO_EXTRAIBLE',
   group: 'MODULO',
+  legacy: true,
   name: 'Botinero con estantes extraíbles',
   description: 'Bandejas extraíbles con guías telescópicas (1 cada 20cm de altura)',
   params: ['width', 'height', 'depth'],
@@ -138,6 +139,7 @@ const BOTINERO_EXTRAIBLE: SpecialModuleTemplate = {
 const BOTINERO_FIJO: SpecialModuleTemplate = {
   id: 'BOTINERO_FIJO',
   group: 'MODULO',
+  legacy: true,
   name: 'Botinero con bandejas fijas inclinadas',
   description: 'Bandejas fijas inclinadas 30° con frentín de 5cm (1 cada 20cm de altura)',
   params: ['width', 'height', 'depth'],
@@ -187,6 +189,7 @@ const BOTINERO_FIJO: SpecialModuleTemplate = {
 const BIBLIOTECA: SpecialModuleTemplate = {
   id: 'BIBLIOTECA',
   group: 'MODULO',
+  legacy: true,
   name: 'Biblioteca',
   description: 'Estantes fijos (1 cada 32cm de altura)',
   params: ['width', 'height', 'depth'],
@@ -363,6 +366,7 @@ const PANEL_ENLISTONADO: SpecialModuleTemplate = {
 const MODULO_ABIERTO: SpecialModuleTemplate = {
   id: 'MODULO_ABIERTO',
   group: 'MODULO',
+  legacy: true,
   name: 'Módulo abierto',
   description: 'Sin frentes. Laterales, piso, techo y fondo (18mm estructura, o fondo 3mm/5.5mm)',
   params: ['width', 'height', 'depth'],

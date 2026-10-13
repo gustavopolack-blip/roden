@@ -95,16 +95,22 @@ const STATUS_COLORS: Record<string, string> = {
 const BACKING_OPTIONS = [
     { label: 'Fondo Blanco 3mm', value: '3MM_WHITE' },
     { label: 'Fondo Color 5.5mm', value: '55_COLOR' },
+    { label: 'Fondo estructural 18mm', value: '18MM_STRUCTURE' },
     { label: 'Sin Fondo', value: 'NONE' }
 ];
 
 // Módulos de cocina armados sobre el módulo estándar (ficha del 13/10/2026). Aparecen en el
 // botón Módulos; reemplazan a las plantillas MODULO_BAJO_MESADA y ESQUINERO (legacy).
-const STANDARD_VARIANTS: { id: string; name: string; cabinetType: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO'; defaults: Partial<ExtendedCabinetModule> }[] = [
+const STANDARD_VARIANTS: { id: string; name: string; cabinetType: NonNullable<ExtendedCabinetModule['cabinetType']>; defaults: Partial<ExtendedCabinetModule> }[] = [
     { id: 'VAR_BAJO',      name: 'Bajo mesada',                 cabinetType: 'BAJO',      defaults: { height: 740, depth: 560 } },
     { id: 'VAR_ESQUINERO', name: 'Bajo mesada esquinero recto', cabinetType: 'ESQUINERO', defaults: { height: 740, depth: 560, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } },
     { id: 'VAR_ALACENA',   name: 'Alacena',                     cabinetType: 'ALACENA',   defaults: { depth: 320 } },
     { id: 'VAR_BAJO_HORNO', name: 'Bajo mesada para horno',     cabinetType: 'BAJO_HORNO', defaults: { width: 613, height: 740, depth: 560, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } },
+    // Módulos abiertos (sin frentes) sobre el estándar: reemplazan a las plantillas del mismo nombre.
+    { id: 'VAR_ABIERTO',    name: 'Módulo abierto',                         cabinetType: 'ABIERTO',            defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: '18MM_STRUCTURE' } },
+    { id: 'VAR_BIBLIOTECA', name: 'Biblioteca',                             cabinetType: 'BIBLIOTECA',         defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0 } },
+    { id: 'VAR_BOT_EXT',    name: 'Botinero con estantes extraíbles',       cabinetType: 'BOTINERO_EXTRAIBLE', defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0 } },
+    { id: 'VAR_BOT_FIJO',   name: 'Botinero con bandejas fijas inclinadas', cabinetType: 'BOTINERO_FIJO',      defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0 } },
 ];
 
 const BOARD_OPTIONS = [
@@ -3615,7 +3621,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <span>Módulo microondas (abierto, fondo 18 mm, piso 420 mm)</span>
                                         </label>
                                     )}
-                                    {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
+                                    {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && !activeVariant?.cabinetType?.startsWith('BOTINERO') && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
                                         <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
                                             <span>Cajones internos (80 mm)</span>
                                             <input type="number" min={0} className="border p-1 rounded text-xs w-14 text-center" value={(moduleForm as ExtendedCabinetModule).internalDrawers ?? 0} onChange={e => handleInputChange('internalDrawers', Math.max(0, Math.round(Number(e.target.value))) || undefined)}/>

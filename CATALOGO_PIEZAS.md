@@ -313,3 +313,27 @@ Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y p
 | Fondos 3 mm | (L1 − 32) × (H − 14) / (L2 − 35) × (H − 14) — A pasa en el rincón, B apoya |
 | Estante A / B (regulable) | (L1 − 41) × (D1 − 31) / (L2 − D1 − 10) × (D2 − 31) — **corregido** respecto de la propuesta (chocaba con el fondo del otro brazo) |
 | Puertas | (L1 − D2 − 25) × (H − 4) / (L2 − D1 − 25) × (H − 4); bisagras hacia afuera del rincón |
+
+## Módulos que no son de cocina y piezas sueltas — 13/10/2026
+
+| Tema | Regla del taller | Estado |
+|---|---|---|
+| Módulo abierto | Estándar sin frentes; estantes con la regla del estándar; fondo a elección (18 / 3 / 5,5). | **Implementado** (variante `ABIERTO`) |
+| Biblioteca | Como el módulo abierto, con 1 estante fijo cada 320 mm de alto. | **Implementado** (`BIBLIOTECA`) |
+| Botinero con estantes extraíbles | Sin puertas. Bandejas de la profundidad de un estante; ancho = interior libre − 26; faja delantera de 36 mm; guías telescópicas simples. 1 bandeja cada 200 mm. | **Implementado** (`BOTINERO_EXTRAIBLE`) |
+| Botinero con bandejas fijas inclinadas | Sin puertas. Bandejas sobre colizas ocultas; frentín (50 mm) con canto en los 4 lados. 1 cada 200 mm. | **Implementado** (`BOTINERO_FIJO`) |
+| Módulo horizontal | División vertical si mide más de 900 mm de ancho; N cajones o N puertas, todos del mismo ancho. | Pendiente (ver preguntas) |
+| Módulo vertical | Distinto de la alacena en profundidad, altura y características (ej. 250 × 1200 × 400). | Pendiente (ver preguntas) |
+| Panel liso | Correcto como está; canto en los 4 lados. | **Implementado** |
+| Panel enlistonado | Listones de 18 mm con canto en el frente; separación de 18 mm. | Ya era así |
+| Puerta suelta | Correcta. | — |
+| Zócalos aplicados | **No llevan canto.** | **Implementado** |
+| Zócalo estructural | Alto 100. | — |
+| Tapa horizontal, divisor, lateral aplicado, ajuste | Sin correcciones. | — |
+| Frente de cajón suelto | Lleva caja y guías. | Pendiente (medidas de la caja) |
+| Frente abatible suelto | Lleva bisagras y pistones. | Pendiente |
+
+Supuestos míos: la faja de la bandeja extraíble es de estructura y en 3D va arriba de la bandeja,
+adelante; las colizas no se cotizan (sin precio en la lista); 1 bandeja cada 200 mm (regla anterior).
+Las plantillas viejas de módulo abierto, biblioteca y botineros quedan ocultas (`legacy`).
+

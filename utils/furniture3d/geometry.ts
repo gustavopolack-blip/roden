@@ -275,7 +275,17 @@ const placeCarcass: Placer = (mod, parts) => {
   });
   // Módulo estándar: equidistantes (regla del taller). Plantillas: separación propia sin definir.
   if (shelfCount > 0 && mod.isSpecialModule) notes.push('Estantes/bandejas distribuidos en partes iguales (separación real pendiente).');
+  if (/^BOTINERO/.test(mod.cabinetType || '')) notes.push('Bandejas repartidas en partes iguales (1 cada 200 mm); las inclinadas se dibujan horizontales.');
   if (status === 'approximate') notes.push('Bandejas inclinadas 30° dibujadas horizontales.');
+  // Faja de bandeja extraíble (36 mm): adelante, sobre cada bandeja (supuesto de dibujo).
+  idxOf(/^Faja bandeja/).forEach(i => {
+    const p = parts[i];
+    for (let k = 0; k < (p.quantity || 1); k++) {
+      const s = shelfTops[k] || shelfTops[shelfTops.length - 1] || { y: 18, zFront: D };
+      const x0 = (W - p.width) / 2;
+      pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, s.y, s.y + p.height, s.zFront - 18, s.zFront), 'shelf'));
+    }
+  });
   // Frentín de bandeja (botinero fijo): al frente de cada bandeja
   idxOf(/^Frent[ií]n/).forEach(i => {
     const p = parts[i];
