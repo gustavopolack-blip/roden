@@ -266,10 +266,12 @@ describe('ficha constructiva del módulo estándar en 3D', () => {
     const elegido = buildAssembly('x', [mod({ id: 'i', cntDoors: 1, doorHingeSide: 'RIGHT' }), mod({ id: 'c', cntDoors: 2 })]);
     expect(elegido.modules[0].pieces.find(p => p.hingeSide)!.hingeSide).toBe('right');
   });
-  it('patas: el módulo se eleva 120 mm y el alto total es H + 120', () => {
-    const a = buildAssembly('x', [mod({ hasLegs: true, cntDoors: 2 })]);
-    expect(a.size.h).toBe(840);
-    expect(Math.min(...a.modules[0].pieces.map(p => p.box.min[1]))).toBe(120);
+  it('base (patas, banquina o zócalo): el módulo se eleva 100 mm y el alto total es H + 100', () => {
+    for (const baseType of ['PATAS', 'BANQUINA', 'ZOCALO']) {
+      const a = buildAssembly('x', [mod({ baseType, cntDoors: 2 })]);
+      expect(a.size.h).toBe(820);
+      expect(Math.min(...a.modules[0].pieces.map(p => p.box.min[1]))).toBe(100);
+    }
   });
   it('caja de cajón: alto según el frente y detrás del frente embutido', () => {
     const lat = (over: any) => placeModule(mod({ cntDrawers: 1, ...over })).pieces.filter(p => p.name === 'Lateral Cajón')[0].box;

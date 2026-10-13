@@ -244,4 +244,37 @@ por debajo). El **Esquinero en L** no tiene ningún frente.
 | 20 | Horno | Sin fondo; techo con 300 mm recortados atrás para ventilar. |
 | 21 | Microondas | En columna (de empotrar): mismo ancho libre que el horno, 385 mm "entre ejes" de piso y techo. En alacena (convencional): piso de 420 mm mínimo, 580 de ancho libre y 350 de alto libre. |
 
-Pendientes: repreguntas de cocina (13/10).
+### Repreguntas cerradas (13/10)
+
+| Tema | Regla |
+|---|---|
+| Base (todos los módulos) | Banquina, zócalo estructural o patas regulables: **100 mm** (reemplaza las patas de 120). Banquina = obra, no se cobra; zócalo estructural y zócalo aplicado se cargan aparte como Piezas; patas = herraje (4 hasta 900 mm de ancho, 6 a partir de ahí). |
+| Horno | 595 mm **entre ejes** de laterales y entre base y techo → caja **613 × 613** (hueco libre 577; el frente del horno, 595 × 595, cubre). |
+| Faja frontal del bajo | Acostada, arriba al frente. |
+| Fondo del bajo | Llega al borde superior: 3 mm **(W − 28) × (H − 14)**. |
+| Profundidad del bajo | D = 560 por defecto (581 con frente). |
+| Esquinero recto | Frente fijo = profundidad del **bajo vecino** (campo propio; vacío = la del esquinero) + 21 + 4. Estante regulable. |
+| Esquinero en L | Se cargan largo brazo 1, largo brazo 2, profundidad lado 1 y lado 2. Piso en L (una pieza), dos fondos, estante en L, dos puertas de largo del brazo − profundidad del otro − 21 − luz. |
+| Alacena | Caja de 320 (+ frente). Microondas convencional: solo el piso es más profundo (420). |
+| Columna | Opción (a): la columna aporta los 2 laterales aplicados; los módulos de adentro se cargan aparte. Puede ir sobre banquina, patas o zócalo estructural. |
+| Horno | Va en la columna o en un bajo mesada. Techo de profundidad D − 300. |
+
+**Implementado** (13/10/2026): bajo mesada, esquinero recto y alacena como variantes del módulo
+estándar (`cabinetType`), base de 100 mm en todos los módulos estándar, módulo horno empotrado
+y columna (plantillas nuevas). Las plantillas viejas de bajo mesada y esquinero quedan ocultas
+(`legacy`) y siguen calculando los presupuestos guardados con ellas.
+
+Supuestos míos a confirmar:
+- Bajo con puertas: **1 estante regulable** (como la plantilla anterior). Con cajones, sin estante.
+- Esquinero recto: puerta = W − 4 − frente fijo − 4 (2 mm al borde libre, 4 mm entre fijo y
+  puerta); bisagras del lado de afuera (abre alejándose del rincón).
+- Bajo con fondo de 5,5 mm: (W − 10) × (H − 5); con fondo de 18 mm: (W − 36) × (H − 18).
+- Alacena: estantes con la regla del estándar (ninguno hasta 850 mm de alto).
+- Horno: tapa y base sobre laterales (como el estándar); sin mano de obra estimada.
+- Columna: el ancho es el exterior total; los módulos de adentro miden ancho − 36. La base de la
+  columna todavía no se aplica (se dibuja en el piso).
+
+Pendientes: esquinero en L (falta cómo se cotiza el piso en L: ¿rectángulo envolvente o dos
+rectángulos?); microondas de columna (¿lleva fondo?); horno en bajo mesada (¿qué lleva debajo?);
+alacena con piso de microondas y frentes (el piso de 420 choca con el frente: ¿el hueco del
+microondas va abierto?).

@@ -19,8 +19,11 @@
 import { CalculatedPart } from '../../types';
 import {
   calculateModuleParts, getFrontLayout, getBoardLabel, isVisibleFrontPiece,
-  FRONT_GAP, FRONT_EDGE_GAP, FRONT_OFFSET, BACK3_GROOVE_FROM_BACK, LEG_HEIGHT,
+  FRONT_GAP, FRONT_EDGE_GAP, FRONT_OFFSET, BACK3_GROOVE_FROM_BACK, BASE_HEIGHT, KITCHEN_FAJA, normalizeCabinet,
 } from '../estimatorEngine';
+
+/** Alacena sin posición guardada: base a 600 mm sobre la mesada (base 100 + bajo 740 + mesada 20 + 600). */
+export const WALL_CABINET_Y = 1460;
 import { SPECIAL_MANUAL_ID } from '../specialModules';
 
 export type Vec3 = [number, number, number];
@@ -86,11 +89,12 @@ export interface Assembly {
 
 // Reglas de dibujo que el sistema NO define y se asumieron solo para la vista 3D.
 export const PENDING_RULES: string[] = [
-  // El módulo estándar sigue la ficha constructiva del taller (CATALOGO_PIEZAS.md, 13/10/2026).
-  'Plantillas especiales (Módulo abierto, Biblioteca, Botineros, Bajo mesada…): todavía usan sus medidas de fondo y frentes anteriores a la ficha del módulo estándar.',
-  'Patas: el módulo se dibuja elevado 120 mm, pero las patas no se dibujan ni se exportan.',
+  // El módulo estándar y las variantes de cocina siguen la ficha del taller (CATALOGO_PIEZAS.md, 13/10/2026).
+  'Plantillas especiales (Módulo abierto, Biblioteca, Botineros…): todavía usan sus medidas de fondo y frentes anteriores a la ficha del módulo estándar.',
+  'Base (banquina, zócalo estructural o patas): el módulo se eleva 100 mm, pero la base no se dibuja ni se exporta.',
+  'Columna: los módulos de adentro se ubican a mano entre los laterales; la base de la columna no se aplica.',
   'Bandejas inclinadas del botinero: se dibujan horizontales.',
-  'Geometría de Módulo horizontal, Bajo mesada, esquineros y paneles: sin definir (se muestran como volumen).',
+  'Geometría de Módulo horizontal, esquinero en L y paneles: sin definir (se muestran como volumen).',
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -205,8 +209,17 @@ const placeCarcass: Placer = (mod, parts) => {
   // Estructura
   // Tapa y base sobre laterales (ancho W) o, con laterales enteros, entre laterales (W − 36):
   // se centran según su ancho real del despiece.
-  idxOf(/^Tapa superior/).forEach(i => { const x0 = (W - parts[i].width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + parts[i].width, H - 18, H, 0, D), 'carcass')); });
-  idxOf(/^Base inferior/).forEach(i => { const x0 = (W - parts[i].width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + parts[i].width, 0, 18, 0, D), 'carcass')); });
+  // Profundidad según el despiece: el techo del horno va recortado atrás (al frente: D − prof … D);
+  // el piso de la alacena con microondas es más profundo y sobresale adelante (0 … prof).
+  idxOf(/^Tapa superior/).forEach(i => { const p = parts[i], x0 = (W - p.width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, H - 18, H, D - p.height, D), 'carcass')); });
+  idxOf(/^(Base inferior|Piso)/).forEach(i => { const p = parts[i], x0 = (W - p.width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, 0, 18, 0, p.height), 'carcass')); });
+  // Fajas de cocina: frontal acostada arriba (bajo); trasera parada contra la pared, arriba
+  // (bajo: al borde superior; alacena: debajo de la tapa).
+  idxOf(/^Faja frontal$/).forEach(i => { const p = parts[i], x0 = (W - p.width) / 2; pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, H - 18, H, D - p.height, D), 'carcass')); });
+  idxOf(/^Faja trasera$/).forEach(i => {
+    const p = parts[i], x0 = (W - p.width) / 2, top = mod.cabinetType === 'ALACENA' ? H - 18 : H;
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, top - KITCHEN_FAJA, top, 0, 18), 'carcass'));
+  });
   idxOf(/^Lateral$/).forEach(i => {
     const p = parts[i];
     const depth = p.width, height = p.height;
@@ -224,7 +237,9 @@ const placeCarcass: Placer = (mod, parts) => {
   idxOf(/^Fondo/).filter(i => !/caj/i.test(parts[i].name)).forEach(i => {
     const p = parts[i];
     const t = materialThickness(p.material);
-    const x0 = (W - p.width) / 2, y0 = (H - p.height) / 2;
+    // Bajo mesada (sin tapa): el fondo llega al borde superior y entra en la ranura/rebaje del piso.
+    const isBase = mod.cabinetType === 'BAJO' || mod.cabinetType === 'ESQUINERO';
+    const x0 = (W - p.width) / 2, y0 = isBase ? H - p.height - (t === 3 ? 1 : 0) : (H - p.height) / 2;
     const z0 = t === 3 ? BACK3_GROOVE_FROM_BACK : 0;
     // groove: alojado en ranura (3 mm) o rebaje (5,5 mm) → el solape con la caja es intencional
     pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, y0, y0 + p.height, z0, z0 + t), 'back', t < 18 ? { groove: true } : {}));
@@ -299,7 +314,23 @@ const placeCarcass: Placer = (mod, parts) => {
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, r.y0, r.y0 + p.height, zF0, zF1), 'front'));
     }
   });
-  idxOf(/^Puerta/).forEach(i => {
+  // Esquinero recto: frente fijo del lado del rincón y la puerta al lado, con bisagras del lado
+  // de afuera (abre alejándose del rincón).
+  const fixedIdx = idxOf(/^Frente fijo esquinero/)[0];
+  if (fixedIdx !== undefined) {
+    const fixed = parts[fixedIdx];
+    const doorIdx = idxOf(/^Puerta/)[0];
+    const y0 = doorRow ? doorRow.y0 : FRONT_EDGE_GAP;
+    const left = mod.cornerSide !== 'RIGHT';
+    const fx0 = left ? frontsX0 : W - frontsX0 - fixed.width;
+    pieces.push(makePiece(mod, parts, fixedIdx, nextCopy(fixedIdx), mkBox(fx0, fx0 + fixed.width, y0, y0 + fixed.height, zF0, zF1), 'front'));
+    if (doorIdx !== undefined) {
+      const d = parts[doorIdx];
+      const dx0 = left ? fx0 + fixed.width + FRONT_GAP : fx0 - FRONT_GAP - d.width;
+      pieces.push(makePiece(mod, parts, doorIdx, nextCopy(doorIdx), mkBox(dx0, dx0 + d.width, y0, y0 + d.height, zF0, zF1), 'front', { hingeSide: left ? 'right' : 'left' }));
+    }
+  }
+  idxOf(/^Puerta/).filter(() => fixedIdx === undefined).forEach(i => {
     const p = parts[i];
     const n = p.quantity || 1;
     const gap = n > 1 ? (frontsWidth - n * p.width) / (n - 1) : 0;
@@ -344,10 +375,12 @@ const placeCarcass: Placer = (mod, parts) => {
     });
   }
 
-  // Patas regulables: el módulo se eleva 120 mm (las patas son herraje: todavía no se dibujan).
-  if (mod.hasLegs && !mod.isSpecialModule) {
-    pieces.forEach(pc => { pc.box = { min: [pc.box.min[0], pc.box.min[1] + LEG_HEIGHT, pc.box.min[2]], max: [pc.box.max[0], pc.box.max[1] + LEG_HEIGHT, pc.box.max[2]] }; });
-    notes.push(`Patas de ${LEG_HEIGHT} mm: el módulo se dibuja elevado; las patas no se dibujan.`);
+  // Base (banquina, zócalo estructural o patas): el módulo se eleva 100 mm. La base no se dibuja:
+  // la banquina es obra, el zócalo se carga aparte como pieza y las patas son herraje.
+  if (mod.baseType && !mod.isSpecialModule) {
+    pieces.forEach(pc => { pc.box = { min: [pc.box.min[0], pc.box.min[1] + BASE_HEIGHT, pc.box.min[2]], max: [pc.box.max[0], pc.box.max[1] + BASE_HEIGHT, pc.box.max[2]] }; });
+    const label = mod.baseType === 'PATAS' ? 'patas' : mod.baseType === 'BANQUINA' ? 'banquina' : 'zócalo estructural';
+    notes.push(`Base de ${BASE_HEIGHT} mm (${label}): el módulo se dibuja elevado; la base no se dibuja.`);
   }
 
   // ¿Quedó alguna pieza del despiece sin ubicar? → el módulo no está resuelto
@@ -411,7 +444,25 @@ const placeStackedTop: Placer = (mod, parts) => {
  * agregar su id acá (reutilizando un ubicador o escribiendo uno propio).
  * Plantillas ausentes → se muestran sin ubicar (volumen + despiece en grilla).
  */
+/** Columna: dos laterales aplicados de la altura total, a los costados, hasta el plano de las puertas. */
+const placeColumnSides: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const i = parts.findIndex(p => /^Lateral aplicado columna/.test(p.name));
+  if (i < 0 || parts.length !== 1) return null;
+  const d = parts[i].width;
+  return {
+    pieces: [
+      makePiece(mod, parts, i, 0, mkBox(0, 18, 0, H, 0, d), 'carcass'),
+      makePiece(mod, parts, i, 1, mkBox(W - 18, W, 0, H, 0, d), 'carcass'),
+    ],
+    status: 'placed',
+    notes: ['Los módulos de adentro se cargan aparte y se ubican entre los laterales.'],
+  };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
+  HORNO_EMPOTRADO: placeCarcass,
+  COLUMNA: placeColumnSides,
   STANDARD: placeCarcass,
   MODULO_ABIERTO: placeCarcass,
   BIBLIOTECA: placeCarcass,
@@ -453,7 +504,7 @@ export const placeModule = (mod: any): { pieces: Piece3D[]; status: PlacementSta
   const parts = calculateModuleParts(mod);
   const tpl = templateIdOf(mod);
   const placer = MODULE_PLACERS[tpl || 'STANDARD'];
-  const res = placer ? placer(mod, parts) : null;
+  const res = placer ? placer(normalizeCabinet(mod), parts) : null;
   if (!res) {
     return {
       pieces: [], status: 'unplaced', gridPieces: gridPieces(mod, parts),
@@ -487,8 +538,15 @@ export const resolveLayouts = (modules: any[]): ModuleLayout3D[] => {
       cursor = Math.max(cursor, end);
     }
   });
+  // Alacenas sin posición: fila propia, colgadas a WALL_CABINET_Y, desde x = 0.
+  let wallCursor = 0;
   return modules.map(m => {
     if (hasLayout(m)) return { x: m.layout3d.x, y: m.layout3d.y, z: m.layout3d.z, rotY: ([0, 90, 180, 270].includes(m.layout3d.rotY) ? m.layout3d.rotY : 0) as RotY };
+    if (m.cabinetType === 'ALACENA' && !m.isSpecialModule) {
+      const l: ModuleLayout3D = { x: wallCursor, y: WALL_CABINET_Y, z: 0, rotY: 0 };
+      wallCursor += (m.width || 0) * (m.quantity || 1);
+      return l;
+    }
     const l: ModuleLayout3D = { x: cursor, y: 0, z: 0, rotY: 0 };
     if (!isManualModule(m)) cursor += (m.width || 0) * (m.quantity || 1);
     return l;
@@ -503,7 +561,7 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   modules.forEach((mod, mi) => {
     if (isManualModule(mod)) return;
     const W = mod.width || 0, H = mod.height || 0, D = mod.depth || 0;
-    const legH = mod.hasLegs && !templateIdOf(mod) ? LEG_HEIGHT : 0;   // patas: se suman a H
+    const legH = mod.baseType && !templateIdOf(mod) ? BASE_HEIGHT : 0;   // base: se suma a H
     const base = placeModule(mod);
     const qty = Math.max(1, mod.quantity || 1);
     const label = mod.name || `Módulo ${mi + 1}`;
@@ -551,6 +609,8 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   const carcassWorld = (pm: PlacedModule) => transformBox(mkBox(0, pm.dims.w, 0, pm.dims.h, 0, pm.dims.d), pm.layout);
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
+      // La columna es un contenedor: los módulos van entre sus laterales (no es choque).
+      if (placed[i].templateId === 'COLUMNA' || placed[j].templateId === 'COLUMNA') continue;
       const a = carcassWorld(placed[i]), b = carcassWorld(placed[j]);
       const v = overlapVolume(a, b);
       if (v > 0) {
@@ -589,7 +649,7 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   placed.forEach(pm => {
     const mod = modules[pm.moduleIndex];
     const hinged = pm.pieces.filter(pc => pc.hingeSide);
-    if (mod.doorHingeSide || hinged.length !== 1 || (pm.layout.rotY !== 0 && pm.layout.rotY !== 180)) return;
+    if (mod.doorHingeSide || mod.cabinetType === 'ESQUINERO' || hinged.length !== 1 || (pm.layout.rotY !== 0 && pm.layout.rotY !== 180)) return;
     const worldLeft = boxCenter(pm.worldBox)[0] <= axisX;
     const localLeft = pm.layout.rotY === 180 ? !worldLeft : worldLeft;
     hinged[0].hingeSide = localLeft ? 'left' : 'right';

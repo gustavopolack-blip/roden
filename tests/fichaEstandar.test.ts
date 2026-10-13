@@ -91,7 +91,7 @@ describe('cajones', () => {
 
 describe('patas', () => {
   it('4 hasta 900 mm de ancho, 6 a partir de ahí; se cobran con priceLeg', () => {
-    const q = (width: number) => calculateItemQuantities([{ ...BASE, id: 'p', name: 'p', width, hasLegs: true } as any]).detailedHardware[LEG_LABEL];
+    const q = (width: number) => calculateItemQuantities([{ ...BASE, id: 'p', name: 'p', width, baseType: 'PATAS' } as any]).detailedHardware[LEG_LABEL];
     expect([q(600), q(900), q(901)]).toEqual([4, 4, 6]);
     expect(hwPriceFor(LEG_LABEL, 6, { priceLeg: 2500 })).toBe(15000);
   });
@@ -116,7 +116,7 @@ describe('opciones del estándar en plantillas', () => {
   it('una plantilla con patas o estantes regulables tildados (quedaron del formulario) no los cobra', () => {
     const q = calculateItemQuantities([{ ...BASE, id: 's', name: 's', isSpecialModule: true, specialTemplateId: 'MODULO_ABIERTO',
       specialParts: [{ name: 'Estante interno', width: 500, height: 400, material: '18mm_Carcass', quantity: 2, grain: 'horizontal' }],
-      specialHardware: {}, hasLegs: true, adjustableShelves: true } as any]);
+      specialHardware: {}, baseType: 'PATAS', adjustableShelves: true } as any]);
     expect(q.detailedHardware[LEG_LABEL]).toBeUndefined();
     expect(q.detailedHardware[SHELF_SUPPORT_LABEL]).toBeUndefined();
   });

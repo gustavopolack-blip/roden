@@ -13,9 +13,12 @@ describe('grupos de plantillas', () => {
   });
   it('Módulos: las cajas', () => {
     expect(ids('MODULO')).toEqual([
-      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'ESQUINERO', 'ESQUINERO_EN_L',
-      'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
+      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L',
+      'HORNO_EMPOTRADO', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
     ]);
+  });
+  it('bajo mesada y esquinero recto viejos: ocultos (los reemplazan variantes del estándar)', () => {
+    expect(SPECIAL_MODULE_TEMPLATES.filter(t => t.legacy).map(t => t.id).sort()).toEqual(['ESQUINERO', 'MODULO_BAJO_MESADA']);
   });
   it('Piezas: las piezas sueltas', () => {
     expect(ids('PIEZA')).toEqual([

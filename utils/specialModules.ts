@@ -49,6 +49,9 @@ export interface SpecialModuleTemplate {
   description: string;
   // Botón del estimador donde aparece: 'MODULO' (caja) o 'PIEZA' (pieza suelta que se agrega sola).
   group: 'MODULO' | 'PIEZA';
+  // Reemplazada por una variante del módulo estándar (ficha de cocina): no se ofrece en el
+  // formulario, pero se conserva para los presupuestos guardados con esta plantilla.
+  legacy?: boolean;
   params: Array<'width' | 'height' | 'depth'>;
   extraOptions?: SpecialModuleExtraOption[];
   // Es función porque algunos templates cambian su espesor según una extraOption
@@ -785,6 +788,7 @@ const AJUSTE: SpecialModuleTemplate = {
 const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
   id: 'MODULO_BAJO_MESADA',
   group: 'MODULO',
+  legacy: true,
   name: 'Bajo mesada',
   description: 'Sin tapa. Laterales, piso, faja frontal y trasera (100mm), fondo 3mm en ranuras.',
   params: ['width', 'height', 'depth'],
@@ -856,6 +860,7 @@ const MODULO_BAJO_MESADA: SpecialModuleTemplate = {
 const ESQUINERO: SpecialModuleTemplate = {
   id: 'ESQUINERO',
   group: 'MODULO',
+  legacy: true,
   name: 'Bajo mesada esquinero recto',
   description: 'Bajo mesada para rincón. Panel fijo 620mm. Puerta = ancho − 620 − 4mm.',
   params: ['width', 'height', 'depth'],
@@ -1096,6 +1101,47 @@ const ESTANTE_18MM: SpecialModuleTemplate = {
 // Sin geometría calculada — el usuario ingresa piezas y costos libres
 // ─────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────
+// COCINA — ficha constructiva del 13/10/2026 (CATALOGO_PIEZAS.md)
+// ─────────────────────────────────────────────────────────────
+
+// Horno empotrado (va en la columna): 595 mm entre ejes de laterales y entre base y techo
+// → caja exterior 613 × 613. Sin fondo; techo recortado 300 mm atrás para ventilar.
+export const OVEN_AXIS = 595;
+export const OVEN_VENT_CUT = 300;
+const HORNO_EMPOTRADO: SpecialModuleTemplate = {
+  id: 'HORNO_EMPOTRADO',
+  group: 'MODULO',
+  name: 'Módulo horno empotrado',
+  description: 'Hueco de horno: 595 mm entre ejes (caja 613 × 613). Sin fondo; techo recortado 300 mm atrás para ventilar.',
+  params: ['depth'],
+  fixedDims: () => ({ width: OVEN_AXIS + 18, height: OVEN_AXIS + 18 }),
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+    parts.push({ name: 'Tapa superior', width: W, height: Math.max(0, D - OVEN_VENT_CUT), material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Base inferior', width: W, height: D,                                material: '18mm_Carcass', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Lateral',       width: D, height: Math.max(0, H - 36),              material: '18mm_Carcass', quantity: 2, grain: 'vertical'   });
+    // Sin estimación de mano de obra: no definida por el taller.
+    return { parts, hardware: {}, laborDays: 0 };
+  }
+};
+
+// Columna: los módulos se cargan aparte y se apilan; la columna aporta los dos laterales
+// aplicados de la altura total, que avanzan 21 mm (al ras de las puertas).
+// Ancho = ancho exterior total (los módulos de adentro miden ancho − 36).
+const COLUMNA: SpecialModuleTemplate = {
+  id: 'COLUMNA',
+  group: 'MODULO',
+  name: 'Columna (laterales aplicados)',
+  description: 'Dos laterales aplicados de la altura total, al ras de las puertas (profundidad + 21). Los módulos de adentro (ancho − 36) se cargan aparte.',
+  params: ['width', 'height', 'depth'],
+  calculate: ({ height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+    parts.push({ name: 'Lateral aplicado columna', width: D + 21, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical' });
+    return { parts, hardware: {}, laborDays: 0 };
+  }
+};
+
 export const SPECIAL_MANUAL_ID = 'ESPECIAL_MANUAL';
 
 // No tiene template con calculate() — se maneja directamente
@@ -1129,6 +1175,9 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   // ── Piezas individuales con espesor fijo ──
   PUERTA_18MM,
   ESTANTE_18MM,
+  // ── Cocina (al final: la matriz de pruebas numera las plantillas por posición) ──
+  HORNO_EMPOTRADO,
+  COLUMNA,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>
