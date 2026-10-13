@@ -51,6 +51,7 @@ export interface Piece3D {
   groove?: boolean;           // va en ranura: solapamiento intencional con su alojamiento
   hingeSide?: 'left' | 'right';
   shape?: 'cylinder';         // herrajes redondos (patas); por defecto, caja
+  rotX?: number;              // giro sobre el eje x (grados) alrededor del centro de `box`; + = el frente baja
 }
 
 export type PlacementStatus = 'placed' | 'approximate' | 'unplaced';
@@ -94,7 +95,6 @@ export const PENDING_RULES: string[] = [
   // El módulo estándar y las variantes de cocina siguen la ficha del taller (CATALOGO_PIEZAS.md, 13/10/2026).
   'Módulos guardados con plantillas viejas (Módulo abierto, Horizontal, Bajo mesada, Esquinero, Biblioteca, Botineros): conservan el despiece de la ficha anterior. En el estimador se pasan a la ficha nueva con "Convertir a ficha nueva".',
   'Zócalo estructural: el módulo se eleva 100 mm; el zócalo se carga aparte como pieza y se ubica solo debajo del primer módulo con esa base.',
-  'Bandejas inclinadas del botinero: se dibujan horizontales.',
   'Geometría de Módulo horizontal y paneles: sin definir (se muestran como volumen).',
 ];
 
@@ -197,6 +197,9 @@ const makePiece = (
  * centrado en el ancho.
  */
 export const ZOCALO_SETBACK = 40;
+/** Bandeja fija del botinero: inclinada 30° (regla del taller, 13/10/2026). */
+export const SHOE_TRAY_TILT = 30;
+const SHOE_TRAY_TILT_RAD = (SHOE_TRAY_TILT * Math.PI) / 180;
 export const LEG_DIAMETER = 40;
 export const LEG_INSET = 40;
 export const LEG_FRONT_INSET = ZOCALO_SETBACK + 18 + LEG_DIAMETER / 2;   // 78
@@ -296,23 +299,39 @@ const placeCarcass: Placer = (mod, parts) => {
   });
   const shelfCount = shelfIdx.reduce((a, i) => a + (parts[i].quantity || 1), 0);
   let shelfN = 0;
-  const shelfTops: { y: number; zFront: number }[] = [];
+  // Bandeja inclinada (botinero fijo): 30°, el frente más bajo, apoyada atrás contra el fondo.
+  // Se reparten con su alto inclinado dentro del hueco (la de abajo y la de arriba no tocan base ni tapa).
+  const tilted = shelfIdx.filter(i => /inclinada/i.test(parts[i].name));
+  const tilt = (L: number) => ({
+    halfY: (L / 2) * Math.sin(SHOE_TRAY_TILT_RAD) + 9 * Math.cos(SHOE_TRAY_TILT_RAD),
+    halfZ: (L / 2) * Math.cos(SHOE_TRAY_TILT_RAD) + 9 * Math.sin(SHOE_TRAY_TILT_RAD),
+  });
+  type ShelfTop = { y: number; zFront: number; tray?: { yc: number; zc: number; L: number } };
+  const shelfTops: ShelfTop[] = [];
   shelfIdx.forEach(i => {
     const p = parts[i];
     for (let k = 0; k < (p.quantity || 1); k++) {
       shelfN++;
-      const yc = 18 + ((H - 36) * shelfN) / (shelfCount + 1);
       const x0 = (W - p.width) / 2;
       const z0 = backFace;
+      if (tilted.includes(i)) {
+        const L = p.height, e = tilt(L), n = p.quantity || 1;
+        const lo = 18 + e.halfY, hi = H - 18 - e.halfY;
+        const yc = n === 1 || hi <= lo ? (lo + hi) / 2 : lo + ((hi - lo) * k) / (n - 1);
+        const zc = z0 + e.halfZ;
+        pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, yc - 9, yc + 9, zc - L / 2, zc + L / 2), 'shelf', { rotX: SHOE_TRAY_TILT }));
+        shelfTops.push({ y: yc + 9, zFront: zc + L / 2, tray: { yc, zc, L } });
+        if (hi < lo) notes.push('Bandejas inclinadas: el módulo es muy bajo para una bandeja de esta profundidad a 30°.');
+        continue;
+      }
+      const yc = 18 + ((H - 36) * shelfN) / (shelfCount + 1);
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, yc - 9, yc + 9, z0, z0 + p.height), 'shelf'));
       shelfTops.push({ y: yc + 9, zFront: z0 + p.height });
-      if (/inclinada/i.test(p.name)) { status = 'approximate'; }
     }
   });
   // Módulo estándar: equidistantes (regla del taller). Plantillas: separación propia sin definir.
   if (shelfCount > 0 && mod.isSpecialModule) notes.push('Estantes/bandejas distribuidos en partes iguales (separación real pendiente).');
-  if (/^BOTINERO/.test(mod.cabinetType || '')) notes.push('Bandejas repartidas en partes iguales (1 cada 200 mm); las inclinadas se dibujan horizontales.');
-  if (status === 'approximate') notes.push('Bandejas inclinadas 30° dibujadas horizontales.');
+  if (/^BOTINERO/.test(mod.cabinetType || '')) notes.push(`Bandejas repartidas en el alto (1 cada 200 mm)${tilted.length ? '; inclinadas 30°, el frente más bajo' : ''}.`);
   // Faja de bandeja extraíble (36 mm): adelante, sobre cada bandeja (supuesto de dibujo).
   idxOf(/^Faja bandeja/).forEach(i => {
     const p = parts[i];
@@ -322,12 +341,21 @@ const placeCarcass: Placer = (mod, parts) => {
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, s.y, s.y + p.height, s.zFront - 18, s.zFront), 'shelf'));
     }
   });
-  // Frentín de bandeja (botinero fijo): al frente de cada bandeja
+  // Frentín de bandeja (botinero fijo): al frente de cada bandeja, sobre ella. En la bandeja
+  // inclinada va perpendicular a la bandeja (gira con ella; supuesto de dibujo).
   idxOf(/^Frent[ií]n/).forEach(i => {
     const p = parts[i];
     for (let k = 0; k < (p.quantity || 1); k++) {
-      const s = shelfTops[k] || shelfTops[shelfTops.length - 1] || { y: 18, zFront: D };
+      const s: ShelfTop = shelfTops[k] || shelfTops[shelfTops.length - 1] || { y: 18, zFront: D };
       const x0 = (W - p.width) / 2;
+      if (s.tray) {
+        // Centro del frentín en coordenadas de la bandeja (y hacia arriba de la bandeja, z hacia su frente)
+        const ly = 9 + p.height / 2, lz = s.tray.L / 2 - 9;
+        const c = Math.cos(SHOE_TRAY_TILT_RAD), sn = Math.sin(SHOE_TRAY_TILT_RAD);
+        const cy = s.tray.yc + ly * c - lz * sn, cz = s.tray.zc + ly * sn + lz * c;
+        pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, cy - p.height / 2, cy + p.height / 2, cz - 9, cz + 9), 'front', { rotX: SHOE_TRAY_TILT }));
+        continue;
+      }
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, s.y, s.y + p.height, s.zFront - 18, s.zFront), 'front'));
     }
   });
@@ -894,12 +922,24 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   return { name, modules: placed, bbox, size: { w: s[0], h: s[1], d: s[2] }, issues };
 };
 
-/** Pares de piezas que se solapan, ignorando los alojamientos intencionales (ranuras). */
+/** Caja que ocupa la pieza ya girada (para controles; `box` es la caja sin girar). */
+export const pieceAABB = (p: Piece3D): Box => {
+  if (!p.rotX) return p.box;
+  const r = (p.rotX * Math.PI) / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r));
+  const [sx, sy, sz] = boxSize(p.box), [cx, cy, cz] = boxCenter(p.box);
+  const hy = (sy * c + sz * s) / 2, hz = (sy * s + sz * c) / 2;
+  return mkBox(cx - sx / 2, cx + sx / 2, cy - hy, cy + hy, cz - hz, cz + hz);
+};
+
+/** Pares de piezas que se solapan, ignorando los alojamientos intencionales (ranuras). Entre dos
+ *  piezas giradas (bandejas inclinadas y sus frentines) la caja girada no sirve: no se controla. */
 export const findPieceOverlaps = (pieces: Piece3D[]): [Piece3D, Piece3D][] => {
   const out: [Piece3D, Piece3D][] = [];
   for (let i = 0; i < pieces.length; i++) {
     for (let j = i + 1; j < pieces.length; j++) {
       const a = pieces[i], b = pieces[j];
+      if (a.rotX && b.rotX) continue;
+      if (a.rotX || b.rotX) { if (overlapVolume(pieceAABB(a), pieceAABB(b)) > 0) out.push([a, b]); continue; }
       if ((a.groove && b.role === 'drawer') || (b.groove && a.role === 'drawer')) continue;
       if ((a.groove && a.role === 'back' && b.role === 'carcass') || (b.groove && b.role === 'back' && a.role === 'carcass')) continue;
       if (overlapVolume(a.box, b.box) > 0) out.push([a, b]);

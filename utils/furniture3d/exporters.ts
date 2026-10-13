@@ -43,6 +43,13 @@ export const safeName = (s: string): string =>
     .replace(/[^A-Za-z0-9_.\- ]+/g, ' ')
     .trim().replace(/\s+/g, '_') || 'sin_nombre';
 
+/** Giro sobre x, convención de three.js: ángulo positivo lleva +y hacia +z y +z hacia −y (el frente baja). */
+const rotateX = (p: Vec3, deg: number): Vec3 => {
+  if (!deg) return p;
+  const r = (deg * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r);
+  return [p[0], p[1] * c - p[2] * s, p[1] * s + p[2] * c];
+};
+
 const n = (v: number) => { const r = Math.round(v * 10000) / 10000; return Object.is(r, -0) ? '0' : String(r); };
 
 // ─────────────────────────────────────────────────────────────
@@ -117,7 +124,7 @@ const meshFor = (m: { size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder' }): B
 // ─────────────────────────────────────────────────────────────
 // Nodos comunes de la escena (los usan FBX y OBJ)
 // ─────────────────────────────────────────────────────────────
-interface MeshNode { name: string; material: string; translation: Vec3; size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder'; props: Record<string, string> }
+interface MeshNode { name: string; material: string; translation: Vec3; size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder'; rotX?: number; props: Record<string, string> }
 interface ModuleNode { name: string; translation: Vec3; rotY: number; meshes: MeshNode[] }
 
 const pieceProps = (p: Piece3D): Record<string, string> => ({
@@ -136,7 +143,7 @@ const collectNodes = (scene: FurnitureScene): ModuleNode[] => {
     const meshes: MeshNode[] = sm.pieces.map(sp => ({
       name: unique(safeName(`${mName}_${sp.piece.name}${sp.piece.hingeSide ? `_bisagra_${sp.piece.hingeSide === 'left' ? 'izq' : 'der'}` : ''}`)),
       material: safeName(sp.piece.boardLabel),
-      translation: boxCenter(sp.box), size: boxSize(sp.box), grainAxis: sp.piece.grainAxis, shape: sp.piece.shape,
+      translation: boxCenter(sp.box), size: boxSize(sp.box), grainAxis: sp.piece.grainAxis, shape: sp.piece.shape, rotX: sp.piece.rotX,
       props: pieceProps(sp.piece),
     }));
     if (sm.placeholder) {
@@ -270,6 +277,7 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
 \t}`);
       objects.push(`\tModel: ${oid}, "Model::${mesh.name}", "Mesh" {\n\t\tVersion: 232\n${props70([
         `P: "Lcl Translation", "Lcl Translation", "", "A",${n(mesh.translation[0])},${n(mesh.translation[1])},${n(mesh.translation[2])}`,
+        ...(mesh.rotX ? [`P: "Lcl Rotation", "Lcl Rotation", "", "A",${n(mesh.rotX)},0,0`] : []),
         ...userProps(mesh.props),
       ])}\n\t\tShading: T\n\t\tCulling: "CullingOff"\n\t}`);
       connections.push(`\tC: "OO",${oid},${mid}`);
@@ -380,13 +388,14 @@ export const exportOBJ = (scene: FurnitureScene, mtlFileName = 'amoblamiento.mtl
     m.meshes.forEach(mesh => {
       const bm = meshFor(mesh);
       lines.push(`o ${mesh.name}`, `g ${root}/${m.name}/${mesh.name}`, `usemtl ${mesh.material}`);
-      bm.positions.forEach(p => {
+      bm.positions.forEach(p0 => {
+        const p = rotateX(p0, mesh.rotX || 0);
         const local: Vec3 = [p[0] + mesh.translation[0], p[1] + mesh.translation[1], p[2] + mesh.translation[2]];
         const r = rotateY(local, m.rotY);
         lines.push(`v ${n(r[0] + m.translation[0])} ${n(r[1] + m.translation[1])} ${n(r[2] + m.translation[2])}`);
       });
       bm.uvs.forEach(uv => lines.push(`vt ${n(uv[0])} ${n(uv[1])}`));
-      bm.normals.forEach(nv => { const r = rotateY(nv, m.rotY); lines.push(`vn ${n(r[0])} ${n(r[1])} ${n(r[2])}`); });
+      bm.normals.forEach(nv => { const r = rotateY(rotateX(nv, mesh.rotX || 0), m.rotY); lines.push(`vn ${n(r[0])} ${n(r[1])} ${n(r[2])}`); });
       bm.polys.forEach(q => lines.push('f ' + q.map(i => `${i + vBase}/${i + vBase}/${i + vBase}`).join(' ')));
       vBase += bm.positions.length;
     });

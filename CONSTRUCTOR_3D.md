@@ -60,8 +60,7 @@ posiciones, rotaciones y medidas en mm coinciden. **No se probó la importación
 
 | Ubicación 3D | Módulos |
 |---|---|
-| Completa | Estándar (puertas, cajones, abatibles, combinados), Bajo mesada, Bajo mesada esquinero recto, Alacena (sin posición: colgada a 1460 mm), Módulo horno empotrado, Microondas de empotrar, Columna, Bajo mesada para horno, Bajo mesada esquinero en L, Módulo abierto, Biblioteca, Botinero con estantes extraíbles, Estante 18mm, Puerta, Lateral aplicado, Divisor vertical, Ajuste, Zócalo aplicado, Tapa horizontal (18/36), Estante 36mm (las ménsulas ocultas no se dibujan) |
-| Aproximada | Botinero con bandejas fijas inclinadas (bandejas a 30° dibujadas horizontales) |
+| Completa | Estándar (puertas, cajones, abatibles, combinados), Bajo mesada, Bajo mesada esquinero recto, Alacena (sin posición: colgada a 1460 mm), Módulo horno empotrado, Microondas de empotrar, Columna, Bajo mesada para horno, Bajo mesada esquinero en L, Módulo abierto, Biblioteca, Botinero con estantes extraíbles, Botinero con bandejas fijas inclinadas (30°, el frente más bajo; frentín perpendicular a la bandeja), Estante 18mm, Puerta, Lateral aplicado, Divisor vertical, Ajuste, Zócalo aplicado, Tapa horizontal (18/36), Estante 36mm (las ménsulas ocultas no se dibujan) |
 | Sin ubicar (volumen + despiece en grilla) | Módulo horizontal, Bajo mesada y esquinero recto anteriores a la ficha (plantillas legacy),  Panel de revestimiento liso, Panel de revestimiento enlistonado, Zócalo estructural |
 | Sin geometría | Módulos manuales (solo costo) |
 
@@ -92,5 +91,4 @@ Pendientes (la app los lista en *Validación → Supuestos de dibujo*):
 
 - Módulos guardados con plantillas viejas: conservan el despiece de la ficha anterior hasta que se
   convierten ("Convertir a ficha nueva" en Módulos pendientes).
-- Bandejas inclinadas del botinero: dibujadas horizontales.
 - Geometría de Módulo horizontal, Bajo mesada, esquineros y paneles.

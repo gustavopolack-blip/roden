@@ -365,7 +365,7 @@ Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y p
 | Módulo abierto | Estándar sin frentes; estantes con la regla del estándar; fondo a elección (18 / 3 / 5,5). | **Implementado** (variante `ABIERTO`) |
 | Biblioteca | Como el módulo abierto, con 1 estante fijo cada 320 mm de alto. | **Implementado** (`BIBLIOTECA`) |
 | Botinero con estantes extraíbles | Sin puertas. Bandejas de la profundidad de un estante; ancho = interior libre − 26; faja delantera de 36 mm; guías telescópicas simples. 1 bandeja cada 200 mm. | **Implementado** (`BOTINERO_EXTRAIBLE`) |
-| Botinero con bandejas fijas inclinadas | Sin puertas. Bandejas sobre colizas ocultas; frentín (50 mm) con canto en los 4 lados. 1 cada 200 mm. | **Implementado** (`BOTINERO_FIJO`) |
+| Botinero con bandejas fijas inclinadas | Sin puertas. Bandejas sobre colizas ocultas, **inclinadas 30°** (el frente más bajo; en 3D, apoyadas atrás contra el fondo; la medida de corte no cambia); frentín (50 mm) con canto en los 4 lados. 1 cada 200 mm. | **Implementado** (`BOTINERO_FIJO`) |
 | Módulo horizontal | N cajones o N puertas lado a lado, del mismo ancho. Cajones: división entre cada par, frente de todo el alto, caja por hueco con la regla del frente. Puertas: N − 1 divisiones si mide más de 900 mm (supuesto mío: sin divisiones hasta 900). | **Implementado** (variante `HORIZONTAL`) |
 | Módulo vertical | Tapa y base sobre laterales o laterales enteros (opción); fondo 5,5 o 18; estante si H > 800 y uno más cada 350; puertas; apoyado o colgado. | **Implementado** (variante `VERTICAL`) |
 | Panel liso | Correcto como está; canto en los 4 lados. | **Implementado** |
