@@ -307,7 +307,7 @@ Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y p
 |---|---|
 | Laterales (extremos) | D1 × H y D2 × H |
 | Piso A / B | (L1 − 18) × D1 / (L2 − D1 − 18) × D2 |
-| Columna de rincón | 80 × (H − 18) y 62 × (H − 18) — apoyada sobre el piso (supuesto mío) |
+| Columna de rincón | 80 × (H − 18) y 62 × (H − 18) — apoyada sobre el piso (confirmado) |
 | Fajas traseras (paradas) | (L1 − 98) × 100 / (L2 − 98) × 100 — desde la columna |
 | Fajas frontales (acostadas) | (L1 − 18 − D2) × 100 / (L2 − 18 − D1) × 100 |
 | Fondos 3 mm | (L1 − 32) × (H − 14) / (L2 − 35) × (H − 14) — A pasa en el rincón, B apoya |

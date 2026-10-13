@@ -898,7 +898,7 @@ const ESQUINERO: SpecialModuleTemplate = {
 // profundidad del lado 1 (D1); opciones: largo del brazo 2 (L2) y profundidad del lado 2 (D2).
 // Construcción de bajo mesada: laterales enteros solo en los extremos, sin tapa, fondo 3 mm en
 // ranura a 18 mm de atrás. En el rincón contra las paredes, una columna de dos fajas de
-// estructura en L (80 × 80 mm: piezas de 80 y 62) apoyada sobre el piso (alto H − 18). Piso y estante en L se
+// estructura en L (80 × 80 mm: piezas de 80 y 62) apoyada sobre el piso (alto H − 18, confirmado por Gustavo). Piso y estante en L se
 // cotizan como dos rectángulos: A a lo largo de todo el brazo 1; B desde donde termina la
 // profundidad de A. Puertas: largo del brazo − profundidad del otro − 21 − 4.
 // Coordenadas (3D): rincón en (0, 0); brazo 1 sobre la pared A (eje x), brazo 2 sobre la pared B (eje z).
