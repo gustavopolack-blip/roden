@@ -123,3 +123,27 @@ describe('OBJ/MTL', () => {
     expect(mtl).toMatch(/newmtl Fondo_Blanco_3mm/);
   });
 });
+
+describe('patas (cilindros) en la exportación', () => {
+  const legged = buildScene(buildAssembly('Patas', [mod({ id: 'p', name: 'Bajo', baseType: 'PATAS', cntDoors: 2 })]), 0);
+  it('FBX: cada pata es una malla cilíndrica de Ø 40 × 100 que el lector acepta', () => {
+    const root = parseFbx(exportFBX(legged, { date: new Date(2026, 9, 13, 12, 0, 0) }));
+    root.updateMatrixWorld(true);
+    const legs: THREE.Mesh[] = [];
+    root.traverse(o => { if ((o as THREE.Mesh).isMesh && o.name.includes('Pata_regulable')) legs.push(o as THREE.Mesh); });
+    expect(legs).toHaveLength(4);
+    legs.forEach(l => {
+      const b = new THREE.Box3().setFromObject(l);
+      const s = b.getSize(new THREE.Vector3());
+      expect(s.x).toBeCloseTo(40, 3); expect(s.y).toBeCloseTo(100, 3); expect(s.z).toBeCloseTo(40, 3);
+      expect(b.min.y).toBeCloseTo(0, 3);
+    });
+  });
+  it('OBJ: las tapas de la pata son polígonos de 24 lados', () => {
+    const { obj } = exportOBJ(legged);
+    const block = obj.split(/^o /m).find(b => b.startsWith('M01_Bajo_Pata_regulable'))!;
+    const faces = block.split('\n').filter(l => l.startsWith('f '));
+    expect(faces).toHaveLength(26);   // 24 laterales + 2 tapas
+    expect(faces.filter(f => f.split(' ').length === 25)).toHaveLength(2);
+  });
+});

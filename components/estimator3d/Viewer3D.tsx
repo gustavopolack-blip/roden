@@ -125,10 +125,14 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
           emissive: new THREE.Color(isSel ? 0x4f46e5 : moduleSelected ? 0x1e1b4b : 0x000000),
           emissiveIntensity: isSel ? 0.55 : moduleSelected ? 0.12 : 0,
         });
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.max(size[0], 0.1), Math.max(size[1], 0.1), Math.max(size[2], 0.1)), mat);
+        const geom = sp.piece.shape === 'cylinder'
+          ? new THREE.CylinderGeometry(size[0] / 2, size[0] / 2, Math.max(size[1], 0.1), 24)
+          : new THREE.BoxGeometry(Math.max(size[0], 0.1), Math.max(size[1], 0.1), Math.max(size[2], 0.1));
+        const mesh = new THREE.Mesh(geom, mat);
         mesh.position.set(center[0], center[1], center[2]);
         mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key };
-        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: isSel ? 0x4f46e5 : 0x6b7280 }));
+        // Cilindro: solo el contorno de las tapas (sin las aristas de cada segmento).
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, sp.piece.shape === 'cylinder' ? 30 : 1), new THREE.LineBasicMaterial({ color: isSel ? 0x4f46e5 : 0x6b7280 }));
         mesh.add(edges);
         // Marca de bisagra (lado de apertura) sobre el canto de la puerta
         if (sp.piece.hingeSide) {

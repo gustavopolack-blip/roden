@@ -270,8 +270,49 @@ describe('ficha constructiva del módulo estándar en 3D', () => {
     for (const baseType of ['PATAS', 'BANQUINA', 'ZOCALO']) {
       const a = buildAssembly('x', [mod({ baseType, cntDoors: 2 })]);
       expect(a.size.h).toBe(820);
-      expect(Math.min(...a.modules[0].pieces.map(p => p.box.min[1]))).toBe(100);
+      expect(Math.min(...a.modules[0].pieces.filter(p => p.role !== 'hardware').map(p => p.box.min[1]))).toBe(100);
     }
+  });
+  it('patas: redondas Ø 40 × 100, centro a 40 mm de costados, frente y atrás; 6 con más de 900 de ancho', () => {
+    const legs = (over: any) => placeModule(mod({ baseType: 'PATAS', cntDoors: 2, ...over })).pieces.filter(p => p.role === 'hardware');
+    const four = legs({});
+    expect(four).toHaveLength(4);
+    four.forEach(l => {
+      expect(l.name).toBe('Pata regulable');
+      expect(l.shape).toBe('cylinder');
+      expect(l.partIndex).toBe(-1);
+      expect(boxSize(l.box)).toEqual([40, 100, 40]);
+      expect(l.box.min[1]).toBe(0);
+    });
+    const centers = (ls: typeof four) => ls.map(l => [boxCenter(l.box)[0], boxCenter(l.box)[2]].join(',')).sort();
+    expect(centers(four)).toEqual(['40,40', '40,540', '560,40', '560,540']);
+    expect(legs({ width: 900 })).toHaveLength(4);
+    expect(centers(legs({ width: 1000 }))).toEqual(['40,40', '40,540', '500,40', '500,540', '960,40', '960,540'].sort());
+    // banquina y zócalo estructural no se dibujan
+    expect(legs({ baseType: 'BANQUINA' })).toHaveLength(0);
+    expect(legs({ baseType: 'ZOCALO' })).toHaveLength(0);
+    // las patas no chocan con la base del módulo (la tocan)
+    expect(findPieceOverlaps(placeModule(mod({ baseType: 'PATAS', cntDoors: 2 })).pieces)).toEqual([]);
+  });
+  it('zócalo aplicado sin posición: delante de las patas del primer módulo con patas', () => {
+    const zocalo = (over: any = {}) => ({ ...mod({ id: 'z', name: 'Zócalo', width: 1200, height: 100, depth: 18 }),
+      moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: 'ZOCALO_APLICADO', specialOptions: {},
+      specialParts: [{ name: 'Zócalo aplicado 18mm', width: 1200, height: 100, material: '18mm_Carcass', quantity: 1, grain: 'horizontal' }], ...over });
+    const a = buildAssembly('x', [
+      mod({ id: 'a', baseType: 'PATAS', cntDoors: 2 }), zocalo(), mod({ id: 'b', baseType: 'PATAS', cntDoors: 2 }),
+    ]);
+    const z = a.modules.find(m => m.templateId === 'ZOCALO_APLICADO')!;
+    // cara trasera del zócalo = frente de las patas delanteras (580 − 40 + 20 = 560)
+    expect(z.layout).toEqual({ x: 0, y: 0, z: 560, rotY: 0 });
+    // no corre la fila: el segundo módulo sigue en x = 600
+    expect(a.modules.find(m => m.moduleId === 'b')!.layout.x).toBe(600);
+    expect(issuesOf(a, 'MODULE_OVERLAP')).toEqual([]);
+    // sin módulos con patas sigue la fila, como antes
+    const sin = buildAssembly('x', [mod({ id: 'a', baseType: 'BANQUINA', cntDoors: 2 }), zocalo()]);
+    expect(sin.modules.find(m => m.templateId === 'ZOCALO_APLICADO')!.layout).toEqual({ x: 600, y: 0, z: 0, rotY: 0 });
+    // con posición guardada se respeta
+    const fijo = buildAssembly('x', [mod({ id: 'a', baseType: 'PATAS', cntDoors: 2 }), zocalo({ layout3d: { x: 10, y: 0, z: 0, rotY: 0 } })]);
+    expect(fijo.modules.find(m => m.templateId === 'ZOCALO_APLICADO')!.layout).toEqual({ x: 10, y: 0, z: 0, rotY: 0 });
   });
   it('caja de cajón: alto según el frente y detrás del frente embutido', () => {
     const lat = (over: any) => placeModule(mod({ cntDrawers: 1, ...over })).pieces.filter(p => p.name === 'Lateral Cajón')[0].box;
