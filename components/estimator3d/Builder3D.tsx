@@ -30,7 +30,9 @@ interface Builder3DProps {
   priceLabel?: string | null;         // precio del ítem según el estimador (informativo)
 }
 
-type ViewMode = 'assembled' | 'exploded' | 'module';
+/** Qué se ve (el ítem con todos sus módulos o un módulo solo) y cómo (armado o despiezado). */
+type ViewScope = 'item' | 'module';
+type ViewPresentation = 'assembled' | 'exploded';
 
 const download = (content: string, fileName: string, mime: string) => {
   const blob = new Blob([content], { type: mime });
@@ -75,7 +77,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     () => Object.fromEntries(furnitures.map(f => [f.id, JSON.parse(JSON.stringify(f.modules || []))])),
   );
   const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<ViewMode>('assembled');
+  const [scope, setScope] = useState<ViewScope>('item');
+  const [presentation, setPresentation] = useState<ViewPresentation>('assembled');
   const [factor, setFactor] = useState(0.6);
   const [selModuleKey, setSelModuleKey] = useState<string | null>(null);
   const [selPieceKey, setSelPieceKey] = useState<string | null>(null);
@@ -86,10 +89,17 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const modules = drafts[active.id] || [];
   const assembly = useMemo(() => buildAssembly(active.name, modules), [active.name, modules]);
   const selectedPlaced: PlacedModule | undefined = assembly.modules.find(m => m.key === selModuleKey);
+  // En vista de módulo se muestra el seleccionado; sin selección, el primero.
+  const viewPlaced = scope === 'module' ? (selectedPlaced || assembly.modules[0]) : undefined;
   const viewScene = useMemo(
-    () => buildScene(assembly, mode === 'assembled' ? 0 : factor, mode === 'module' ? (selModuleKey || assembly.modules[0]?.key) : undefined),
-    [assembly, mode, factor, selModuleKey],
+    () => buildScene(assembly, presentation === 'assembled' ? 0 : factor, viewPlaced?.key),
+    [assembly, presentation, factor, viewPlaced?.key],
   );
+  const showScope = (next: ViewScope) => {
+    if (next === 'module' && !selModuleKey && assembly.modules[0]) setSelModuleKey(assembly.modules[0].key);
+    setScope(next);
+    setFitToken(t => t + 1);
+  };
   const issueModuleKeys = useMemo(() => new Set(assembly.issues.filter(i => i.level === 'error').flatMap(i => i.moduleKeys || [])), [assembly]);
 
   const selModIndex = selectedPlaced ? selectedPlaced.moduleIndex : -1;
@@ -162,8 +172,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const selHardware = selMod && !isManualModule(selMod) ? Object.entries(calculateItemQuantities([{ ...selMod, quantity: 1 }]).detailedHardware) : [];
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-sm flex items-stretch justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[1500px] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[300] bg-white flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col">
         {/* Encabezado */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <div className="flex items-center gap-3 min-w-0">
@@ -207,7 +217,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
               <div className="space-y-1">
                 {assembly.modules.filter(m => m.instance === 0).map(m => (
                   <button key={m.key}
-                    onClick={() => { setSelModuleKey(m.key); setSelPieceKey(null); }}
+                    onClick={() => { setSelModuleKey(m.key); setSelPieceKey(null); if (scope === 'module') setFitToken(t => t + 1); }}
                     className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${selModuleKey === m.key ? 'bg-indigo-50 border-indigo-400' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}>
                     <div className="flex justify-between gap-2">
                       <span className="font-bold truncate">{modules[m.moduleIndex]?.name || m.name}</span>
@@ -315,14 +325,25 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
           {/* Centro: visor */}
           <main className="flex-1 flex flex-col min-w-0">
             <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-200">
-              {([['assembled', 'Ensamblado', BoxIcon], ['exploded', 'Despiece del mueble', Layers], ['module', 'Despiece del módulo', Layers]] as const).map(([k, label, Icon]) => (
-                <button key={k} onClick={() => { setMode(k); setFitToken(t => t + 1); }}
-                  disabled={k === 'module' && !selModuleKey && assembly.modules.length === 0}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${mode === k ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <Icon size={14} /> {label}
-                </button>
-              ))}
-              {mode !== 'assembled' && (
+              <div className="flex rounded-lg border border-gray-200 p-0.5">
+                {([['item', 'Ítem completo'], ['module', 'Módulo']] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => showScope(k)}
+                    disabled={k === 'module' && assembly.modules.length === 0}
+                    className={`px-3 py-1 rounded-md text-xs font-bold disabled:opacity-40 ${scope === k ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex rounded-lg border border-gray-200 p-0.5">
+                {([['assembled', 'Ensamblado', BoxIcon], ['exploded', 'Despiece', Layers]] as const).map(([k, label, Icon]) => (
+                  <button key={k} onClick={() => { setPresentation(k); setFitToken(t => t + 1); }}
+                    className={`px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 ${presentation === k ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    <Icon size={14} /> {label}
+                  </button>
+                ))}
+              </div>
+              {viewPlaced && <span className="text-xs text-gray-600 font-bold truncate max-w-[220px]">{modules[viewPlaced.moduleIndex]?.name || viewPlaced.name}</span>}
+              {presentation === 'exploded' && (
                 <label className="flex items-center gap-2 text-xs text-gray-600 ml-2">
                   Separación
                   <input type="range" min={0.1} max={1.5} step={0.05} value={factor} onChange={e => setFactor(Number(e.target.value))} />
@@ -338,7 +359,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
             <div className="flex-1 min-h-0">
               {assembly.modules.length > 0 ? (
                 <Viewer3D
-                  scene={viewScene} bbox={assembly.bbox}
+                  scene={viewScene} bbox={viewPlaced ? viewPlaced.localBox : assembly.bbox}
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}

@@ -2,11 +2,13 @@
  * Constructor 3D: geometría, composición, validaciones y correspondencia con el despiece.
  */
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import { buildStandardModules, buildSpecialModules } from './fixtures/moduleMatrix.mjs';
 import { SPECIAL_MODULE_TEMPLATES } from '../utils/specialModules';
 import { calculateModuleParts } from '../utils/estimatorEngine';
 import {
-  buildAssembly, buildScene, placeModule, findPieceOverlaps, boxSize, transformBox, overlapVolume, MODULE_PLACERS,
+  buildAssembly, buildScene, placeModule, findPieceOverlaps, boxSize, boxCenter, transformBox, overlapVolume, MODULE_PLACERS,
+  fitCameraDistance,
 } from '../utils/furniture3d/geometry';
 
 const BASE = {
@@ -182,4 +184,36 @@ describe('despiece explotado', () => {
     // un módulo puede verse solo
     expect(buildScene(a, 0.6, a.modules[1].key).modules.length).toBe(1);
   });
+});
+
+describe('encuadre de cámara del visor', () => {
+  // Los 8 vértices tienen que proyectarse dentro de la pantalla (NDC en [-1, 1]) con la misma
+  // dirección de cámara que usa el visor, también en visores angostos o apaisados.
+  const corners = (b: { min: number[]; max: number[] }) => {
+    const out: THREE.Vector3[] = [];
+    for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) out.push(new THREE.Vector3(x, y, z));
+    return out;
+  };
+  const cases = [
+    { name: 'módulo 600×720×580', box: { min: [0, 0, 0], max: [600, 720, 580] } },
+    { name: 'placard 4200×2600×600', box: { min: [0, 0, 0], max: [4200, 2600, 600] } },
+    { name: 'estante 2400×18×250', box: { min: [-1200, 900, 0], max: [1200, 918, 250] } },
+  ];
+  for (const { name, box } of cases) {
+    for (const aspect of [0.45, 1, 2.4]) {
+      it(`${name} entra completo con proporción ${aspect}`, () => {
+        const camera = new THREE.PerspectiveCamera(40, aspect, 1, 1e6);
+        const center = new THREE.Vector3(...boxCenter(box as any));
+        const dist = fitCameraDistance(box as any, camera.fov, aspect);
+        camera.position.copy(center).addScaledVector(new THREE.Vector3(0.7, 0.55, 1.5).normalize(), dist);
+        camera.lookAt(center);
+        camera.updateMatrixWorld();
+        for (const c of corners(box)) {
+          const p = c.clone().project(camera);
+          expect(Math.abs(p.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(p.y)).toBeLessThanOrEqual(1);
+        }
+      });
+    }
+  }
 });

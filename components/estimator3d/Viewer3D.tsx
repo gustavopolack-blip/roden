@@ -6,12 +6,12 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { FurnitureScene, Box, boxCenter, boxSize } from '../../utils/furniture3d/geometry';
+import { FurnitureScene, Box, boxCenter, boxSize, fitCameraDistance } from '../../utils/furniture3d/geometry';
 import { materialColorFor } from '../../utils/furniture3d/exporters';
 
 interface Viewer3DProps {
   scene: FurnitureScene;
-  bbox: Box;
+  bbox: Box;                     // caja de lo que se está viendo (ítem o módulo): medidas del rótulo
   selectedPieceKey: string | null;
   selectedModuleKey: string | null;
   issueModuleKeys: Set<string>;
@@ -168,11 +168,13 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const b = new THREE.Box3().setFromObject(c.content);
     if (b.isEmpty()) return;
     const center = b.getCenter(new THREE.Vector3());
-    const size = b.getSize(new THREE.Vector3());
-    const d = Math.max(size.x, size.y, size.z, 600);
+    // Distancia según el tamaño real (incluido el despiece explotado) y la proporción del visor:
+    // antes era un múltiplo fijo de la medida mayor y en visores angostos el mueble quedaba cortado.
+    const dist = fitCameraDistance({ min: b.min.toArray(), max: b.max.toArray() }, c.camera.fov, c.camera.aspect);
+    const dir = new THREE.Vector3(0.7, 0.55, 1.5).normalize();
     c.controls.target.copy(center);
-    c.camera.position.set(center.x + d * 0.7, center.y + d * 0.55, center.z + d * 1.5);
-    c.camera.near = d / 200; c.camera.far = d * 50;
+    c.camera.position.copy(center).addScaledVector(dir, dist);
+    c.camera.near = dist / 200; c.camera.far = dist * 50;
     c.camera.updateProjectionMatrix();
   };
   useEffect(() => { fit(); }, [fitToken]);
