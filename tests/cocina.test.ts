@@ -3,7 +3,7 @@
  * alacena, horno empotrado y columna. Despiece, herrajes y ubicación 3D.
  */
 import { describe, it, expect } from 'vitest';
-import { calculateModuleParts, calculateItemQuantities, SHELF_SUPPORT_LABEL } from '../utils/estimatorEngine';
+import { calculateModuleParts, calculateItemQuantities, SHELF_SUPPORT_LABEL, isVisibleFrontPiece, visibleEdgeLength } from '../utils/estimatorEngine';
 import { placeModule, buildAssembly, findPieceOverlaps, WALL_CABINET_Y } from '../utils/furniture3d/geometry';
 import { getTemplate, getFixedDims } from '../utils/specialModules';
 
@@ -208,5 +208,80 @@ describe('bajo mesada esquinero en L', () => {
     expect(findPieceOverlaps(pieces)).toEqual([]);
     const a = buildAssembly('x', [L()]);
     expect([a.size.w, a.size.d]).toEqual([1200, 1000]);
+  });
+});
+
+describe('módulos abiertos y tapacantos (ficha del 13/10)', () => {
+  const m = (cabinetType: string, over: any = {}) => mod({ cabinetType, width: 800, height: 1800, depth: 400, cntDoors: 2, ...over });
+  it('módulo abierto: sin frentes, estantes con la regla del estándar', () => {
+    const p = calculateModuleParts(m('ABIERTO') as any);
+    expect(p.some(x => /^(Puerta|Frente)/.test(x.name))).toBe(false);
+    expect(p.find(x => x.name === 'Estante Interno')!.quantity).toBe(3);   // (1800 − 850)/350 + 1
+  });
+  it('biblioteca: 1 estante fijo cada 320 mm', () => {
+    expect(calculateModuleParts(m('BIBLIOTECA') as any).find(x => x.name === 'Estante Interno')!.quantity).toBe(5);
+  });
+  it('botinero extraíble: bandeja = interior − 26, faja de 36, un par de guías simples por bandeja', () => {
+    const p = calculateModuleParts(m('BOTINERO_EXTRAIBLE') as any);
+    expect(size(p, 'Bandeja extraíble')).toEqual([738, 369, 9]);
+    expect(size(p, 'Faja bandeja')).toEqual([738, 36, 9]);
+    expect(p.some(x => x.name === 'Estante Interno')).toBe(false);
+    const q = calculateItemQuantities([m('BOTINERO_EXTRAIBLE', { calculateSlides: true, slideType: 'TELESCOPIC_SOFT' }) as any]);
+    expect(q.totalSlides).toBe(9);
+    expect(Object.keys(q.detailedHardware).filter(k => /Guías/.test(k))).toEqual(['Guías Telescópicas (350mm)']);
+  });
+  it('botinero fijo: bandejas inclinadas y frentín de frente con canto en los 4 lados', () => {
+    const p = calculateModuleParts(m('BOTINERO_FIJO') as any);
+    expect(size(p, 'Bandeja fija inclinada')).toEqual([764, 369, 9]);
+    const f = p.find(x => x.name === 'Frentín bandeja')!;
+    expect([f.width, f.height, f.quantity]).toEqual([764, 50, 9]);
+    expect(isVisibleFrontPiece(f.name)).toBe(true);
+    expect(visibleEdgeLength(f)).toBe((764 + 50) * 2);
+  });
+  it('panel liso: canto en los 4 lados; zócalo aplicado: sin canto', () => {
+    expect(isVisibleFrontPiece('Panel frontal 18mm')).toBe(true);
+    expect(visibleEdgeLength({ name: 'Zócalo aplicado 18mm', width: 2000, height: 100, material: '18mm_Carcass', grain: 'horizontal' })).toBe(0);
+  });
+  it('3D: módulos abiertos sin choques', () => {
+    for (const t of ['ABIERTO', 'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO']) {
+      expect([t, findPieceOverlaps(placeModule(m(t)).pieces)]).toEqual([t, []]);
+    }
+  });
+});
+
+describe('módulo horizontal, módulo vertical y frentes sueltos (13/10)', () => {
+  const hz = (over: any) => mod({ cabinetType: 'HORIZONTAL', width: 1200, height: 500, depth: 450, ...over });
+  it('horizontal con 3 cajones: lado a lado, del mismo ancho, división entre cada par y caja por hueco', () => {
+    const p = calculateModuleParts(hz({ cntDrawers: 3 }) as any);
+    expect(size(p, 'División vertical')).toEqual([429, 464, 2]);
+    const f = p.find(x => x.name === 'Frente Cajón')!;
+    expect([f.width, f.height, f.quantity]).toEqual([(1196 - 8) / 3, 496, 3]);
+    const lat = p.find(x => x.name === 'Lateral Cajón')!;
+    expect([lat.height, lat.quantity]).toEqual([300, 6]);
+    expect(p.find(x => x.name === 'Contra/Frente Cajón')!.width).toBeCloseTo((1164 - 36) / 3 - 25 - 30);
+    const { pieces } = placeModule(hz({ cntDrawers: 3 }));
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+  });
+  it('horizontal con puertas: divisiones entre puertas solo si mide más de 900 mm', () => {
+    expect(size(calculateModuleParts(hz({ cntDoors: 3 }) as any), 'División vertical')).toEqual([429, 464, 2]);
+    expect(calculateModuleParts(hz({ cntDoors: 2, width: 900 }) as any).some(x => x.name === 'División vertical')).toBe(false);
+    expect(findPieceOverlaps(placeModule(hz({ cntDoors: 3 })).pieces)).toEqual([]);
+  });
+  it('vertical: estante si mide más de 800 mm y uno más cada 350', () => {
+    const n = (h: number) => calculateModuleParts(mod({ cabinetType: 'VERTICAL', width: 250, height: h, depth: 400, cntDoors: 1 }) as any).find(x => x.name === 'Estante Interno')?.quantity || 0;
+    expect([n(800), n(801), n(1149), n(1150)]).toEqual([0, 1, 1, 2]);
+  });
+  it('frente de cajón suelto: caja según el frente y un par de guías', () => {
+    const m = special('FRENTE_CAJON_SUELTO', { width: 596, height: 236, depth: 580 });
+    const p = calculateModuleParts(m as any);
+    expect(size(p, 'Lateral Cajón')).toEqual([560, 120, 2]);
+    expect(size(p, 'Contra/Frente Cajón')).toEqual([509, 120, 2]);
+    expect(calculateItemQuantities([m as any]).totalSlides).toBe(1);
+  });
+  it('frente abatible suelto: 2 bisagras y 1 pistón', () => {
+    const m = special('FRENTE_ABATIBLE_SUELTO', { width: 600, height: 350, depth: 580 });
+    const q = calculateItemQuantities([m as any]);
+    expect([q.totalHinges, q.totalPistons, q.detailedHardware['Pistones a Gas']]).toEqual([2, 1, 1]);
+    expect(placeModule(m).status).toBe('placed');
   });
 });

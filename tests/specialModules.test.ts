@@ -17,12 +17,13 @@ describe('grupos de plantillas', () => {
       'HORNO_EMPOTRADO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
     ]);
   });
-  it('bajo mesada y esquinero recto viejos: ocultos (los reemplazan variantes del estándar)', () => {
-    expect(SPECIAL_MODULE_TEMPLATES.filter(t => t.legacy).map(t => t.id).sort()).toEqual(['ESQUINERO', 'MODULO_BAJO_MESADA']);
+  it('plantillas reemplazadas por variantes del estándar: ocultas en el formulario', () => {
+    expect(SPECIAL_MODULE_TEMPLATES.filter(t => t.legacy).map(t => t.id).sort()).toEqual(
+      ['BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'ESQUINERO', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL']);
   });
   it('Piezas: las piezas sueltas', () => {
     expect(ids('PIEZA')).toEqual([
-      'AJUSTE', 'DIVISOR_VERTICAL', 'ESTANTE_18MM', 'ESTANTE_FLOTANTE', 'LATERAL_APLICADO',
+      'AJUSTE', 'DIVISOR_VERTICAL', 'ESTANTE_18MM', 'ESTANTE_FLOTANTE', 'FRENTE_ABATIBLE_SUELTO', 'FRENTE_CAJON_SUELTO', 'LATERAL_APLICADO',
       'PANEL_ENLISTONADO', 'PANEL_LISO', 'PUERTA_18MM', 'TAPA_HORIZONTAL', 'ZOCALO_APLICADO', 'ZOCALO_ESTRUCTURAL',
     ]);
   });

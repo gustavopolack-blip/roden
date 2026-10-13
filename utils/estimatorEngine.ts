@@ -11,7 +11,8 @@
  * motor único de costos (computeItemFinancials) y escenarios (getRecalculatedItemPrices).
  */
 import { CabinetModule, CalculatedPart, CostSettings } from '../types';
-import { SPECIAL_MANUAL_ID, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET } from './specialModules';
+import { SPECIAL_MANUAL_ID, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET, drawerBoxHeightFor } from './specialModules';
+export { drawerBoxHeightFor };
 
 export interface ModuleExtra {
     id: string;
@@ -47,7 +48,11 @@ export interface ExtendedCabinetModule extends CabinetModule {
     //  ESQUINERO: bajo mesada esquinero recto (frente fijo de rincón + 1 puerta).
     //  ALACENA: estándar + faja trasera superior de 100 mm; opción piso de microondas (420 mm).
     //  BAJO_HORNO: bajo mesada para horno (613 de ancho, sin fondo, estante de apoyo y faja inferior).
-    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO';
+    //  ABIERTO / BIBLIOTECA: estándar sin frentes (biblioteca: 1 estante fijo cada 320 mm).
+    //  BOTINERO_EXTRAIBLE / BOTINERO_FIJO: sin frentes, 1 bandeja cada 200 mm.
+    //  HORIZONTAL: N puertas o N cajones lado a lado, del mismo ancho, con divisiones verticales.
+    //  VERTICAL: estante si H > 800 y uno más cada 350 mm.
+    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO' | 'ABIERTO' | 'BIBLIOTECA' | 'BOTINERO_EXTRAIBLE' | 'BOTINERO_FIJO' | 'HORIZONTAL' | 'VERTICAL';
     neighborDepth?: number;          // esquinero: profundidad del bajo que llega de costado (vacío = D)
     cornerSide?: 'LEFT' | 'RIGHT';   // esquinero: lado del rincón (frente fijo)
     microwaveFloor?: boolean;        // alacena = módulo microondas: abierto, fondo 18 mm y piso de 420 mm
@@ -169,12 +174,16 @@ export const INTERNAL_DRAWER_HEIGHT = 80; // cajón interno: solo la caja
 // estante fijo que deja 600 mm libres hasta la mesada; debajo, faja inferior de frente.
 export const OVEN_BASE_WIDTH = 613;
 export const OVEN_FREE_HEIGHT = 600;
+// Módulos abiertos (ficha del 13/10/2026).
+const OPEN_CABINETS = ['ABIERTO', 'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO'];
+export const LIBRARY_SHELF_STEP = 320;   // biblioteca: 1 estante fijo cada 320 mm de alto
+export const SHOE_TRAY_STEP = 200;       // botineros: 1 bandeja cada 200 mm de alto
+export const SHOE_TRAY_FAJA = 36;        // bandeja extraíble: faja delantera de 36 mm
+export const SHOE_FRENTIN = 50;          // bandeja fija inclinada: frentín de 50 mm
+export const shoeTraysFor = (h: number): number => Math.floor(h / SHOE_TRAY_STEP);
 // Estantes de alacena según el alto: hasta 600 → 1; hasta 900 → 2; más de 900 → 3.
 export const wallCabinetShelves = (h: number): number => (h <= 600 ? 1 : h <= 900 ? 2 : 3);
 export const legsFor = (width: number): number => (width <= 900 ? 4 : 6);
-// Alto interior de la caja de cajón (alto del lateral de 15 mm) según el alto del frente.
-export const drawerBoxHeightFor = (frontH: number): number =>
-    frontH < 160 ? 80 : frontH < 240 ? 120 : frontH < 340 ? 200 : 300;
 // Veta: con veta → paralela al lado mayor; lisa → libre; sin dato (módulo anterior) → la de antes.
 const grainOf = (hasGrain: boolean | undefined, w: number, h: number, legacy: CalculatedPart['grain']) =>
     hasGrain === undefined ? legacy : hasGrain ? (w >= h ? 'horizontal' : 'vertical') : 'free';
@@ -214,6 +223,8 @@ export const getFrontLayout = (mod: ExtendedCabinetModule) => {
 export const normalizeCabinet = (mod: ExtendedCabinetModule): ExtendedCabinetModule =>
     mod.cabinetType === 'ESQUINERO' ? { ...mod, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 }
   : mod.cabinetType === 'ALACENA' && mod.microwaveFloor ? { ...mod, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: '18MM_STRUCTURE' }
+  : OPEN_CABINETS.includes(mod.cabinetType || '') ? { ...mod, cntDoors: 0, cntDrawers: 0, cntFlaps: 0,
+      ...(mod.cabinetType?.startsWith('BOTINERO') ? { internalDrawers: 0 } : {}) }
   : mod.cabinetType === 'BAJO_HORNO' ? { ...mod, width: OVEN_BASE_WIDTH, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, internalDrawers: 0, backingType: 'NONE' }
   : mod;
 
@@ -346,6 +357,12 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
           extraShelves = cntDoors > 0 ? 1 : 0;
       } else if (kind === 'ALACENA') {
           extraShelves = mod.microwaveFloor ? 0 : wallCabinetShelves(H);
+      } else if (kind === 'BIBLIOTECA') {
+          extraShelves = Math.floor(H / LIBRARY_SHELF_STEP);
+      } else if (kind === 'BOTINERO_EXTRAIBLE' || kind === 'BOTINERO_FIJO') {
+          extraShelves = 0;   // lleva bandejas en lugar de estantes
+      } else if (kind === 'VERTICAL') {
+          extraShelves = H > 800 ? Math.floor((H - 800) / 350) + 1 : 0;
       } else if (H > 850) {
           extraShelves = Math.floor((H - 850) / 350) + 1;
       }
@@ -356,6 +373,21 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
           parts.push(carcass('Estante Interno', shelfW, shelfD, extraShelves, 'width', 'horizontal'));
       }
 
+      // Botineros: 1 bandeja cada 200 mm, de la profundidad de un estante.
+      //  - Extraíble: ancho = interior libre − 26 (guías telescópicas simples), faja delantera de 36.
+      //  - Fija inclinada: apoya en colizas ocultas; frentín de 50 de material de frente (4 cantos).
+      if (kind === 'BOTINERO_EXTRAIBLE' || kind === 'BOTINERO_FIJO') {
+          const n = shoeTraysFor(H);
+          const trayD = Math.max(0, D - backDepth - SHELF_FRONT_SETBACK);
+          if (n > 0 && kind === 'BOTINERO_EXTRAIBLE') {
+              parts.push(carcass('Bandeja extraíble', Math.max(0, innerW - 26), trayD, n, 'width', 'horizontal'));
+              parts.push(carcass('Faja bandeja', Math.max(0, innerW - 26), SHOE_TRAY_FAJA, n, 'width', 'horizontal'));
+          } else if (n > 0) {
+              parts.push(carcass('Bandeja fija inclinada', innerW, trayD, n, 'width', 'horizontal'));
+              parts.push({ name: 'Frentín bandeja', width: innerW, height: SHOE_FRENTIN, material: frontMat, quantity: n, grain: grainOf(fG, innerW, SHOE_FRENTIN, 'horizontal') });
+          }
+      }
+
       // 4. Frentes: luz de 4 mm entre frentes; superpuestos con 2 mm al borde del módulo,
       //    embutidos con 4 mm contra la caja.
       const frontsW = mod.insetFronts ? Math.max(0, W - 36 - 2 * FRONT_GAP) : Math.max(0, W - 2 * FRONT_EDGE_GAP);
@@ -363,7 +395,18 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
       const front = (name: string, w: number, h: number, qty: number): CalculatedPart =>
           ({ name, width: w, height: h, material: frontMat, quantity: qty, grain: grainOf(fG, w, h, 'horizontal') });
 
-      if (cntDrawers > 0) {
+      // Módulo horizontal: frentes lado a lado del mismo ancho; división entre cada par de cajones
+      // (y entre puertas si mide más de 900 mm).
+      const horizontal = kind === 'HORIZONTAL';
+      const colGap = (n: number) => (frontsW - (n - 1) * FRONT_GAP) / n;
+      const horizFrontH = Math.max(0, mod.insetFronts ? H - 36 - 2 * FRONT_GAP : H - 2 * FRONT_EDGE_GAP);
+      if (horizontal) {
+          const nDiv = cntDrawers > 0 ? cntDrawers - 1 : (cntDoors > 1 && W > 900 ? cntDoors - 1 : 0);
+          if (nDiv > 0) parts.push(carcass('División vertical', Math.max(0, D - backDepth), Math.max(0, H - 36), nDiv, 'height', 'vertical'));
+      }
+      if (cntDrawers > 0 && horizontal) {
+          parts.push(front('Frente Cajón', colGap(cntDrawers), horizFrontH, cntDrawers));
+      } else if (cntDrawers > 0) {
           parts.push(front('Frente Cajón', frontsW, layout.drawerH, cntDrawers));
       }
       if (kind === 'BAJO_HORNO') {
@@ -391,9 +434,12 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
       //    caja exterior = hueco − 25. Alto interior según el alto del frente (80/120/200/300).
       //    Largo D − 20 (− 18 más con frentes embutidos: el frente ocupa esa profundidad).
       if (cntDrawers > 0) {
-          const drawerHeight = drawerBoxHeightFor(layout.drawerH);
+          // Horizontal: un hueco por cajón entre divisiones; el frente ocupa todo el alto.
+          const frontH = horizontal ? horizFrontH : layout.drawerH;
+          const opening = horizontal ? (innerW - (cntDrawers - 1) * 18) / cntDrawers : innerW;
+          const drawerHeight = drawerBoxHeightFor(frontH);
           const boxL = Math.max(0, D - 20 - (mod.insetFronts ? 18 : 0));
-          const boxOuterW = Math.max(0, W - 36 - SLIDE_GAP_TOTAL);          // W − 61
+          const boxOuterW = Math.max(0, opening - SLIDE_GAP_TOTAL);          // estándar: W − 61
           const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);   // W − 91
           parts.push({ name: 'Lateral Cajón', width: boxL, height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
           // FRENTE Y TRASERO: entre los laterales de la caja
@@ -418,7 +464,9 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
 // Frente visible (puerta, frente de cajón, abatible): el nombre EMPIEZA con Frente/Puerta.
 // Con includes(), "Contra/Frente Cajón" (pieza interior de la caja, 15mm) se tomaba como
 // frente visible y llevaba tapacanto visible 45mm del color de los frentes.
-export const isVisibleFrontPiece = (name: string = ''): boolean => /^(Frente|Puerta)/.test(name);
+// También el frentín de bandeja y el panel de revestimiento liso: canto visible en los 4 lados
+// (ficha del 13/10/2026).
+export const isVisibleFrontPiece = (name: string = ''): boolean => /^(Frente|Puerta|Frent[ií]n|Panel frontal)/.test(name);
 
 // Largo de tapacanto por pieza (mm), solo cantos vistos:
 // - Frentes y puertas: los 4 cantos.
@@ -432,6 +480,7 @@ export const visibleEdgeLength = (p: CalculatedPart): number => {
     if (isVisibleFrontPiece(p.name)) return (w + h) * 2;
     if ((p.material || '').includes('15mm')) return w;
     if (/^Fondo/.test(p.name || '')) return 0;
+    if (/^Zócalo aplicado/.test(p.name || '')) return 0;   // los zócalos aplicados no llevan canto
     if (p.frontEdge === 'width') return w;
     if (p.frontEdge === 'height') return h;
     if (p.grain === 'vertical') return h;
@@ -534,16 +583,28 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
             const shelves = parts.filter(p => /^Estante/.test(p.name)).reduce((a, p) => a + (p.quantity || 1), 0);
             if (shelves > 0) detailedHardware[SHELF_SUPPORT_LABEL] = (detailedHardware[SHELF_SUPPORT_LABEL] || 0) + (4 * shelves * qty);
         }
+        if (sh.pistons > 0) {
+            detailedHardware['Pistones a Gas'] = (detailedHardware['Pistones a Gas'] || 0) + (sh.pistons * qty);
+            modPistons += sh.pistons;
+        }
         if (sh.brackets > 0) {
             const bracketName = bracketLabel(sh.bracketLength);
             detailedHardware[bracketName] = (detailedHardware[bracketName] || 0) + (sh.brackets * qty);
         }
+        // Botinero con bandejas extraíbles: un par de guías telescópicas simples por bandeja.
+        if (isStandard && mod.calculateSlides && mod.cabinetType === 'BOTINERO_EXTRAIBLE') {
+            const trays = shoeTraysFor(h);
+            const trayName = `${SLIDE_LABELS['TELESCOPIC']} (${getStandardSlideLength(d)}mm)`;
+            if (trays > 0) detailedHardware[trayName] = (detailedHardware[trayName] || 0) + (trays * qty);
+            modSlides += trays;
+        }
         if (mod.calculateSlides && !templateSlides) {
-            modSlides += (mod.cntDrawers || 0) + (isStandard ? Math.max(0, Math.round(mod.internalDrawers || 0)) : 0);
+            const ownSlides = (mod.cntDrawers || 0) + (isStandard ? Math.max(0, Math.round(mod.internalDrawers || 0)) : 0);
+            modSlides += ownSlides;
             // Con frentes embutidos la caja es 18 mm más corta: la guía se elige con esa profundidad.
             const slideLen = getStandardSlideLength(mod.insetFronts ? d - 18 : d);
             const slideName = `${SLIDE_LABELS[mod.slideType || 'TELESCOPIC']} (${slideLen}mm)`;
-            if (modSlides > 0) detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (modSlides * qty);
+            if (ownSlides > 0) detailedHardware[slideName] = (detailedHardware[slideName] || 0) + (ownSlides * qty);
         }
 
         totalHinges += modHinges * qty;
