@@ -20,7 +20,7 @@ import { CalculatedPart } from '../../types';
 import {
   calculateModuleParts, getFrontLayout, getBoardLabel, isVisibleFrontPiece,
   FRONT_GAP, FRONT_EDGE_GAP, FRONT_OFFSET, BACK3_GROOVE_FROM_BACK, BASE_HEIGHT, KITCHEN_FAJA, OVEN_FREE_HEIGHT, normalizeCabinet,
-  LEG_LABEL, legsFor,
+  LEG_LABEL, legsFor, expandColumn,
 } from '../estimatorEngine';
 
 /** Alacena sin posición guardada: base a 600 mm sobre la mesada (base 100 + bajo 740 + mesada 20 + 600). */
@@ -33,11 +33,11 @@ export type RotY = 0 | 90 | 180 | 270;
 
 export interface ModuleLayout3D { x: number; y: number; z: number; rotY: RotY }
 
-export type PieceRole = 'carcass' | 'back' | 'shelf' | 'front' | 'drawer' | 'hardware' | 'other';
+export type PieceRole = 'carcass' | 'back' | 'shelf' | 'front' | 'drawer' | 'hardware' | 'obra' | 'other';
 
 export interface Piece3D {
   key: string;
-  partIndex: number;          // índice en calculateModuleParts(módulo); −1 = herraje (no sale del despiece)
+  partIndex: number;          // índice en calculateModuleParts(módulo); −1 = herraje u obra (no sale del despiece)
   copy: number;               // copia dentro de part.quantity
   name: string;               // nombre de la pieza del despiece
   material: string;           // código de material del despiece (18mm_White, 3mm_White…)
@@ -75,7 +75,7 @@ export interface PlacedModule {
 export type IssueLevel = 'error' | 'warning' | 'info';
 export interface AssemblyIssue {
   level: IssueLevel;
-  code: 'INVALID_DIMENSION' | 'FRONT_OVERFLOW' | 'MODULE_OVERLAP' | 'MODULE_GAP' | 'PIECE_OVERLAP' | 'UNPLACED_MODULE' | 'APPROXIMATE_MODULE';
+  code: 'INVALID_DIMENSION' | 'FRONT_OVERFLOW' | 'MODULE_OVERLAP' | 'MODULE_GAP' | 'PIECE_OVERLAP' | 'UNPLACED_MODULE' | 'APPROXIMATE_MODULE' | 'ZOCALO_SHORT';
   message: string;
   moduleKeys?: string[];
   pieceKeys?: string[];
@@ -93,8 +93,7 @@ export interface Assembly {
 export const PENDING_RULES: string[] = [
   // El módulo estándar y las variantes de cocina siguen la ficha del taller (CATALOGO_PIEZAS.md, 13/10/2026).
   'Plantillas especiales (Módulo abierto, Biblioteca, Botineros…): todavía usan sus medidas de fondo y frentes anteriores a la ficha del módulo estándar.',
-  'Base de banquina o zócalo estructural: el módulo se eleva 100 mm, pero la base no se dibuja ni se exporta (las patas sí).',
-  'Columna: los módulos de adentro se ubican a mano entre los laterales; la base de la columna no se aplica.',
+  'Zócalo estructural: el módulo se eleva 100 mm; el zócalo se carga aparte como pieza y se ubica solo debajo del primer módulo con esa base.',
   'Bandejas inclinadas del botinero: se dibujan horizontales.',
   'Geometría de Módulo horizontal y paneles: sin definir (se muestran como volumen).',
 ];
@@ -190,22 +189,38 @@ const makePiece = (
 };
 
 /**
- * Patas regulables (herraje, no salen del despiece): redondas Ø 40, alto = base (100 mm).
- * Centro a 40 mm de los costados, del frente y de atrás de la estructura; con 6 patas
- * (más de 900 mm de ancho) el par extra va centrado en el ancho. Regla del taller, 13/10/2026.
+ * Base del módulo (regla del taller, 13/10/2026). El zócalo (aplicado, estructural) y la banquina
+ * van retirados 40 mm del frente del módulo (frente de la estructura, D).
+ * Patas regulables (herraje, no salen del despiece): redondas Ø 40, alto = base (100 mm). Centro a
+ * 40 mm de los costados y de atrás; las delanteras siempre detrás del zócalo (zócalo de 18 mm:
+ * centro a 40 + 18 + 20 = 78 mm del frente). Con 6 patas (más de 900 de ancho) el par extra va
+ * centrado en el ancho.
  */
+export const ZOCALO_SETBACK = 40;
 export const LEG_DIAMETER = 40;
 export const LEG_INSET = 40;
+export const LEG_FRONT_INSET = ZOCALO_SETBACK + 18 + LEG_DIAMETER / 2;   // 78
 const legPieces = (mod: any): Piece3D[] => {
   const W = mod.width || 0, D = mod.depth || 0, r = LEG_DIAMETER / 2;
   const xs = legsFor(W) === 6 ? [LEG_INSET, W / 2, W - LEG_INSET] : [LEG_INSET, W - LEG_INSET];
-  const zs = [LEG_INSET, D - LEG_INSET];
+  const zs = [LEG_INSET, D - LEG_FRONT_INSET];
   return xs.flatMap(x => zs.map(z => ({ x, z }))).map(({ x, z }, k) => ({
     key: `${mod.id}/pata${k}`, partIndex: -1, copy: k, name: LEG_LABEL, material: 'hardware',
     boardLabel: LEG_LABEL, grain: 'free', thickness: LEG_DIAMETER,
     partSize: { width: LEG_DIAMETER, height: BASE_HEIGHT },
     box: mkBox(x - r, x + r, 0, BASE_HEIGHT, z - r, z + r), grainAxis: 1 as const, role: 'hardware' as const, shape: 'cylinder' as const,
   }));
+};
+/** Banquina (obra, no se cobra): bloque de 100 mm de alto, retirado 40 mm del frente. */
+export const BANQUINA_LABEL = 'Banquina (obra)';
+const banquinaPiece = (mod: any, x0: number, x1: number): Piece3D => {
+  const D = mod.depth || 0, d = Math.max(0, D - ZOCALO_SETBACK);
+  return {
+    key: `${mod.id}/banquina`, partIndex: -1, copy: 0, name: BANQUINA_LABEL, material: 'obra',
+    boardLabel: BANQUINA_LABEL, grain: 'free', thickness: BASE_HEIGHT,
+    partSize: { width: x1 - x0, height: d },
+    box: mkBox(x0, x1, 0, BASE_HEIGHT, 0, d), grainAxis: 0, role: 'obra',
+  };
 };
 
 /** Copias pendientes de cada pieza del despiece (para consumirlas en orden). */
@@ -469,7 +484,8 @@ const placeCarcass: Placer = (mod, parts) => {
   if (mod.baseType && !mod.isSpecialModule) {
     pieces.forEach(pc => { pc.box = { min: [pc.box.min[0], pc.box.min[1] + BASE_HEIGHT, pc.box.min[2]], max: [pc.box.max[0], pc.box.max[1] + BASE_HEIGHT, pc.box.max[2]] }; });
     if (mod.baseType === 'PATAS') pieces.push(...legPieces(mod));
-    else notes.push(`Base de ${BASE_HEIGHT} mm (${mod.baseType === 'BANQUINA' ? 'banquina' : 'zócalo estructural'}): el módulo se dibuja elevado; la base no se dibuja.`);
+    else if (mod.baseType === 'BANQUINA') pieces.push(banquinaPiece(mod, 0, mod.width || 0));
+    else notes.push(`Base de ${BASE_HEIGHT} mm (zócalo estructural): se carga aparte como pieza.`);
   }
 
   // ¿Quedó alguna pieza del despiece sin ubicar? → el módulo no está resuelto
@@ -587,6 +603,44 @@ const placeCornerL: Placer = (mod, parts) => {
   return { pieces, status: 'placed', notes: ['Puerta del brazo 2: bisagras hacia afuera del rincón (la marca de bisagra no se dibuja en esa orientación).'] };
 };
 
+/**
+ * Columna (variante estándar, un solo ítem): laterales aplicados hasta el piso y, entre ellos,
+ * los módulos de expandColumn apilados sobre la base. Cada módulo se ubica con su propio placer;
+ * sus piezas se renumeran al despiece completo de la columna (calculateModuleParts concatena).
+ */
+const isColumnModule = (m: any): boolean => m?.cabinetType === 'COLUMNA' && !m?.isSpecialModule;
+const placeColumn: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const subs = expandColumn(mod);
+  const pieces: Piece3D[] = [];
+  let offset = 0;
+  let y = mod.baseType ? BASE_HEIGHT : 0;
+  for (let k = 0; k < subs.length; k++) {
+    const sub = subs[k];
+    const n = calculateModuleParts(sub).length;
+    if (k === 0) {
+      // Laterales aplicados: de piso a techo, avanzan 21 mm (al ras de las puertas).
+      const d = parts[0].width;
+      pieces.push(makePiece(mod, parts, 0, 0, mkBox(0, 18, 0, H, 0, d), 'carcass'));
+      pieces.push(makePiece(mod, parts, 0, 1, mkBox(W - 18, W, 0, H, 0, d), 'carcass'));
+    } else {
+      const r = placeModule({ ...sub, id: mod.id, baseType: undefined });
+      if (r.status === 'unplaced') return null;
+      const y0 = y;
+      r.pieces.forEach(pc => {
+        const idx = pc.partIndex + offset;
+        pieces.push({ ...pc, key: `${mod.id}/p${idx}c${pc.copy}`, partIndex: idx,
+          box: { min: [pc.box.min[0] + 18, pc.box.min[1] + y0, pc.box.min[2]], max: [pc.box.max[0] + 18, pc.box.max[1] + y0, pc.box.max[2]] } });
+      });
+      y += sub.height || 0;
+    }
+    offset += n;
+  }
+  if (mod.baseType === 'PATAS') pieces.push(...legPieces(mod));
+  else if (mod.baseType === 'BANQUINA') pieces.push(banquinaPiece(mod, 18, W - 18));
+  return { pieces, status: 'placed', notes: mod.baseType === 'ZOCALO' ? [`Base de ${BASE_HEIGHT} mm (zócalo estructural): se carga aparte como pieza.`] : [] };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
   ESQUINERO_EN_L: placeCornerL,
   HORNO_EMPOTRADO: placeCarcass,
@@ -633,7 +687,7 @@ export const placeModule = (mod: any): { pieces: Piece3D[]; status: PlacementSta
   if (isManualModule(mod)) return { pieces: [], status: 'unplaced', notes: ['Módulo manual: sin geometría (solo costo).'], gridPieces: [] };
   const parts = calculateModuleParts(mod);
   const tpl = templateIdOf(mod);
-  const placer = MODULE_PLACERS[tpl || 'STANDARD'];
+  const placer = isColumnModule(mod) ? placeColumn : MODULE_PLACERS[tpl || 'STANDARD'];
   const res = placer ? placer(normalizeCabinet(mod), parts) : null;
   if (!res) {
     return {
@@ -668,11 +722,15 @@ export const resolveLayouts = (modules: any[]): ModuleLayout3D[] => {
       cursor = Math.max(cursor, end);
     }
   });
-  // Zócalo aplicado sin posición: va delante de las patas del primer módulo con patas apoyado
-  // en el piso y sin girar (su cara trasera toca las patas delanteras). Si no hay módulo con
-  // patas, sigue la fila como cualquier módulo.
-  const isLooseZocalo = (m: any) => !hasLayout(m) && templateIdOf(m) === 'ZOCALO_APLICADO';
-  const row = (zocaloInRow: boolean): ModuleLayout3D[] => {
+  // Zócalos sin posición guardada: van debajo del primer módulo con su base, apoyado en el piso y
+  // sin girar, con el frente retirado 40 mm del frente del módulo. Zócalo aplicado → módulo con
+  // patas (delante de las patas); zócalo estructural → módulo con base de zócalo. En una columna,
+  // entre los laterales aplicados. Si no hay módulo con esa base, el zócalo sigue la fila.
+  const looseZocalo = (m: any): string | null => {
+    const t = templateIdOf(m);
+    return !hasLayout(m) && t && ZOCALO_BASE[t] ? t : null;
+  };
+  const row = (inRow: Set<string>): ModuleLayout3D[] => {
     let c = cursor;
     let wallCursor = 0;   // alacenas sin posición: fila propia, colgadas a WALL_CABINET_Y, desde x = 0
     return modules.map(m => {
@@ -683,24 +741,33 @@ export const resolveLayouts = (modules: any[]): ModuleLayout3D[] => {
         return l;
       }
       const l: ModuleLayout3D = { x: c, y: 0, z: 0, rotY: 0 };
-      if (!isManualModule(m) && (zocaloInRow || !isLooseZocalo(m))) c += (m.width || 0) * (m.quantity || 1);
+      const z = looseZocalo(m);
+      if (!isManualModule(m) && (!z || inRow.has(z))) c += (m.width || 0) * (m.quantity || 1);
       return l;
     });
   };
-  const layouts = row(false);
-  const anchor = modules.findIndex((m, i) =>
-    !m.isSpecialModule && m.baseType === 'PATAS' && Math.abs(layouts[i].y) < 1 && layouts[i].rotY === 0);
-  if (anchor < 0) return row(true);
-  const a = layouts[anchor];
-  const zFront = a.z + (modules[anchor].depth || 0) - LEG_INSET + LEG_DIAMETER / 2;
-  let zx = a.x;
-  modules.forEach((m, i) => {
-    if (!isLooseZocalo(m)) return;
-    layouts[i] = { x: zx, y: 0, z: zFront, rotY: 0 };
-    zx += (m.width || 0) * (m.quantity || 1);
+  const first = row(new Set());
+  const anchorOf = (kind: string) => modules.findIndex((m, i) =>
+    !m.isSpecialModule && m.baseType === ZOCALO_BASE[kind] && Math.abs(first[i].y) < 1 && first[i].rotY === 0);
+  const kinds = Object.keys(ZOCALO_BASE);
+  const layouts = row(new Set(kinds.filter(k => anchorOf(k) < 0)));
+  kinds.forEach(kind => {
+    const ai = anchorOf(kind);
+    if (ai < 0) return;
+    const a = layouts[ai], am = modules[ai];
+    const front = a.z + (am.depth || 0) - ZOCALO_SETBACK;
+    let zx = a.x + (isColumnModule(am) ? 18 : 0);
+    modules.forEach((m, i) => {
+      if (looseZocalo(m) !== kind) return;
+      layouts[i] = { x: zx, y: 0, z: front - (m.depth || 0), rotY: 0 };
+      zx += (m.width || 0) * (m.quantity || 1);
+    });
   });
   return layouts;
 };
+
+/** Zócalo (plantilla) → base del módulo bajo el que va. */
+const ZOCALO_BASE: Record<string, string> = { ZOCALO_APLICADO: 'PATAS', ZOCALO_ESTRUCTURAL: 'ZOCALO' };
 
 export const buildAssembly = (name: string, modules: any[]): Assembly => {
   const layouts = resolveLayouts(modules);
@@ -711,7 +778,7 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
     const mod = normalizeCabinet(rawMod);   // ej. bajo para horno: ancho fijo de 613
     if (isManualModule(mod)) return;
     const W = mod.width || 0, H = mod.height || 0, D = mod.depth || 0;
-    const legH = mod.baseType && !templateIdOf(mod) ? BASE_HEIGHT : 0;   // base: se suma a H
+    const legH = mod.baseType && !templateIdOf(mod) && !isColumnModule(mod) ? BASE_HEIGHT : 0;   // base: se suma a H (la columna ya la incluye)
     const base = placeModule(mod);
     const qty = Math.max(1, mod.quantity || 1);
     const label = mod.name || `Módulo ${mi + 1}`;
@@ -756,17 +823,17 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   });
 
   // Solapamientos y separaciones entre módulos (volumen de estructura, sin frentes)
-  const hasLegs = (m: any) => !m.isSpecialModule && m.baseType === 'PATAS';
+  const hasBase = (m: any) => !m.isSpecialModule && !!m.baseType;
   const carcassWorld = (pm: PlacedModule, aboveLegs = false) =>
     transformBox(mkBox(0, pm.dims.w, aboveLegs ? BASE_HEIGHT : 0, pm.dims.h, 0, pm.dims.d), pm.layout);
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
       // La columna es un contenedor: los módulos van entre sus laterales (no es choque).
       if (placed[i].templateId === 'COLUMNA' || placed[j].templateId === 'COLUMNA') continue;
-      // El zócalo aplicado va en la franja de las patas de otro módulo: ahí ese módulo está vacío.
-      const zi = placed[i].templateId === 'ZOCALO_APLICADO', zj = placed[j].templateId === 'ZOCALO_APLICADO';
-      const a = carcassWorld(placed[i], zj && hasLegs(modules[placed[i].moduleIndex]));
-      const b = carcassWorld(placed[j], zi && hasLegs(modules[placed[j].moduleIndex]));
+      // Un zócalo va en la franja de la base de otro módulo: ahí ese módulo no tiene estructura.
+      const zi = !!ZOCALO_BASE[placed[i].templateId || ''], zj = !!ZOCALO_BASE[placed[j].templateId || ''];
+      const a = carcassWorld(placed[i], zj && hasBase(modules[placed[i].moduleIndex]));
+      const b = carcassWorld(placed[j], zi && hasBase(modules[placed[j].moduleIndex]));
       const v = overlapVolume(a, b);
       if (v > 0) {
         issues.push({ level: 'error', code: 'MODULE_OVERLAP', message: `${placed[i].name} se superpone con ${placed[j].name}.`, moduleKeys: [placed[i].key, placed[j].key] });
@@ -784,6 +851,21 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
       }
     }
   }
+
+  // Zócalo corto: el largo de los zócalos cargados no cubre el ancho de los módulos con esa base
+  // (en la columna, el ancho entre laterales aplicados).
+  Object.entries(ZOCALO_BASE).forEach(([kind, base]) => {
+    const zocalos = modules.filter(m => templateIdOf(m) === kind);
+    if (zocalos.length === 0) return;
+    const len = zocalos.reduce((a, m) => a + (m.width || 0) * (m.quantity || 1), 0);
+    const need = modules.filter(m => !m.isSpecialModule && m.baseType === base)
+      .reduce((a, m) => a + (isColumnModule(m) ? (normalizeCabinet(m).width || 0) - 36 : (m.width || 0)) * (m.quantity || 1), 0);
+    if (len < need - 0.5) {
+      const what = kind === 'ZOCALO_APLICADO' ? 'zócalo aplicado' : 'zócalo estructural';
+      const where = kind === 'ZOCALO_APLICADO' ? 'con patas' : 'con base de zócalo estructural';
+      issues.push({ level: 'warning', code: 'ZOCALO_SHORT', message: `El ${what} suma ${Math.round(len)} mm y los módulos ${where} suman ${Math.round(need)} mm: falta zócalo.` });
+    }
+  });
 
   // Solapamientos de piezas dentro de cada módulo (control de la ubicación y de reglas pendientes)
   const seenModule = new Set<string>();

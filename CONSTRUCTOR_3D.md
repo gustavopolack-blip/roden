@@ -77,14 +77,19 @@ o embutidos al ras, luces de 2 mm al borde y 4 mm entre frentes, fondo de 3 mm e
 de atrás, de 5,5 mm en rebaje y de 18 mm dentro de la caja, laterales enteros opcionales, estantes
 equidistantes a 10 mm del frente, caja de cajón según el alto del frente, apertura según la
 posición del módulo en el mueble (1 puerta), izquierda/derecha/derecha (3) o en pares, y patas
-redondas Ø 40 × 100 mm (centro a 40 mm de costados, frente y atrás; 6 con más de 900 de ancho,
-el par extra centrado). Las patas son herraje: se dibujan y se exportan (cilindro "Pata regulable")
-pero no salen del despiece. Un **zócalo aplicado** sin posición guardada se ubica solo delante de
-las patas del primer módulo con patas apoyado en el piso; si no hay ninguno, sigue la fila.
+redondas Ø 40 × 100 mm (centro a 40 mm de costados y de atrás; las delanteras detrás del zócalo,
+a 78 mm del frente; 6 con más de 900 de ancho, el par extra centrado). Las patas son herraje: se
+dibujan y se exportan (cilindro "Pata regulable") pero no salen del despiece. La **banquina** se
+dibuja como bloque de obra retirado 40 mm. Un **zócalo aplicado** o **estructural** sin posición
+guardada se ubica solo debajo del primer módulo con patas o con base de zócalo (frente retirado
+40 mm; en la columna, entre los laterales); si no hay ninguno, sigue la fila. Si el largo de los
+zócalos no cubre los módulos con esa base, Validación avisa ("falta zócalo").
+
+La **columna** (un solo ítem) se arma con sus laterales aplicados hasta el piso y los módulos
+inferior, horno, microondas y superior apilados sobre la base.
 
 Pendientes (la app los lista en *Validación → Supuestos de dibujo*):
 
 - Plantillas especiales: todavía usan sus medidas de fondo y frentes anteriores a la ficha.
-- Banquina y zócalo estructural: el módulo se eleva pero la base no se dibuja.
 - Bandejas inclinadas del botinero: dibujadas horizontales.
 - Geometría de Módulo horizontal, Bajo mesada, esquineros y paneles.

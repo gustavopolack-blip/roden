@@ -1154,6 +1154,9 @@ const HORNO_EMPOTRADO: SpecialModuleTemplate = {
 const COLUMNA: SpecialModuleTemplate = {
   id: 'COLUMNA',
   group: 'MODULO',
+  // Reemplazada por la variante Columna (un solo ítem con sus 4 módulos): queda para presupuestos
+  // guardados y como pieza de los laterales de esa variante (expandColumn).
+  legacy: true,
   name: 'Columna (laterales aplicados)',
   description: 'Dos laterales aplicados de la altura total, al ras de las puertas (profundidad + 21). Los módulos de adentro (ancho − 36) se cargan aparte.',
   params: ['width', 'height', 'depth'],

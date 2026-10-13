@@ -19,7 +19,7 @@ import {
     ModuleExtra, ExtendedCabinetModule, EstimatorItem,
     HINGE_LABELS, SLIDE_LABELS, getSheetSize, getSheetArea, getStandardSlideLength,
     expandModuleExtras, sumModuleExtras, getFrontLayout, calculateModuleParts, isVisibleFrontPiece,
-    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice,
+    visibleEdgeLength, calculateItemQuantities, boardPriceFor, hwPriceFor, resolveSlidePrice, COLUMN_WIDTH, columnUpperHeight,
     buildFinishLines, finishDescription, computeItemFinancials, getBoardLabel, getRecalculatedItemPrices,
     scenarioPricesFromRecalc, detailsFromRecalc,
 } from '../utils/estimatorEngine';
@@ -106,6 +106,8 @@ const STANDARD_VARIANTS: { id: string; name: string; cabinetType: NonNullable<Ex
     { id: 'VAR_ESQUINERO', name: 'Bajo mesada esquinero recto', cabinetType: 'ESQUINERO', defaults: { height: 740, depth: 560, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } },
     { id: 'VAR_ALACENA',   name: 'Alacena',                     cabinetType: 'ALACENA',   defaults: { depth: 320 } },
     { id: 'VAR_BAJO_HORNO', name: 'Bajo mesada para horno',     cabinetType: 'BAJO_HORNO', defaults: { width: 613, height: 740, depth: 560, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } },
+    // Columna: un solo ítem (laterales aplicados + inferior + horno + microondas + superior).
+    { id: 'VAR_COLUMNA',    name: 'Columna (horno y microondas)', cabinetType: 'COLUMNA', defaults: { width: COLUMN_WIDTH, height: 2300, depth: 560, cntDoors: 0, cntDrawers: 0, cntFlaps: 0 } },
     // Módulos abiertos (sin frentes) sobre el estándar: reemplazan a las plantillas del mismo nombre.
     { id: 'VAR_HORIZONTAL', name: 'Módulo horizontal',                      cabinetType: 'HORIZONTAL',         defaults: {} },
     { id: 'VAR_VERTICAL',   name: 'Módulo vertical',                        cabinetType: 'VERTICAL',           defaults: { backingType: '55_COLOR' } },
@@ -1391,6 +1393,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
               ...moduleForm,
               ...(activeVariant.cabinetType === 'ESQUINERO' ? { cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } : {}),
               ...(activeVariant.cabinetType === 'BAJO_HORNO' ? { width: 613, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } : {}),
+              ...(activeVariant.cabinetType === 'COLUMNA' ? { width: COLUMN_WIDTH, cntFlaps: 0 } : {}),
               cabinetType: activeVariant.cabinetType,
               name: moduleForm.name || activeVariant.name,
           } as ExtendedCabinetModule;
@@ -3623,7 +3626,12 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <span>Módulo microondas (abierto, fondo 18 mm, piso 420 mm)</span>
                                         </label>
                                     )}
-                                    {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && !activeVariant?.cabinetType?.startsWith('BOTINERO') && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
+                                    {activeVariant?.cabinetType === 'COLUMNA' && (
+                                        <span className={`text-[11px] ${columnUpperHeight(moduleForm.height || 0, !!(moduleForm as ExtendedCabinetModule).baseType) < 200 ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                                            Ancho fijo {COLUMN_WIDTH} mm. Alto total con la base. Inferior: cajones si cargás cantidad; si no, 1 puerta. Superior: 1 puerta, alto {Math.round(columnUpperHeight(moduleForm.height || 0, !!(moduleForm as ExtendedCabinetModule).baseType))} mm.
+                                        </span>
+                                    )}
+                                    {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && activeVariant?.cabinetType !== 'COLUMNA' && !activeVariant?.cabinetType?.startsWith('BOTINERO') && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
                                         <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
                                             <span>Cajones internos (80 mm)</span>
                                             <input type="number" min={0} className="border p-1 rounded text-xs w-14 text-center" value={(moduleForm as ExtendedCabinetModule).internalDrawers ?? 0} onChange={e => handleInputChange('internalDrawers', Math.max(0, Math.round(Number(e.target.value))) || undefined)}/>
@@ -3633,7 +3641,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                         ['fullHeightSides',   'Laterales enteros'],
                                         ['adjustableShelves', 'Estantes regulables'],
                                         ['insetFronts',       'Frente embutido'],
-                                    ] as const).filter(([key]) => !(activeVariant && (activeVariant.cabinetType !== 'ALACENA') && key === 'fullHeightSides')).map(([key, label]) => (
+                                    ] as const).filter(([key]) => !(activeVariant && (activeVariant.cabinetType !== 'ALACENA') && key === 'fullHeightSides') && !(activeVariant?.cabinetType === 'COLUMNA' && key === 'insetFronts')).map(([key, label]) => (
                                         <label key={key} className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
                                             <input type="checkbox" className="w-4 h-4" checked={!!(moduleForm as ExtendedCabinetModule)[key]} onChange={e => handleInputChange(key, e.target.checked)}/>
                                             <span>{label}</span>

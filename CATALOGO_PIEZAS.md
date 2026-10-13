@@ -190,7 +190,7 @@ Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código ante
 | Frentes combinados | **No se usan.** Un módulo lleva un solo tipo de frente. |
 | Apertura | 4 o más puertas: en pares (izquierda/derecha). Módulo de 1 puerta en el centro del mueble: indistinto (izquierda). |
 | Cajones | El alto de interior (alto del lateral de la caja, 15 mm) depende del alto del frente: 80 / 120 / 200 / 300 mm. Puede haber cajón interno detrás de un frente. Fondo de cajón a 10 mm de abajo en todos los altos. |
-| Patas | Opcionales. 4 hasta 900 mm de ancho; 6 a partir de ahí. Altura de **100 mm** que **se suma a H**. Herraje "Pata regulable" en la lista de precios. Redondas de **Ø 40 mm**; centro a **40 mm** de los costados, del frente y de atrás de la estructura; con 6, el par extra va centrado en el ancho. El zócalo aplicado va delante de las patas delanteras. |
+| Patas | Opcionales. 4 hasta 900 mm de ancho; 6 a partir de ahí. Altura de **100 mm** que **se suma a H**. Herraje "Pata regulable" en la lista de precios. Redondas de **Ø 40 mm**; centro a **40 mm** de los costados y de atrás; las delanteras detrás del zócalo (centro a 78 mm del frente); con 6, el par extra va centrado en el ancho. El zócalo va retirado 40 mm del frente. |
 | Profundidad del estante | Fondo 3 mm → D − 31; 5,5 mm → D − 15,5; 18 mm → D − 28; sin fondo → D − 10 (− 18 más con frente embutido). |
 | Caja de cajón | Interior según el frente: < 160 → 80; 160–239 → 120; 240–339 → 200; ≥ 340 → 300 mm. Con frente embutido la caja es 18 mm más corta (y la guía se elige con esa profundidad). |
 | Frentes combinados | El formulario no deja cargar nuevos; los presupuestos guardados se siguen calculando igual. |
@@ -256,7 +256,7 @@ por debajo). El **Esquinero en L** no tiene ningún frente.
 | Esquinero recto | Frente fijo = profundidad del **bajo vecino** (campo propio; vacío = la del esquinero) + 21 + 4. Estante regulable. |
 | Esquinero en L | Se cargan largo brazo 1, largo brazo 2, profundidad lado 1 y lado 2. Piso en L (una pieza), dos fondos, estante en L, dos puertas de largo del brazo − profundidad del otro − 21 − luz. |
 | Alacena | Caja de 320 (+ frente). Microondas convencional: solo el piso es más profundo (420). |
-| Columna | Opción (a): la columna aporta los 2 laterales aplicados; los módulos de adentro se cargan aparte. Puede ir sobre banquina, patas o zócalo estructural. |
+| Columna | Opción (a): la columna aporta los 2 laterales aplicados; los módulos de adentro se cargan aparte. Puede ir sobre banquina, patas o zócalo estructural. **Reemplazada el 13/10/2026 por la columna de un solo ítem (ver abajo).** |
 | Horno | Va en la columna o en un bajo mesada. Techo de profundidad D − 300. |
 
 **Implementado** (13/10/2026): bajo mesada, esquinero recto y alacena como variantes del módulo
@@ -271,8 +271,32 @@ Supuestos míos a confirmar:
 - Bajo con fondo de 5,5 mm: (W − 10) × (H − 5); con fondo de 18 mm: (W − 36) × (H − 18).
 - Alacena: estantes con la regla del estándar (ninguno hasta 850 mm de alto).
 - Horno: tapa y base sobre laterales (como el estándar); sin mano de obra estimada.
-- Columna: el ancho es el exterior total; los módulos de adentro miden ancho − 36. La base de la
-  columna todavía no se aplica (se dibuja en el piso).
+- Columna: el ancho es el exterior total; los módulos de adentro miden ancho − 36. (Plantilla vieja,
+  oculta: ver "Columna de un solo ítem".)
+
+### Columna de un solo ítem (13/10/2026)
+
+| Tema | Regla del taller |
+|---|---|
+| Composición | Un solo ítem. De abajo hacia arriba: base, **módulo inferior** (cajones o 1 puerta), **horno**, **microondas** y **módulo superior** con 1 puerta. Dos laterales aplicados **hasta el piso** (tapan la base). |
+| Ancho | **Fijo: 649** (horno 613 + laterales aplicados 36). |
+| Alturas | Inferior **740** (alineado con los bajos), horno 613, microondas 403; el superior completa el alto total (H − base − 1756). H = alto total, con la base. |
+| Base | Banquina, zócalo estructural o patas (4). |
+
+Implementado como variante del estándar (`cabinetType: 'COLUMNA'`, `expandColumn` en el motor):
+cada módulo se calcula con sus propias reglas y los herrajes se cuentan una vez. La plantilla
+vieja `COLUMNA` queda oculta para los presupuestos guardados.
+
+### Base: zócalo, banquina y patas (13/10/2026)
+
+| Tema | Regla del taller |
+|---|---|
+| Zócalo | Aplicado o estructural: retirado **40 mm** del frente del módulo, en todos los casos. |
+| Banquina | También retirada 40 mm. En 3D se dibuja como bloque (obra, no se cobra). |
+| Patas | Siempre **detrás del zócalo**: las delanteras con centro a 78 mm del frente (40 + 18 de zócalo + 20 de radio); las traseras a 40 mm de atrás; a 40 mm de los costados. |
+
+Supuesto mío: el retiro de 40 mm se mide desde el frente de la estructura (D), no desde las
+puertas.
 
 ### Tercera ronda (13/10)
 

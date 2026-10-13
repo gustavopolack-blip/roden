@@ -27,6 +27,7 @@ export const materialColorFor = (label: string): [number, number, number] => {
   if (l.includes('blanc')) return [0.96, 0.96, 0.95];
   if (l.includes('volumen')) return [0.7, 0.75, 0.85];
   if (l.includes('pata')) return [0.25, 0.25, 0.25];          // herraje: gris oscuro de referencia
+  if (l.includes('banquina')) return [0.62, 0.6, 0.57];        // obra: gris cemento de referencia
   // color de melamina: tono estable derivado del nombre
   let h = 0;
   for (let i = 0; i < l.length; i++) h = (h * 31 + l.charCodeAt(i)) >>> 0;
