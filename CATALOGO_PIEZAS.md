@@ -333,7 +333,8 @@ Carga: ancho = largo del brazo 1, prof. = lado 1, opciones largo del brazo 2 y p
 | Frente de cajón suelto | Caja: ancho del frente + 4 − 36 − 25, largo D − 20, alto según el frente; un par de guías. | **Implementado** (pieza `FRENTE_CAJON_SUELTO`; en 3D se ve como volumen) |
 | Frente abatible suelto | 2 bisagras y 1 pistón. | **Implementado** (pieza `FRENTE_ABATIBLE_SUELTO`) |
 
+Confirmado por Gustavo (13/10/2026): las colizas **no se cotizan**.
 Supuestos míos: la faja de la bandeja extraíble es de estructura y en 3D va arriba de la bandeja,
-adelante; las colizas no se cotizan (sin precio en la lista); 1 bandeja cada 200 mm (regla anterior).
+adelante; 1 bandeja cada 200 mm (regla anterior).
 Las plantillas viejas de módulo abierto, biblioteca y botineros quedan ocultas (`legacy`).
 
