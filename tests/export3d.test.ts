@@ -107,7 +107,7 @@ describe('FBX', () => {
     const t = exportFBX(buildScene(buildAssembly('x', [sp]), 0));
     const r = parseFbx(t);
     let names: string[] = []; r.traverse(o => { if ((o as THREE.Mesh).isMesh) names.push(o.name); });
-    expect(names).toEqual(['M01_Esquinero_Volumen_sin_despiece']);
+    expect(names).toEqual(['M01_Bajo_mesada_esquinero_recto_Volumen_sin_despiece']);
   });
 });
 

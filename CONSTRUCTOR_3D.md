@@ -60,9 +60,9 @@ posiciones, rotaciones y medidas en mm coinciden. **No se probó la importación
 
 | Ubicación 3D | Módulos |
 |---|---|
-| Completa | Estándar (puertas, cajones, abatibles, combinados), Módulo Abierto, Biblioteca, Botinero c/ Extraíbles, Estante 18mm, Puerta 18mm, Lateral Aplicado, Divisor Vertical, Ajuste, Zócalo Aplicado, Tapa Horizontal (18/36), Estante Flotante |
-| Aproximada | Botinero c/ Bandejas Fijas (bandejas a 30° dibujadas horizontales) |
-| Sin ubicar (volumen + despiece en grilla) | Módulo Horizontal, Bajo Mesada, Esquinero, Esquinero en L, Panel Liso, Panel Enlistonado, Zócalo Estructural |
+| Completa | Estándar (puertas, cajones, abatibles, combinados), Módulo abierto, Biblioteca, Botinero con estantes extraíbles, Estante 18mm, Puerta, Lateral aplicado, Divisor vertical, Ajuste, Zócalo aplicado, Tapa horizontal (18/36), Estante 36mm (las ménsulas ocultas no se dibujan) |
+| Aproximada | Botinero con bandejas fijas inclinadas (bandejas a 30° dibujadas horizontales) |
+| Sin ubicar (volumen + despiece en grilla) | Módulo horizontal, Bajo mesada, Bajo mesada esquinero recto, Bajo mesada esquinero en L, Panel de revestimiento liso, Panel de revestimiento enlistonado, Zócalo estructural |
 | Sin geometría | Módulos manuales (solo costo) |
 
 Para sumar una plantilla: agregar su id a `MODULE_PLACERS` en `utils/furniture3d/geometry.ts`

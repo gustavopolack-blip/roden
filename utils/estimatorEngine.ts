@@ -76,6 +76,9 @@ export const HINGE_LABELS: Record<string, string> = {
     'PUSH': 'Bisagras Push-Open'
 };
 
+// Herraje del estante 36mm flotante (template ESTANTE_FLOTANTE). Precio: priceFloatingBracket.
+export const BRACKET_LABEL = 'Ménsula metálica oculta';
+
 export const SLIDE_LABELS: Record<string, string> = {
     'TELESCOPIC': 'Guías Telescópicas',
     'TELESCOPIC_SOFT': 'Guías Telescópicas Cierre Suave',
@@ -400,6 +403,9 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
             detailedHardware[hingeName] = (detailedHardware[hingeName] || 0) + (sh.hinges * qty);
             modHinges += sh.hinges;
         }
+        if (sh.brackets > 0) {
+            detailedHardware[BRACKET_LABEL] = (detailedHardware[BRACKET_LABEL] || 0) + (sh.brackets * qty);
+        }
         if (mod.calculateSlides && !templateSlides) {
             modSlides += (mod.cntDrawers || 0);
             const slideLen = getStandardSlideLength(d);
@@ -613,6 +619,7 @@ export const hwPriceFor = (name: string, qty: number, S: any): number => {
     else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
     else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
     else if (n.includes('guías') || n.includes('guia')) unitPrice = resolveSlidePrice(name, S).price;
+    else if (n.includes('ménsula'))                                 unitPrice = S.priceFloatingBracket || 0;
     return unitPrice * qty;
 };
 

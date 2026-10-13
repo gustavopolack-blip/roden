@@ -3286,6 +3286,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 <div className="space-y-2">
                                     <div><label className="text-xs block font-bold text-gray-400 mb-2">Otros</label></div>
                                     <div><label className="text-xs block">Pistón a gas</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGasPiston} onChange={e => setSettings({...settings, priceGasPiston: Number(e.target.value)})} /></div>
+                                    <div><label className="text-xs block">Ménsula metálica oculta (estante 36mm flotante)</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Lata cemento contacto 2.8kg</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGlueTin} onChange={e => setSettings({...settings, priceGlueTin: Number(e.target.value)})} /></div>
                                     <div><label className="text-xs block">Tornillería (Estimado)</label><input type="number" className="border p-1 w-full rounded" value={settings.priceScrews} onChange={e => setSettings({...settings, priceScrews: Number(e.target.value)})} /></div>
                                 </div>

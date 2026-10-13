@@ -126,3 +126,21 @@ Ninguno se corrigió: cambiar cualquiera de estos puntos cambia costos, y eso lo
 
 Las medidas **no** se mueven al catálogo: siguen en la fórmula de cada módulo, que es donde están
 hoy y donde se prueban.
+
+## Módulos y piezas nuevos — a definir antes de programar
+
+Pedidos por Gustavo (13/10). No se programan hasta tener su regla constructiva: inventarla
+cotizaría mal. Para cada uno hace falta: **qué piezas lleva** (y con qué medida respecto de
+ancho W, alto H, profundidad D), **qué carga el usuario**, **herrajes** (cuáles y cuántos) y
+**mano de obra** (días).
+
+| Nuevo | Botón | Preguntas puntuales |
+|---|---|---|
+| Módulo vertical | Módulos | ¿Qué lo distingue del módulo estándar alto? ¿Barral, estantes cada X mm, división interna, zócalo? |
+| Alacena | Módulos | ¿Colgadores (herraje y cantidad) o listón de colgar? ¿Fondo 3 mm o 18 mm para fijar a la pared? ¿Abatibles con pistón por defecto? ¿Profundidad típica? |
+| Columna de cocina | Módulos | ¿Es una caja con huecos (horno, microondas) y puertas arriba/abajo, o se arma combinando los módulos de horno y microondas? |
+| Módulo horno empotrado | Módulos | Medidas del hueco (ancho/alto libres). ¿Estante soporte, ventilación trasera (sin fondo o con corte), cajón inferior? |
+| Módulo microondas | Módulos | Medidas del hueco. ¿Estante soporte, marco o frente alrededor? |
+| Cajonera interior de placard | Módulos | ¿Lleva laterales propios o va entre los laterales del placard? Frentes: ¿18 mm de frente o 15 mm blanco interior? ¿Guías y alto de cajón? |
+| Frente de cajón suelto | Piezas | ¿Solo la placa de frente (4 cantos 45 mm) o incluye caja y guías? |
+| Frente abatible suelto | Piezas | ¿Lleva bisagras (¿cuántas?) y pistón? |
