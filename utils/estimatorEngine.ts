@@ -180,6 +180,7 @@ export const LIBRARY_SHELF_STEP = 320;   // biblioteca: 1 estante fijo cada 320 
 export const SHOE_TRAY_STEP = 200;       // botineros: 1 bandeja cada 200 mm de alto
 export const SHOE_TRAY_FAJA = 36;        // bandeja extraíble: faja delantera de 36 mm
 export const SHOE_FRENTIN = 50;          // bandeja fija inclinada: frentín de 50 mm
+export const SHOE_FIXED_MIN_HEIGHT = 500; // botinero con bandejas fijas inclinadas: alto mínimo
 export const shoeTraysFor = (h: number): number => Math.floor(h / SHOE_TRAY_STEP);
 // Estantes de alacena según el alto: hasta 600 → 1; hasta 900 → 2; más de 900 → 3.
 export const wallCabinetShelves = (h: number): number => (h <= 600 ? 1 : h <= 900 ? 2 : 3);

@@ -484,7 +484,8 @@ const placeCarcass: Placer = (mod, parts) => {
     });
   }
 
-  // Cajones internos (solo la caja): apilados desde el piso, detrás de los frentes.
+  // Cajón interno (solo la caja, 80 mm): arriba, debajo de la tapa (regla del taller, 13/10/2026).
+  // Si un presupuesto guardado tiene más de uno, se apilan hacia abajo.
   const intLat = idxOf(/^Lateral cajón interno/)[0];
   const intTesta = idxOf(/^Contra\/Frente cajón interno/)[0];
   const intFondo = idxOf(/^Fondo cajón interno/)[0];
@@ -495,7 +496,7 @@ const placeCarcass: Placer = (mod, parts) => {
     const bz1 = inset ? D - 18 : D, bz0 = bz1 - lat.width, bh = lat.height;
     const n = Math.round((lat.quantity || 2) / 2);
     for (let k = 0; k < n; k++) {
-      const yb = 18 + 10 + k * (bh + 40);   // separación vertical entre cajas: supuesto de dibujo
+      const yb = H - 18 - 10 - bh - k * (bh + 40);   // 10 mm bajo la tapa; separación entre cajas: supuesto de dibujo
       pieces.push(makePiece(mod, parts, intLat, nextCopy(intLat), mkBox(bx0, bx0 + tSide, yb, yb + bh, bz0, bz1), 'drawer'));
       pieces.push(makePiece(mod, parts, intLat, nextCopy(intLat), mkBox(bx0 + outerW - tSide, bx0 + outerW, yb, yb + bh, bz0, bz1), 'drawer'));
       pieces.push(makePiece(mod, parts, intTesta, nextCopy(intTesta), mkBox(bx0 + tSide, bx0 + tSide + testa.width, yb, yb + bh, bz0, bz0 + tT), 'drawer'));
@@ -669,7 +670,99 @@ const placeColumn: Placer = (mod, parts) => {
   return { pieces, status: 'placed', notes: mod.baseType === 'ZOCALO' ? [`Base de ${BASE_HEIGHT} mm (zócalo estructural): se carga aparte como pieza.`] : [] };
 };
 
+/**
+ * Panel enlistonado: placa base 18 mm atrás y listones 18 × 18 adelante, cada 36 mm (listón +
+ * separación de 18). El patrón va centrado en el panel (supuesto de dibujo).
+ */
+const placeSlattedPanel: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const bi = parts.findIndex(p => /^Panel base/.test(p.name));
+  const li = parts.findIndex(p => /^Listón/.test(p.name));
+  if (bi < 0 || li < 0 || parts.length !== 2) return null;
+  const pieces: Piece3D[] = [makePiece(mod, parts, bi, 0, mkBox(0, W, 0, H, 0, 18), 'back')];
+  const l = parts[li], n = l.quantity || 0, vertical = /vertical/.test(l.name);
+  const span = Math.max(0, n * 36 - 18), start = ((vertical ? W : H) - span) / 2;
+  for (let k = 0; k < n; k++) {
+    const a = start + k * 36;
+    pieces.push(makePiece(mod, parts, li, k, vertical ? mkBox(a, a + 18, 0, H, 18, 36) : mkBox(0, W, a, a + 18, 18, 36), 'front'));
+  }
+  return { pieces, status: 'placed', notes: ['Listones centrados en el panel (supuesto de dibujo).'] };
+};
+
+/**
+ * Zócalo estructural: tapa y base W × D, laterales entre ellas y refuerzos internos repartidos en
+ * partes iguales entre los laterales (separación real: supuesto de dibujo).
+ */
+const placeStructuralPlinth: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0, D = mod.depth || 0;
+  const at = (re: RegExp) => parts.findIndex(p => re.test(p.name));
+  const ti = at(/^Tapa$/), bi = at(/^Base$/), li = at(/^Lateral$/), ri = at(/^Refuerzo interno/);
+  if (ti < 0 || bi < 0 || li < 0) return null;
+  const pieces: Piece3D[] = [
+    makePiece(mod, parts, ti, 0, mkBox(0, W, H - 18, H, 0, D), 'carcass'),
+    makePiece(mod, parts, bi, 0, mkBox(0, W, 0, 18, 0, D), 'carcass'),
+    makePiece(mod, parts, li, 0, mkBox(0, 18, 18, H - 18, 0, D), 'carcass'),
+    makePiece(mod, parts, li, 1, mkBox(W - 18, W, 18, H - 18, 0, D), 'carcass'),
+  ];
+  const n = ri >= 0 ? parts[ri].quantity || 0 : 0;
+  for (let k = 0; k < n; k++) {
+    const xc = 18 + ((W - 36) * (k + 1)) / (n + 1);
+    pieces.push(makePiece(mod, parts, ri, k, mkBox(xc - 9, xc + 9, 18, H - 18, 0, D), 'carcass'));
+  }
+  return { pieces, status: 'placed', notes: n ? ['Refuerzos repartidos en partes iguales (supuesto de dibujo).'] : [] };
+};
+
+/**
+ * Frente de cajón suelto: el frente delante del hueco (z = D) y la caja detrás, centrada en el
+ * ancho y en el alto del frente; fondo en ranura a 10 mm de abajo.
+ */
+const placeLooseDrawerFront: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0, D = mod.depth || 0;
+  const at = (name: string) => parts.findIndex(p => p.name === name);
+  const fi = at('Frente Cajón'), li = at('Lateral Cajón'), ti = at('Contra/Frente Cajón'), oi = at('Fondo Cajón');
+  if (fi < 0 || li < 0 || ti < 0) return null;
+  const lat = parts[li], testa = parts[ti];
+  const tS = materialThickness(lat.material), tT = materialThickness(testa.material);
+  const outerW = testa.width + 2 * tS, bx0 = (W - outerW) / 2, bh = lat.height;
+  const bz1 = D, bz0 = bz1 - lat.width, yb = (H - bh) / 2;
+  const pieces: Piece3D[] = [
+    makePiece(mod, parts, fi, 0, mkBox(0, W, 0, H, D, D + 18), 'front'),
+    makePiece(mod, parts, li, 0, mkBox(bx0, bx0 + tS, yb, yb + bh, bz0, bz1), 'drawer'),
+    makePiece(mod, parts, li, 1, mkBox(bx0 + outerW - tS, bx0 + outerW, yb, yb + bh, bz0, bz1), 'drawer'),
+    makePiece(mod, parts, ti, 0, mkBox(bx0 + tS, bx0 + tS + testa.width, yb, yb + bh, bz0, bz0 + tT), 'drawer'),
+    makePiece(mod, parts, ti, 1, mkBox(bx0 + tS, bx0 + tS + testa.width, yb, yb + bh, bz1 - tT, bz1), 'drawer'),
+  ];
+  if (oi >= 0) {
+    const f = parts[oi], fx0 = (W - f.width) / 2, fz0 = bz0 + (lat.width - f.height) / 2;
+    pieces.push(makePiece(mod, parts, oi, 0, mkBox(fx0, fx0 + f.width, yb + 10, yb + 13, fz0, fz0 + f.height), 'drawer', { groove: true }));
+  }
+  return { pieces, status: 'placed', notes: ['Caja centrada en el alto del frente (supuesto de dibujo).'] };
+};
+
+/** Panel liso: placa frontal adelante y bastidor atrás, retirado 50 mm del perímetro. */
+const placePlainPanel: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const at = (re: RegExp) => parts.findIndex(p => re.test(p.name));
+  const fi = at(/^Panel frontal/), hi = at(/^Bastidor horizontal/), vi = at(/^Bastidor vertical/);
+  if (fi < 0 || hi < 0 || vi < 0 || parts.length !== 3) return null;
+  const R = 50, h = parts[hi], v = parts[vi];
+  return {
+    pieces: [
+      makePiece(mod, parts, fi, 0, mkBox(0, W, 0, H, 18, 36), 'front'),
+      makePiece(mod, parts, hi, 0, mkBox(R, R + h.width, R, R + h.height, 0, 18), 'carcass'),
+      makePiece(mod, parts, hi, 1, mkBox(R, R + h.width, H - R - h.height, H - R, 0, 18), 'carcass'),
+      makePiece(mod, parts, vi, 0, mkBox(R, R + v.width, R + h.height, R + h.height + v.height, 0, 18), 'carcass'),
+      makePiece(mod, parts, vi, 1, mkBox(W - R - v.width, W - R, R + h.height, R + h.height + v.height, 0, 18), 'carcass'),
+    ],
+    status: 'placed', notes: [],
+  };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
+  PANEL_LISO: placePlainPanel,
+  PANEL_ENLISTONADO: placeSlattedPanel,
+  ZOCALO_ESTRUCTURAL: placeStructuralPlinth,
+  FRENTE_CAJON_SUELTO: placeLooseDrawerFront,
   ESQUINERO_EN_L: placeCornerL,
   HORNO_EMPOTRADO: placeCarcass,
   MICROONDAS_COLUMNA: placeCarcass,

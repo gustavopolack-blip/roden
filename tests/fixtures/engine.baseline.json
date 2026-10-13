@@ -1811,7 +1811,7 @@
    {
     "name": "Bastidor vertical",
     "width": 50,
-    "height": 620,
+    "height": 520,
     "material": "18mm_MDF",
     "quantity": 2,
     "grain": "vertical"
@@ -2631,8 +2631,8 @@
   "especiales": {
    "whiteAglo": 2910279.375,
    "whiteMDF": 3179604.375,
-   "colorAglo": 3414352.5,
-   "colorMDF": 3730927.5,
+   "colorAglo": 3412681.875,
+   "colorMDF": 3729256.875,
    "whiteLacqAglo": 6261198.75,
    "whiteLacqMDF": 6492048.75,
    "colorLacqAglo": 6628786.875,
@@ -2641,8 +2641,8 @@
    "whiteVenrMDF": 6722223.75,
    "colorVenrAglo": 6858961.875,
    "colorVenrMDF": 7130311.875,
-   "baseConfig": 3414352.5,
-   "totalDirectCost": 2023320,
+   "baseConfig": 3412681.875,
+   "totalDirectCost": 2022330,
    "realConfig": 3749675.625,
    "realConfigTaller": 2999740.5,
    "realConfigDirect": 2222030,

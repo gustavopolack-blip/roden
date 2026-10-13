@@ -256,11 +256,13 @@ const PANEL_LISO: SpecialModuleTemplate = {
       grain:    'vertical'
     });
 
-    // Bastidor trasero: 4 listones de 18mm × 50mm
-    // 2 horizontales (ancho total - 2 retiros) × 50mm
-    // 2 verticales   (alto total - 2 retiros)  × 50mm
+    // Bastidor trasero: 4 listones de 18mm × 50mm, retirados 50 mm del perímetro.
+    // 2 horizontales enteros (ancho total − 2 retiros) × 50mm
+    // 2 verticales ENTRE los horizontales (alto total − 2 retiros − 2 × 50) × 50mm.
+    // Antes los verticales también medían H − 100: se pisaban en las esquinas y se
+    // cotizaban 4 tramos de 50 mm de más (regla del taller, 13/10/2026).
     const bastidorH_width  = Math.max(0, W - RET * 2);
-    const bastidorV_height = Math.max(0, H - RET * 2);
+    const bastidorV_height = Math.max(0, H - RET * 2 - 50 * 2);
 
     parts.push({
       name:     'Bastidor horizontal',
