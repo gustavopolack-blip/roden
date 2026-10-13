@@ -17,6 +17,7 @@ export interface SpecialHardware {
   hinges?: number;
   hingeType?: string;  // 'COMMON' | 'SOFT_CLOSE' | 'PUSH'
   brackets?: number;   // ménsulas metálicas ocultas (estante flotante)
+  bracketLength?: 150 | 250; // largo de la ménsula (mm): según la profundidad del estante
 }
 
 export interface SpecialModuleResult {
@@ -419,6 +420,8 @@ const MODULO_ABIERTO: SpecialModuleTemplate = {
 
 export const floatingShelfBrackets = (width: number): number =>
   width <= 900 ? 2 : 2 + Math.ceil((width - 900) / 400);
+// Largo de ménsula: profundidad < 250mm → 15cm; 250mm o más → 25cm.
+export const floatingShelfBracketLength = (depth: number): 150 | 250 => depth < 250 ? 150 : 250;
 
 const ESTANTE_FLOTANTE: SpecialModuleTemplate = {
   id: 'ESTANTE_FLOTANTE',
@@ -465,7 +468,7 @@ const ESTANTE_FLOTANTE: SpecialModuleTemplate = {
 
     return {
       parts,
-      hardware: flotante ? { brackets: floatingShelfBrackets(W) } : {},
+      hardware: flotante ? { brackets: floatingShelfBrackets(W), bracketLength: floatingShelfBracketLength(D) } : {},
       laborDays: 0.15
     };
   }

@@ -2,8 +2,8 @@
  * Clasificación de plantillas en los botones del estimador: Módulos (cajas) y Piezas (sueltas).
  */
 import { describe, it, expect } from 'vitest';
-import { SPECIAL_MODULE_TEMPLATES, getTemplate, floatingShelfBrackets } from '../utils/specialModules';
-import { calculateItemQuantities, hwPriceFor, BRACKET_LABEL } from '../utils/estimatorEngine';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, floatingShelfBrackets, floatingShelfBracketLength } from '../utils/specialModules';
+import { calculateItemQuantities, hwPriceFor, bracketLabel } from '../utils/estimatorEngine';
 
 const ids = (g: string) => SPECIAL_MODULE_TEMPLATES.filter(t => t.group === g).map(t => t.id).sort();
 
@@ -32,19 +32,24 @@ describe('estante 36mm flotante (ménsulas metálicas ocultas)', () => {
   });
   const tpl = getTemplate('ESTANTE_FLOTANTE')!;
   it('flotante (o sin opción guardada) lleva ménsulas; no flotante, no', () => {
-    expect(tpl.calculate({ width: 1200, height: 36, depth: 250 }, { flotante: 'SI' }).hardware).toEqual({ brackets: 3 });
-    expect(tpl.calculate({ width: 1200, height: 36, depth: 250 }).hardware).toEqual({ brackets: 3 });
+    expect(tpl.calculate({ width: 1200, height: 36, depth: 250 }, { flotante: 'SI' }).hardware).toEqual({ brackets: 3, bracketLength: 250 });
+    expect(tpl.calculate({ width: 1200, height: 36, depth: 250 }).hardware).toEqual({ brackets: 3, bracketLength: 250 });
     expect(tpl.calculate({ width: 1200, height: 36, depth: 250 }, { flotante: 'NO' }).hardware).toEqual({});
   });
-  it('las ménsulas se cuentan por unidad del módulo y se cobran con su precio de lista', () => {
+  it('largo de ménsula según profundidad: < 250mm → 15cm; 250mm o más → 25cm', () => {
+    expect([150, 200, 249, 250, 300].map(floatingShelfBracketLength)).toEqual([150, 150, 150, 250, 250]);
+  });
+  it('las ménsulas se cuentan por unidad del módulo y se cobran con el precio de su largo', () => {
     const r = tpl.calculate({ width: 1200, height: 36, depth: 250 }, { flotante: 'SI' });
     const mod: any = {
       id: 'e', name: 'Estante', width: 1200, height: 36, depth: 250, quantity: 2, cntDoors: 0, cntFlaps: 0, cntDrawers: 0,
       moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: 'ESTANTE_FLOTANTE', specialOptions: { flotante: 'SI' },
       specialParts: r.parts, specialHardware: r.hardware, specialLaborDays: r.laborDays, extras: [],
     };
-    expect(calculateItemQuantities([mod]).detailedHardware[BRACKET_LABEL]).toBe(6);
-    expect(hwPriceFor(BRACKET_LABEL, 6, { priceFloatingBracket: 5000 })).toBe(30000);
-    expect(hwPriceFor(BRACKET_LABEL, 6, {})).toBe(0);
+    expect(calculateItemQuantities([mod]).detailedHardware).toEqual({ 'Ménsula metálica oculta 25cm': 6 });
+    const S = { priceFloatingBracket15: 3000, priceFloatingBracket25: 5000 };
+    expect(hwPriceFor(bracketLabel(250), 6, S)).toBe(30000);
+    expect(hwPriceFor(bracketLabel(150), 6, S)).toBe(18000);
+    expect(hwPriceFor(bracketLabel(250), 6, {})).toBe(0);
   });
 });

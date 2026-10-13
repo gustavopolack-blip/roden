@@ -76,8 +76,9 @@ export const HINGE_LABELS: Record<string, string> = {
     'PUSH': 'Bisagras Push-Open'
 };
 
-// Herraje del estante 36mm flotante (template ESTANTE_FLOTANTE). Precio: priceFloatingBracket.
-export const BRACKET_LABEL = 'Ménsula metálica oculta';
+// Herraje del estante 36mm flotante (template ESTANTE_FLOTANTE), en dos largos.
+// Precio: priceFloatingBracket15 / priceFloatingBracket25.
+export const bracketLabel = (length: 150 | 250): string => `Ménsula metálica oculta ${length / 10}cm`;
 
 export const SLIDE_LABELS: Record<string, string> = {
     'TELESCOPIC': 'Guías Telescópicas',
@@ -404,7 +405,8 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
             modHinges += sh.hinges;
         }
         if (sh.brackets > 0) {
-            detailedHardware[BRACKET_LABEL] = (detailedHardware[BRACKET_LABEL] || 0) + (sh.brackets * qty);
+            const bracketName = bracketLabel(sh.bracketLength);
+            detailedHardware[bracketName] = (detailedHardware[bracketName] || 0) + (sh.brackets * qty);
         }
         if (mod.calculateSlides && !templateSlides) {
             modSlides += (mod.cntDrawers || 0);
@@ -619,7 +621,7 @@ export const hwPriceFor = (name: string, qty: number, S: any): number => {
     else if (n.includes('push') && n.includes('bisag'))             unitPrice = S.priceHingePush || 0;
     else if (n.includes('pistón') || n.includes('piston'))          unitPrice = S.priceGasPiston || 0;
     else if (n.includes('guías') || n.includes('guia')) unitPrice = resolveSlidePrice(name, S).price;
-    else if (n.includes('ménsula'))                                 unitPrice = S.priceFloatingBracket || 0;
+    else if (n.includes('ménsula'))                                 unitPrice = (n.includes('25cm') ? S.priceFloatingBracket25 : S.priceFloatingBracket15) || 0;
     return unitPrice * qty;
 };
 
