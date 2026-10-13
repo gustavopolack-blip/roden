@@ -147,3 +147,21 @@ describe('patas (cilindros) en la exportación', () => {
     expect(faces.filter(f => f.split(' ').length === 25)).toHaveLength(2);
   });
 });
+
+describe('bandejas inclinadas en la exportación', () => {
+  const bot = buildScene(buildAssembly('Botinero', [mod({ id: 'bf', name: 'Botinero', cabinetType: 'BOTINERO_FIJO', width: 800, height: 1200, depth: 350 })]), 0);
+  it('FBX: la bandeja lleva Lcl Rotation de 30° en x y el lector la gira', () => {
+    const root = parseFbx(exportFBX(bot, { date: new Date(2026, 9, 13, 12, 0, 0) }));
+    const trays: THREE.Object3D[] = [];
+    root.traverse(o => { if ((o as THREE.Mesh).isMesh && o.name.includes('Bandeja_fija_inclinada')) trays.push(o); });
+    expect(trays).toHaveLength(6);
+    trays.forEach(t => expect(THREE.MathUtils.radToDeg(t.rotation.x)).toBeCloseTo(30, 3));
+  });
+  it('OBJ: los vértices de la bandeja quedan girados (alto = L·sen30 + 18·cos30)', () => {
+    const { obj } = exportOBJ(bot);
+    const block = obj.split(/^o /m).find(b => b.startsWith('M01_Botinero_Bandeja_fija_inclinada'))!;
+    const ys = block.split('\n').filter(l => l.startsWith('v ')).map(l => Number(l.split(' ')[2]));
+    const L = 350 - 21 - 10;   // fondo 3 mm: profundidad del estante D − 31
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(L * 0.5 + 18 * Math.cos(Math.PI / 6), 3);
+  });
+});

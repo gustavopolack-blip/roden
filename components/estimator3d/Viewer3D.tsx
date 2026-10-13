@@ -130,6 +130,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
           : new THREE.BoxGeometry(Math.max(size[0], 0.1), Math.max(size[1], 0.1), Math.max(size[2], 0.1));
         const mesh = new THREE.Mesh(geom, mat);
         mesh.position.set(center[0], center[1], center[2]);
+        if (sp.piece.rotX) mesh.rotation.x = THREE.MathUtils.degToRad(sp.piece.rotX);
         mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key };
         // Cilindro: solo el contorno de las tapas (sin las aristas de cada segmento).
         const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, sp.piece.shape === 'cylinder' ? 30 : 1), new THREE.LineBasicMaterial({ color: isSel ? 0x4f46e5 : 0x6b7280 }));

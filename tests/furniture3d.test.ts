@@ -8,7 +8,7 @@ import { SPECIAL_MODULE_TEMPLATES } from '../utils/specialModules';
 import { calculateModuleParts, calculateItemQuantities } from '../utils/estimatorEngine';
 import {
   buildAssembly, buildScene, placeModule, findPieceOverlaps, boxSize, boxCenter, transformBox, overlapVolume, MODULE_PLACERS,
-  fitCameraDistance,
+  fitCameraDistance, pieceAABB,
 } from '../utils/furniture3d/geometry';
 
 const BASE = {
@@ -380,5 +380,34 @@ describe('columna (un solo ítem)', () => {
     // banquina entre los laterales aplicados
     const b = buildAssembly('x', [col({ baseType: 'BANQUINA' })]).modules[0].pieces.filter(p => p.role === 'obra');
     expect(b.map(p => p.box)).toEqual([{ min: [18, 0, 0], max: [631, 100, 520] }]);
+  });
+});
+
+describe('botinero fijo: bandejas inclinadas 30°', () => {
+  const bot = (over: any = {}) => mod({ id: 'bf', cabinetType: 'BOTINERO_FIJO', width: 800, height: 1200, depth: 350, ...over });
+  it('bandejas y frentines girados 30° (frente abajo), dentro de la caja y sin choques', () => {
+    const a = buildAssembly('x', [bot()]);
+    const m = a.modules[0];
+    expect(m.status).toBe('placed');
+    const trays = m.pieces.filter(p => p.name === 'Bandeja fija inclinada');
+    const frentines = m.pieces.filter(p => p.name === 'Frentín bandeja');
+    expect(trays).toHaveLength(6);                       // 1200 / 200
+    expect(frentines).toHaveLength(6);
+    [...trays, ...frentines].forEach(p => expect(p.rotX).toBe(30));
+    const back = Math.max(...m.pieces.filter(p => p.role === 'back').map(p => p.box.max[2]));
+    trays.forEach(t => {
+      const b = pieceAABB(t);
+      expect(b.min[1]).toBeGreaterThanOrEqual(18 - 1e-6);
+      expect(b.max[1]).toBeLessThanOrEqual(1200 - 18 + 1e-6);
+      expect(b.min[2]).toBeCloseTo(back, 6);            // apoyada atrás contra el fondo
+      expect(b.max[2]).toBeLessThanOrEqual(350);
+      // medida de corte intacta: la caja sin girar conserva el despiece
+      expect(boxSize(t.box)[2]).toBeCloseTo(t.partSize.height, 6);
+    });
+    expect(issuesOf(a, 'PIECE_OVERLAP')).toEqual([]);
+    // el frentín queda adelante y abajo de su bandeja
+    const t0 = boxCenter(trays[0].box), f0 = boxCenter(frentines[0].box);
+    expect(f0[2]).toBeGreaterThan(t0[2]);
+    expect(f0[1]).toBeLessThan(t0[1] + 50);
   });
 });
