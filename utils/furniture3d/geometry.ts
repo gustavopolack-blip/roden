@@ -118,6 +118,19 @@ export const overlapVolume = (a: Box, b: Box, tol = 0.01): number => {
   return v;
 };
 
+/**
+ * Distancia de cámara para que la caja entre completa en pantalla desde cualquier dirección:
+ * se encuadra la esfera que la contiene con el menor de los dos ángulos de visión (vertical u
+ * horizontal, según la proporción del visor). Con margen 1 la esfera toca el borde.
+ */
+export const fitCameraDistance = (b: Box, vFovDeg: number, aspect: number, margin = 1.1): number => {
+  const s = boxSize(b);
+  const radius = Math.max(Math.hypot(s[0], s[1], s[2]) / 2, 1);
+  const halfV = (vFovDeg * Math.PI) / 360;
+  const halfH = Math.atan(Math.tan(halfV) * aspect);
+  return (radius / Math.sin(Math.min(halfV, halfH))) * margin;
+};
+
 /** Rotación sobre Y (misma convención que three.js: ángulo positivo = antihorario visto desde +Y). */
 export const rotateY = (p: Vec3, deg: number): Vec3 => {
   const r = (deg * Math.PI) / 180;

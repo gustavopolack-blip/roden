@@ -24,7 +24,9 @@ En el constructor:
 
 - Elegí un módulo en la lista para editar medidas, puertas, cajones, abatibles, alto de frentes
   combinados, apertura (bisagra) y posición X/Y/Z (mm) y giro (0/90/180/270°).
-- **Ensamblado / Despiece del mueble / Despiece del módulo** y control de separación.
+- Se abre a pantalla completa. Dos vistas: **Ítem completo** (todos los módulos) y **Módulo**
+  (el seleccionado en la lista, solo), cada una **Ensamblada** o en **Despiece** con control de
+  separación. Al cambiar de vista la cámara encuadra todo lo visible según la proporción del visor.
 - Clic en una pieza: nombre, placa, medidas y veta (las mismas del despiece y la planilla de cortes).
 - La validación marca módulos superpuestos, separaciones chicas (≤ 5 mm), medidas inválidas,
   frentes que no entran y piezas que chocan por reglas pendientes. Con errores no se puede aplicar.
