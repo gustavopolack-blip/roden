@@ -174,4 +174,24 @@ Reglas del taller para despiece, costo y 3D. "Hoy" = lo que hace el código ante
 | 16 | Fondo de cajón | En ranura en las 4 caras, a 10 mm de abajo, 4 mm menos por lado. | Igual | — |
 | 17 | Patas | Opcionales. | No existen | [costo] herraje |
 
-Pendientes del estándar: ver repreguntas (sesión del 13/10). Módulos de cocina: por definir.
+### Detalle cerrado (repreguntas del 13/10)
+
+| Tema | Regla |
+|---|---|
+| Fondo 3 mm | Ranura a **18 mm del canto trasero**, 5 mm de profundidad. Corte: **(W − 28) × (H − 28)** (1 mm de juego por lado). |
+| Fondo 5,5 mm | Corte **(W − 10) × (H − 10)**. Rebaje atrás en laterales, tapa y base de 13 × 5,5 mm (quedan 5 mm de canto visible). Laterales a D completa. |
+| Fondo estructural 18 mm | Corte **(W − 36) × (H − 36)**, dentro de la caja y al ras atrás. Laterales, tapa y base a D completa. |
+| Laterales enteros | Opción: laterales **H × D**; tapa y base **(W − 36) × D** entre laterales. Se usa cuando el lateral queda a la vista (a criterio). |
+| Estantes regulables | Opción. 4 soportes por estante: **se cuentan pero no se cobran**. Estante 2 mm más angosto (W − 38). |
+| Sin fondo | Estante de profundidad D − 10. |
+| Frente embutido | Entre laterales y entre tapa y base, con 4 mm de luz contra la caja y entre frentes; al ras del frente de la caja (profundidad total D). Los estantes se acortan 18 mm. |
+| Luz perimetral (superpuesto) | **2 mm por lado** (frente de W − 4) → entre módulos vecinos quedan 4 mm. |
+| Veta | Casilla **"con veta"** en el material de estructura y en el de frentes. Laqueado: libre. Kiri: con veta. |
+| Frentes combinados | **No se usan.** Un módulo lleva un solo tipo de frente. |
+| Apertura | 4 o más puertas: en pares (izquierda/derecha). Módulo de 1 puerta en el centro del mueble: indistinto (izquierda). |
+| Cajones | El alto de interior (alto del lateral de la caja, 15 mm) depende del alto del frente: 80 / 120 / 200 / 300 mm. Puede haber cajón interno detrás de un frente. Fondo de cajón a 10 mm de abajo en todos los altos. |
+| Patas | Opcionales. 4 hasta 900 mm de ancho; 6 a partir de ahí. Altura de 120 mm que **se suma a H**. Herraje "Pata regulable" en la lista de precios. |
+
+Pendientes: regla alto de frente → alto de caja de cajón; cajón interno; profundidad de estante con
+el fondo de 3 mm a 18 mm de atrás; qué hacer con presupuestos guardados que tienen frentes
+combinados. Módulos de cocina: por definir.
