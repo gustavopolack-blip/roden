@@ -46,7 +46,8 @@ export interface ExtendedCabinetModule extends CabinetModule {
     //  BAJO: bajo mesada (laterales enteros, piso entre laterales, sin tapa, fajas de 100 mm).
     //  ESQUINERO: bajo mesada esquinero recto (frente fijo de rincón + 1 puerta).
     //  ALACENA: estándar + faja trasera superior de 100 mm; opción piso de microondas (420 mm).
-    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA';
+    //  BAJO_HORNO: bajo mesada para horno (613 de ancho, sin fondo, estante de apoyo y faja inferior).
+    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO';
     neighborDepth?: number;          // esquinero: profundidad del bajo que llega de costado (vacío = D)
     cornerSide?: 'LEFT' | 'RIGHT';   // esquinero: lado del rincón (frente fijo)
     microwaveFloor?: boolean;        // alacena = módulo microondas: abierto, fondo 18 mm y piso de 420 mm
@@ -164,6 +165,10 @@ export const BASE_HEIGHT = 100;           // banquina, zócalo estructural o pat
 export const KITCHEN_FAJA = 100;          // fajas de bajos y faja trasera de alacena
 export const MICROWAVE_FLOOR_DEPTH = 420; // alacena con microondas convencional: piso de 420 mm
 export const INTERNAL_DRAWER_HEIGHT = 80; // cajón interno: solo la caja
+// Bajo mesada para horno: 595 mm entre ejes de laterales (613 exterior); el horno apoya en un
+// estante fijo que deja 600 mm libres hasta la mesada; debajo, faja inferior de frente.
+export const OVEN_BASE_WIDTH = 613;
+export const OVEN_FREE_HEIGHT = 600;
 // Estantes de alacena según el alto: hasta 600 → 1; hasta 900 → 2; más de 900 → 3.
 export const wallCabinetShelves = (h: number): number => (h <= 600 ? 1 : h <= 900 ? 2 : 3);
 export const legsFor = (width: number): number => (width <= 900 ? 4 : 6);
@@ -209,6 +214,7 @@ export const getFrontLayout = (mod: ExtendedCabinetModule) => {
 export const normalizeCabinet = (mod: ExtendedCabinetModule): ExtendedCabinetModule =>
     mod.cabinetType === 'ESQUINERO' ? { ...mod, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 }
   : mod.cabinetType === 'ALACENA' && mod.microwaveFloor ? { ...mod, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: '18MM_STRUCTURE' }
+  : mod.cabinetType === 'BAJO_HORNO' ? { ...mod, width: OVEN_BASE_WIDTH, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, internalDrawers: 0, backingType: 'NONE' }
   : mod;
 
 export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedPart[] => {
@@ -286,7 +292,7 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
       //    "laterales enteros" los laterales van de piso a techo y tapa/base entre ellos.
       //    Los laterales van siempre a profundidad D (los fondos de 5,5 y 18 mm van dentro).
       const kind = mod.cabinetType;
-      const isBase = kind === 'BAJO' || kind === 'ESQUINERO';
+      const isBase = kind === 'BAJO' || kind === 'ESQUINERO' || kind === 'BAJO_HORNO';
       const innerW = Math.max(0, W - 36);
       if (isBase) {
           // Bajo mesada: laterales enteros, piso entre laterales, sin tapa (va la mesada):
@@ -359,6 +365,14 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
 
       if (cntDrawers > 0) {
           parts.push(front('Frente Cajón', frontsW, layout.drawerH, cntDrawers));
+      }
+      if (kind === 'BAJO_HORNO') {
+          // Estante fijo de apoyo del horno: su cara superior deja 600 mm libres hasta la mesada.
+          // Debajo, faja inferior de material de frente (tapacanto visible), con 2 mm de luz al
+          // borde del módulo y al horno.
+          parts.push(carcass('Estante apoyo horno', innerW, Math.max(0, D - SHELF_FRONT_SETBACK), 1, 'width', 'horizontal'));
+          const fajaH = Math.max(0, H - OVEN_FREE_HEIGHT - 2 * FRONT_EDGE_GAP);
+          parts.push(front('Frente faja inferior horno', frontsW, fajaH, 1));
       }
       if (kind === 'ESQUINERO') {
           // Frente fijo de rincón = profundidad del bajo vecino + 21 + 4 de luz; la puerta, el resto.

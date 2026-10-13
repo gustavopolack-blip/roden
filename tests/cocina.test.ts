@@ -163,3 +163,23 @@ describe('repreguntas de cocina (13/10)', () => {
     expect(findPieceOverlaps(pieces)).toEqual([]);
   });
 });
+
+describe('bajo mesada para horno', () => {
+  const bh = (over: any = {}) => mod({ cabinetType: 'BAJO_HORNO', width: 800, height: 740, depth: 560, cntDoors: 2, ...over });
+  it('613 de ancho (595 entre ejes), sin fondo ni puertas, estante de apoyo y faja inferior de frente', () => {
+    const p = calculateModuleParts(bh() as any);
+    expect(size(p, 'Lateral')).toEqual([560, 740, 2]);
+    expect(size(p, 'Piso')).toEqual([577, 560, 1]);
+    expect(size(p, 'Estante apoyo horno')).toEqual([577, 550, 1]);
+    expect(size(p, 'Frente faja inferior horno')).toEqual([609, 136, 1]);
+    expect(p.some(x => /^(Fondo|Puerta)/.test(x.name))).toBe(false);
+  });
+  it('3D: estante con 600 mm libres hasta arriba, faja al frente, sin choques', () => {
+    const a = buildAssembly('x', [bh()]);
+    expect(a.size.w).toBe(613);
+    const pieces = a.modules[0].pieces;
+    expect(pieces.find(x => x.name === 'Estante apoyo horno')!.box.max[1]).toBe(140);
+    expect(pieces.find(x => x.name === 'Frente faja inferior horno')!.box).toEqual({ min: [2, 2, 563], max: [611, 138, 581] });
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+  });
+});

@@ -100,10 +100,11 @@ const BACKING_OPTIONS = [
 
 // Módulos de cocina armados sobre el módulo estándar (ficha del 13/10/2026). Aparecen en el
 // botón Módulos; reemplazan a las plantillas MODULO_BAJO_MESADA y ESQUINERO (legacy).
-const STANDARD_VARIANTS: { id: string; name: string; cabinetType: 'BAJO' | 'ESQUINERO' | 'ALACENA'; defaults: Partial<ExtendedCabinetModule> }[] = [
+const STANDARD_VARIANTS: { id: string; name: string; cabinetType: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO'; defaults: Partial<ExtendedCabinetModule> }[] = [
     { id: 'VAR_BAJO',      name: 'Bajo mesada',                 cabinetType: 'BAJO',      defaults: { height: 740, depth: 560 } },
     { id: 'VAR_ESQUINERO', name: 'Bajo mesada esquinero recto', cabinetType: 'ESQUINERO', defaults: { height: 740, depth: 560, cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } },
     { id: 'VAR_ALACENA',   name: 'Alacena',                     cabinetType: 'ALACENA',   defaults: { depth: 320 } },
+    { id: 'VAR_BAJO_HORNO', name: 'Bajo mesada para horno',     cabinetType: 'BAJO_HORNO', defaults: { width: 613, height: 740, depth: 560, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } },
 ];
 
 const BOARD_OPTIONS = [
@@ -1381,6 +1382,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
           const variantMod = {
               ...moduleForm,
               ...(activeVariant.cabinetType === 'ESQUINERO' ? { cntDoors: 1, cntDrawers: 0, cntFlaps: 0 } : {}),
+              ...(activeVariant.cabinetType === 'BAJO_HORNO' ? { width: 613, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } : {}),
               cabinetType: activeVariant.cabinetType,
               name: moduleForm.name || activeVariant.name,
           } as ExtendedCabinetModule;
@@ -3613,7 +3615,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                             <span>Módulo microondas (abierto, fondo 18 mm, piso 420 mm)</span>
                                         </label>
                                     )}
-                                    {activeVariant?.cabinetType !== 'ESQUINERO' && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
+                                    {activeVariant?.cabinetType !== 'ESQUINERO' && activeVariant?.cabinetType !== 'BAJO_HORNO' && !(activeVariant?.cabinetType === 'ALACENA' && (moduleForm as ExtendedCabinetModule).microwaveFloor) && (
                                         <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
                                             <span>Cajones internos (80 mm)</span>
                                             <input type="number" min={0} className="border p-1 rounded text-xs w-14 text-center" value={(moduleForm as ExtendedCabinetModule).internalDrawers ?? 0} onChange={e => handleInputChange('internalDrawers', Math.max(0, Math.round(Number(e.target.value))) || undefined)}/>

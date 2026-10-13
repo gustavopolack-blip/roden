@@ -290,5 +290,12 @@ Supuestos míos a confirmar:
 de 18 mm la reemplaza — supuesto mío), microondas de columna y cajón interno (en 3D se apilan
 desde el piso cada 120 mm — supuesto de dibujo).
 
-Pendientes de definir: despiece del esquinero en L y del bajo mesada para horno (propuestas
-enviadas a Gustavo el 13/10).
+### Cuarta ronda (13/10)
+
+| Tema | Regla |
+|---|---|
+| Bajo mesada para horno | 595 entre ejes de laterales (613 de ancho). Construcción de bajo, **sin fondo**. Estante fijo de apoyo, (W − 36) × (D − 10), que deja **600 mm libres** hasta la mesada. **Faja inferior de material de frente**, (W − 4) × (H − 600 − 4). **Implementado.** |
+| Esquinero en L | Pisos: A a lo largo de todo el brazo 1; B desde donde termina la profundidad de A. Puertas abren hacia afuera del rincón. Rigidez: **dos fajas verticales en L de 80 × 80 mm por la altura total** ("columna" en el ángulo). |
+
+Pendiente: esquinero en L — ubicación de la columna de 80 × 80 (rincón contra las paredes,
+encuentro de las puertas o ambos) y material de las fajas.

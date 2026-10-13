@@ -19,7 +19,7 @@
 import { CalculatedPart } from '../../types';
 import {
   calculateModuleParts, getFrontLayout, getBoardLabel, isVisibleFrontPiece,
-  FRONT_GAP, FRONT_EDGE_GAP, FRONT_OFFSET, BACK3_GROOVE_FROM_BACK, BASE_HEIGHT, KITCHEN_FAJA, normalizeCabinet,
+  FRONT_GAP, FRONT_EDGE_GAP, FRONT_OFFSET, BACK3_GROOVE_FROM_BACK, BASE_HEIGHT, KITCHEN_FAJA, OVEN_FREE_HEIGHT, normalizeCabinet,
 } from '../estimatorEngine';
 
 /** Alacena sin posición guardada: base a 600 mm sobre la mesada (base 100 + bajo 740 + mesada 20 + 600). */
@@ -238,7 +238,7 @@ const placeCarcass: Placer = (mod, parts) => {
     const p = parts[i];
     const t = materialThickness(p.material);
     // Bajo mesada (sin tapa): el fondo llega al borde superior y entra en la ranura/rebaje del piso.
-    const isBase = mod.cabinetType === 'BAJO' || mod.cabinetType === 'ESQUINERO';
+    const isBase = mod.cabinetType === 'BAJO' || mod.cabinetType === 'ESQUINERO' || mod.cabinetType === 'BAJO_HORNO';
     const x0 = (W - p.width) / 2, y0 = isBase ? H - p.height - (t === 3 ? 1 : 0) : (H - p.height) / 2;
     const z0 = t === 3 ? BACK3_GROOVE_FROM_BACK : 0;
     // groove: alojado en ranura (3 mm) o rebaje (5,5 mm) → el solape con la caja es intencional
@@ -248,7 +248,16 @@ const placeCarcass: Placer = (mod, parts) => {
   });
 
   // Estantes y bandejas: equidistantes en el alto interior (regla de separación pendiente)
-  const shelfIdx = idxOf(/^(Estante|Bandeja)/);
+  const shelfIdx = idxOf(/^(Estante|Bandeja)/).filter(i => !/apoyo horno/.test(parts[i].name));
+  // Bajo para horno: estante de apoyo fijo (cara superior a H − 600) y faja inferior al frente.
+  idxOf(/^Estante apoyo horno/).forEach(i => {
+    const p = parts[i], x0 = (W - p.width) / 2, top = H - OVEN_FREE_HEIGHT;
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, top - 18, top, 0, p.height), 'shelf'));
+  });
+  idxOf(/^Frente faja inferior horno/).forEach(i => {
+    const p = parts[i], x0 = (W - p.width) / 2;
+    pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, FRONT_EDGE_GAP, FRONT_EDGE_GAP + p.height, D + FRONT_OFFSET, D + FRONT_OFFSET + 18), 'front'));
+  });
   const shelfCount = shelfIdx.reduce((a, i) => a + (parts[i].quantity || 1), 0);
   let shelfN = 0;
   const shelfTops: { y: number; zFront: number }[] = [];
@@ -582,7 +591,8 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   const placed: PlacedModule[] = [];
   const issues: AssemblyIssue[] = [];
 
-  modules.forEach((mod, mi) => {
+  modules.forEach((rawMod, mi) => {
+    const mod = normalizeCabinet(rawMod);   // ej. bajo para horno: ancho fijo de 613
     if (isManualModule(mod)) return;
     const W = mod.width || 0, H = mod.height || 0, D = mod.depth || 0;
     const legH = mod.baseType && !templateIdOf(mod) ? BASE_HEIGHT : 0;   // base: se suma a H
