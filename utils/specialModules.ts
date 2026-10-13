@@ -1173,6 +1173,8 @@ export const MICROWAVE_AXIS_H = 385;
 const MICROONDAS_COLUMNA: SpecialModuleTemplate = {
   id: 'MICROONDAS_COLUMNA',
   group: 'MODULO',
+  // Oculta: la columna de un solo ítem ya lo incluye (expandColumn). Queda para presupuestos guardados.
+  legacy: true,
   name: 'Módulo microondas de empotrar (columna)',
   description: 'Mismo ancho que el horno (613); 385 mm entre ejes de piso y techo (403 exterior). Sin fondo.',
   params: ['depth'],

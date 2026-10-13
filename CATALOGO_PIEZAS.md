@@ -295,8 +295,9 @@ vieja `COLUMNA` queda oculta para los presupuestos guardados.
 | Banquina | También retirada 40 mm. En 3D se dibuja como bloque (obra, no se cobra). |
 | Patas | Siempre **detrás del zócalo**: las delanteras con centro a 78 mm del frente (40 + 18 de zócalo + 20 de radio); las traseras a 40 mm de atrás; a 40 mm de los costados. |
 
-Supuesto mío: el retiro de 40 mm se mide desde el frente de la estructura (D), no desde las
-puertas.
+El retiro de 40 mm se mide desde el frente de la estructura (D), no desde las puertas
+(confirmado por Gustavo, 13/10/2026). El microondas de columna suelto queda oculto (`legacy`):
+la columna ya lo incluye.
 
 ### Tercera ronda (13/10)
 
