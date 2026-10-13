@@ -71,7 +71,10 @@ const INITIAL_MODULE_FORM: Partial<ExtendedCabinetModule> = {
     hasGasPistons: false,
     extras: [],
     structureCore: 'AGLO',
-    frontsCore: 'AGLO'
+    frontsCore: 'AGLO',
+    // Melamina lisa por defecto (veta libre); "con veta" se tilda al lado del material.
+    structureHasGrain: false,
+    frontsHaveGrain: false,
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -1364,6 +1367,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   const handleAddModule = (e: React.FormEvent) => {
       e.preventDefault();
+      if (combinedFrontsBlocked) return;
 
       if (moduleKind === 'SPECIAL' && specialTemplateId) {
           const template = getTemplate(specialTemplateId);
@@ -1425,6 +1429,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       setSpecialTemplateId('');
       setSpecialOptions({});
   };
+
+  // Ficha constructiva: un módulo estándar lleva un solo tipo de frente (los guardados con
+  // frentes combinados se siguen calculando igual, pero no se cargan nuevos).
+  const combinedFrontsBlocked = moduleKind === 'STANDARD'
+      && [moduleForm.cntDoors, moduleForm.cntDrawers, moduleForm.cntFlaps].filter(n => (n || 0) > 0).length > 1;
 
   const handleInputChange = (field: keyof ExtendedCabinetModule, value: any) => {
       setModuleForm(prev => {
@@ -3286,6 +3295,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 <div className="space-y-2">
                                     <div><label className="text-xs block font-bold text-gray-400 mb-2">Otros</label></div>
                                     <div><label className="text-xs block">Pistón a gas</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGasPiston} onChange={e => setSettings({...settings, priceGasPiston: Number(e.target.value)})} /></div>
+                                    <div><label className="text-xs block">Pata regulable</label><input type="number" className="border p-1 w-full rounded" value={settings.priceLeg ?? ''} onChange={e => setSettings({...settings, priceLeg: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Ménsula metálica estante 15cm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket15 ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket15: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Ménsula metálica estante 25cm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket25 ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket25: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Lata cemento contacto 2.8kg</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGlueTin} onChange={e => setSettings({...settings, priceGlueTin: Number(e.target.value)})} /></div>
@@ -3531,6 +3541,21 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     </div>
                                     <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700 border-l border-gray-300 pl-4"><input type="checkbox" className="w-4 h-4" checked={moduleForm.hasGasPistons} onChange={e => handleInputChange('hasGasPistons', e.target.checked)}/><span>Pistones Gas</span></label>
                                 </div>
+                                {moduleKind === 'STANDARD' && (
+                                <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                                    {([
+                                        ['fullHeightSides',   'Laterales enteros'],
+                                        ['adjustableShelves', 'Estantes regulables'],
+                                        ['insetFronts',       'Frente embutido'],
+                                        ['hasLegs',           'Patas (120 mm)'],
+                                    ] as const).map(([key, label]) => (
+                                        <label key={key} className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
+                                            <input type="checkbox" className="w-4 h-4" checked={!!(moduleForm as ExtendedCabinetModule)[key]} onChange={e => handleInputChange(key, e.target.checked)}/>
+                                            <span>{label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                )}
 
                                 {/* Material Configuration Section — dos selectores independientes */}
                                 <div className="flex flex-wrap items-center gap-4 bg-amber-50 p-3 rounded-xl border border-amber-200">
@@ -3585,6 +3610,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="enchapad_gloss">Kiri lustre brillante (todo el mueble)</option>
                                             </optgroup>
                                         </select>
+                                        <label className="flex items-center gap-1.5 text-[10px] text-amber-800 cursor-pointer"><input type="checkbox" className="w-3.5 h-3.5" checked={!!(moduleForm as ExtendedCabinetModule).structureHasGrain} onChange={e => handleInputChange('structureHasGrain', e.target.checked)}/>Con veta (paralela al lado mayor)</label>
                                     </div>
 
                                     <div className="w-px h-10 bg-amber-300 self-center"></div>
@@ -3650,6 +3676,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 <option value="enchapad_gloss">Kiri lustre brillante</option>
                                             </optgroup>
                                         </select>
+                                        <label className="flex items-center gap-1.5 text-[10px] text-amber-800 cursor-pointer"><input type="checkbox" className="w-3.5 h-3.5" checked={!!(moduleForm as ExtendedCabinetModule).frontsHaveGrain} onChange={e => handleInputChange('frontsHaveGrain', e.target.checked)}/>Con veta (paralela al lado mayor)</label>
                                         {(moduleForm.moduleType === 'LACQUER_FULL' || moduleForm.moduleType === 'VENEER_FULL') && (
                                             <span className="text-[9px] text-amber-600 italic">Igual a estructura</span>
                                         )}
@@ -3755,8 +3782,11 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 )}
 
                             {/* Action Buttons */}
-                                <div className="flex gap-2">
-                                    <button type="submit" className="bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
+                                <div className="flex gap-2 items-center">
+                                    {combinedFrontsBlocked && (
+                                        <span className="text-[11px] text-red-600 font-bold max-w-[260px] leading-tight">Un módulo lleva un solo tipo de frente: puertas, cajones o abatibles.</span>
+                                    )}
+                                    <button type="submit" disabled={combinedFrontsBlocked} className="disabled:opacity-40 disabled:cursor-not-allowed bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
                                         {editingId ? <Save size={16}/> : <Plus size={16}/>} {editingId ? 'Actualizar' : 'Agregar'}
                                     </button>
                                 </div>

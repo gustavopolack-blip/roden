@@ -7,7 +7,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -15,7 +16,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -23,20 +25,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -49,7 +52,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -57,28 +61,30 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
-    "width": 562,
+    "width": 580,
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 5.5mm Color",
-    "width": 564,
-    "height": 702,
+    "width": 590,
+    "height": 710,
     "material": "5.5mm_Color",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -91,7 +97,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -99,7 +106,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -107,12 +115,13 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -125,7 +134,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -133,28 +143,31 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
-    "width": 562,
+    "width": 580,
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo Estructural 18mm",
     "width": 564,
-    "height": 702,
+    "height": 684,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "width"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -167,7 +180,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -175,28 +189,30 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
-    "width": 562,
+    "width": 580,
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 5.5mm Color",
-    "width": 564,
-    "height": 702,
+    "width": 590,
+    "height": 710,
     "material": "5.5mm_Color",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -209,7 +225,8 @@
     "height": 580,
     "material": "18mm_White",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -217,7 +234,8 @@
     "height": 580,
     "material": "18mm_White",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -225,20 +243,21 @@
     "height": 684,
     "material": "18mm_White",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 594,
-    "height": 714,
+    "width": 596,
+    "height": 716,
     "material": "18mm_White",
     "quantity": 1,
     "grain": "horizontal"
@@ -251,7 +270,8 @@
     "height": 580,
     "material": "18mm_MDF",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -259,7 +279,8 @@
     "height": 580,
     "material": "18mm_MDF",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -267,20 +288,21 @@
     "height": 684,
     "material": "18mm_MDF",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 594,
-    "height": 714,
+    "width": 596,
+    "height": 716,
     "material": "18mm_MDF",
     "quantity": 1,
     "grain": "horizontal"
@@ -293,7 +315,8 @@
     "height": 580,
     "material": "18mm_MDF",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -301,7 +324,8 @@
     "height": 580,
     "material": "18mm_MDF",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -309,20 +333,21 @@
     "height": 684,
     "material": "18mm_MDF",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 594,
-    "height": 714,
+    "width": 596,
+    "height": 716,
     "material": "18mm_MDF",
     "quantity": 1,
     "grain": "horizontal"
@@ -335,7 +360,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -343,7 +369,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -351,20 +378,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 594,
-    "height": 714,
+    "width": 596,
+    "height": 716,
     "material": "18mm_MDF",
     "quantity": 1,
     "grain": "horizontal"
@@ -377,7 +405,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -385,7 +414,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -393,20 +423,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_MDFCrudo",
     "quantity": 2,
     "grain": "horizontal"
@@ -419,7 +450,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -427,7 +459,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -435,20 +468,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Cajón",
-    "width": 594,
-    "height": 235.33333333333334,
+    "width": 596,
+    "height": 236,
     "material": "18mm_Kiri",
     "quantity": 3,
     "grain": "horizontal"
@@ -485,7 +519,8 @@
     "height": 580,
     "material": "18mm_MDF",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -493,7 +528,8 @@
     "height": 580,
     "material": "18mm_MDF",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -501,20 +537,21 @@
     "height": 684,
     "material": "18mm_MDF",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_MDFCrudo",
     "quantity": 2,
     "grain": "horizontal"
@@ -527,7 +564,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -535,7 +573,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -543,20 +582,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Cajón",
-    "width": 594,
-    "height": 235.33333333333334,
+    "width": 596,
+    "height": 236,
     "material": "18mm_Color",
     "quantity": 3,
     "grain": "horizontal"
@@ -593,7 +633,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -601,7 +642,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -609,19 +651,20 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Cajón",
-    "width": 594,
+    "width": 596,
     "height": 150,
     "material": "18mm_Color",
     "quantity": 1,
@@ -629,8 +672,8 @@
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 560,
+    "width": 296,
+    "height": 562,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -638,7 +681,7 @@
    {
     "name": "Lateral Cajón",
     "width": 560,
-    "height": 120,
+    "height": 80,
     "material": "15mm_White",
     "quantity": 2,
     "grain": "free"
@@ -646,7 +689,7 @@
    {
     "name": "Contra/Frente Cajón",
     "width": 509,
-    "height": 120,
+    "height": 80,
     "material": "15mm_White",
     "quantity": 2,
     "grain": "free"
@@ -667,7 +710,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -675,7 +719,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -683,28 +728,29 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Cajón",
-    "width": 594,
-    "height": 355,
+    "width": 596,
+    "height": 356,
     "material": "18mm_Color",
     "quantity": 1,
     "grain": "horizontal"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 355,
+    "width": 296,
+    "height": 356,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -712,7 +758,7 @@
    {
     "name": "Lateral Cajón",
     "width": 560,
-    "height": 120,
+    "height": 300,
     "material": "15mm_White",
     "quantity": 2,
     "grain": "free"
@@ -720,7 +766,7 @@
    {
     "name": "Contra/Frente Cajón",
     "width": 509,
-    "height": 120,
+    "height": 300,
     "material": "15mm_White",
     "quantity": 2,
     "grain": "free"
@@ -741,7 +787,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -749,7 +796,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -757,12 +805,13 @@
     "height": 1964,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 1962,
+    "width": 572,
+    "height": 1972,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
@@ -770,22 +819,23 @@
    {
     "name": "Estante Interno",
     "width": 564,
-    "height": 535,
+    "height": 549,
     "material": "18mm_Color",
     "quantity": 4,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 1590,
+    "width": 296,
+    "height": 1592,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
    },
    {
     "name": "Frente Abatible",
-    "width": 594,
+    "width": 596,
     "height": 400,
     "material": "18mm_Color",
     "quantity": 1,
@@ -799,7 +849,8 @@
     "height": 650,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -807,7 +858,8 @@
     "height": 650,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -815,12 +867,13 @@
     "height": 2264,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 864,
-    "height": 2262,
+    "width": 872,
+    "height": 2272,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
@@ -828,15 +881,16 @@
    {
     "name": "Estante Interno",
     "width": 864,
-    "height": 605,
+    "height": 619,
     "material": "18mm_Color",
     "quantity": 5,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Puerta",
-    "width": 296.6666666666667,
-    "height": 2294,
+    "width": 296,
+    "height": 2296,
     "material": "18mm_Color",
     "quantity": 3,
     "grain": "horizontal"
@@ -849,7 +903,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -857,7 +912,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -865,20 +921,21 @@
     "height": 364,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 362,
+    "width": 572,
+    "height": 372,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Abatible",
-    "width": 594,
-    "height": 195,
+    "width": 596,
+    "height": 196,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -891,7 +948,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -899,7 +957,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -907,20 +966,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -933,7 +993,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -941,7 +1002,8 @@
     "height": 580,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -949,20 +1011,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Puerta",
-    "width": 295,
-    "height": 714,
+    "width": 296,
+    "height": 716,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -975,7 +1038,8 @@
     "height": 650,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -983,7 +1047,8 @@
     "height": 650,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -991,20 +1056,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Cajón",
-    "width": 594,
-    "height": 355,
+    "width": 596,
+    "height": 356,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -1012,7 +1078,7 @@
    {
     "name": "Lateral Cajón",
     "width": 630,
-    "height": 120,
+    "height": 300,
     "material": "15mm_White",
     "quantity": 4,
     "grain": "free"
@@ -1020,7 +1086,7 @@
    {
     "name": "Contra/Frente Cajón",
     "width": 509,
-    "height": 120,
+    "height": 300,
     "material": "15mm_White",
     "quantity": 4,
     "grain": "free"
@@ -1041,7 +1107,8 @@
     "height": 450,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Base inferior",
@@ -1049,7 +1116,8 @@
     "height": 450,
     "material": "18mm_Color",
     "quantity": 1,
-    "grain": "horizontal"
+    "grain": "horizontal",
+    "frontEdge": "width"
    },
    {
     "name": "Lateral",
@@ -1057,20 +1125,21 @@
     "height": 684,
     "material": "18mm_Color",
     "quantity": 2,
-    "grain": "vertical"
+    "grain": "vertical",
+    "frontEdge": "height"
    },
    {
     "name": "Fondo 3mm Blanco",
-    "width": 564,
-    "height": 682,
+    "width": 572,
+    "height": 692,
     "material": "3mm_White",
     "quantity": 1,
     "grain": "vertical"
    },
    {
     "name": "Frente Cajón",
-    "width": 594,
-    "height": 355,
+    "width": 596,
+    "height": 356,
     "material": "18mm_Color",
     "quantity": 2,
     "grain": "horizontal"
@@ -1078,7 +1147,7 @@
    {
     "name": "Lateral Cajón",
     "width": 430,
-    "height": 120,
+    "height": 300,
     "material": "15mm_White",
     "quantity": 4,
     "grain": "free"
@@ -1086,7 +1155,7 @@
    {
     "name": "Contra/Frente Cajón",
     "width": 509,
-    "height": 120,
+    "height": 300,
     "material": "15mm_White",
     "quantity": 4,
     "grain": "free"

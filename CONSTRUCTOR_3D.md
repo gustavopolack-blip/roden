@@ -69,18 +69,19 @@ Para sumar una plantilla: agregar su id a `MODULE_PLACERS` en `utils/furniture3d
 (reusando un ubicador o escribiendo uno). La prueba de correspondencia verifica que cada pieza del
 despiece aparezca con sus medidas.
 
-## Reglas pendientes de validar con el taller
+## Reglas del taller y pendientes
 
-Son supuestos **solo de dibujo** (no cambian medidas ni costos); la app los lista en
-*Validación → Supuestos de dibujo*:
+El **módulo estándar** se dibuja según su ficha constructiva (`CATALOGO_PIEZAS.md`, definida con
+Gustavo el 13/10/2026): frentes superpuestos separados 3 mm de la caja (profundidad total D + 21)
+o embutidos al ras, luces de 2 mm al borde y 4 mm entre frentes, fondo de 3 mm en ranura a 18 mm
+de atrás, de 5,5 mm en rebaje y de 18 mm dentro de la caja, laterales enteros opcionales, estantes
+equidistantes a 10 mm del frente, caja de cajón según el alto del frente, apertura según la
+posición del módulo en el mueble (1 puerta), izquierda/derecha/derecha (3) o en pares, y patas
+de 120 mm que elevan el módulo.
 
-- Frentes delante de la profundidad D (¿D incluye el frente?).
-- Orden vertical de frentes combinados: abatibles, cajones, puertas.
-- Separación de estantes (equidistantes) y su posición en profundidad.
-- Posición de la ranura del fondo 3mm y de la ranura del fondo de cajón.
-- Alto de caja de cajón (120mm fijo en el despiece actual) y su posición vertical.
-- **Fondo 5,5mm y fondo estructural 18mm**: el despiece los mide H − 18, incoherente con tapas
-  sobre laterales (alto interior H − 36); el 3D muestra el choque como aviso.
-- Sentido de apertura por defecto (1 puerta: izquierda; 2+: hacia afuera).
-- Geometría de Módulo Horizontal (frentes de ancho de columna a alto completo), Bajo Mesada
-  (fajas), Esquineros y Paneles.
+Pendientes (la app los lista en *Validación → Supuestos de dibujo*):
+
+- Plantillas especiales: todavía usan sus medidas de fondo y frentes anteriores a la ficha.
+- Patas: el módulo se eleva pero las patas no se dibujan ni se exportan.
+- Bandejas inclinadas del botinero: dibujadas horizontales.
+- Geometría de Módulo horizontal, Bajo mesada, esquineros y paneles.

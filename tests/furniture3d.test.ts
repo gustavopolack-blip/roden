@@ -32,10 +32,12 @@ describe('ubicación de piezas de un módulo estándar', () => {
       { min: [0, 18, 0], max: [18, 702, 580] },
       { min: [582, 18, 0], max: [600, 702, 580] },
     ]);
-    // puertas delante de la estructura, margen 3mm, alto H − 6
+    // puertas separadas 3 mm de la caja, 2 mm al borde, 4 mm entre puertas, alto H − 4
     const doors = by('Puerta');
-    expect(doors.map(d => d.box.min[0])).toEqual([3, 302]);
-    doors.forEach(d => { expect(d.box.min[1]).toBe(3); expect(d.box.max[1]).toBe(717); expect(d.box.min[2]).toBe(580); expect(d.box.max[2]).toBe(598); });
+    expect(doors.map(d => d.box.min[0])).toEqual([2, 302]);
+    doors.forEach(d => { expect(d.box.min[1]).toBe(2); expect(d.box.max[1]).toBe(718); expect(d.box.min[2]).toBe(583); expect(d.box.max[2]).toBe(601); });
+    // fondo 3 mm en ranura a 18 mm de atrás
+    expect(by('Fondo 3mm Blanco')[0].box).toEqual({ min: [14, 14, 18], max: [586, 706, 21] });
     expect(doors.map(d => d.hingeSide)).toEqual(['left', 'right']);
     expect(findPieceOverlaps(pieces)).toEqual([]);
   });
@@ -43,14 +45,14 @@ describe('ubicación de piezas de un módulo estándar', () => {
   it('3 cajones: frentes apilados con 4mm, cajas dentro del hueco y fondo en ranura', () => {
     const { pieces } = placeModule(mod({ cntDrawers: 3 }));
     const fronts = pieces.filter(p => p.name === 'Frente Cajón').map(p => p.box);
-    expect(fronts[0].max[1]).toBe(717);                      // arranca a 3mm de arriba
+    expect(fronts[0].max[1]).toBe(718);                      // arranca a 2mm de arriba
     expect(fronts[1].max[1]).toBeCloseTo(fronts[0].min[1] - 4); // 4mm entre filas
-    expect(fronts[2].min[1]).toBeCloseTo(3);                  // termina a 3mm de abajo
+    expect(fronts[2].min[1]).toBeCloseTo(2);                  // termina a 2mm de abajo
     const box = pieces.filter(p => p.role === 'drawer');
     box.forEach(p => { expect(p.box.min[0]).toBeGreaterThanOrEqual(18 + 12.5 - 1e-9); expect(p.box.max[0]).toBeLessThanOrEqual(600 - 18 - 12.5 + 1e-9); });
     // la ranura del fondo de cajón no cuenta como choque
     expect(findPieceOverlaps(pieces)).toEqual([]);
-    expect(pieces.filter(p => p.groove).length).toBe(3);
+    expect(pieces.filter(p => p.groove).length).toBe(4);      // 3 fondos de cajón + fondo 3 mm del módulo
   });
 
   it('cajón + 2 puertas: cajón arriba y puertas debajo, sin superposición de frentes', () => {
@@ -109,7 +111,7 @@ describe('composición del amoblamiento', () => {
     expect(a.modules.map(m => m.layout.x)).toEqual([0, 600, 1000]);
     expect(a.size.w).toBe(1400);
     expect(a.size.h).toBe(720);
-    expect(a.size.d).toBe(598);       // 580 de estructura + 18 de frente
+    expect(a.size.d).toBe(601);       // 580 de estructura + 3 de separación + 18 de frente
     expect(issuesOf(a, 'MODULE_OVERLAP')).toEqual([]);
     expect(issuesOf(a, 'MODULE_GAP')).toEqual([]);
   });
@@ -152,10 +154,13 @@ describe('validaciones', () => {
     expect(issuesOf(buildAssembly('x', [mod({ cntDrawers: 1, cntDoors: 2, drawerFrontHeight: 800 })]), 'FRONT_OVERFLOW').length).toBe(1);
   });
 
-  it('señala el choque del fondo 5,5mm (regla pendiente) en vez de ocultarlo', () => {
-    const a = buildAssembly('x', [mod({ backingType: '55_COLOR', cntDoors: 2 })]);
-    expect(issuesOf(a, 'PIECE_OVERLAP').length).toBeGreaterThan(0);
-    expect(a.modules[0].notes.join(' ')).toMatch(/pendiente/);
+  it('fondos de 5,5 mm (rebaje) y 18 mm (dentro de la caja) sin choques', () => {
+    const f55 = placeModule(mod({ backingType: '55_COLOR', cntDoors: 2 })).pieces;
+    expect(f55.find(p => p.name === 'Fondo 5.5mm Color')!.box).toEqual({ min: [5, 5, 0], max: [595, 715, 5.5] });
+    expect(findPieceOverlaps(f55)).toEqual([]);
+    const f18 = placeModule(mod({ backingType: '18MM_STRUCTURE', cntDoors: 2 })).pieces;
+    expect(f18.find(p => p.name === 'Fondo Estructural 18mm')!.box).toEqual({ min: [18, 18, 0], max: [582, 702, 18] });
+    expect(findPieceOverlaps(f18)).toEqual([]);
   });
 
   it('plantillas sin ubicación definida quedan marcadas y se muestran como volumen', () => {
@@ -216,4 +221,61 @@ describe('encuadre de cámara del visor', () => {
       });
     }
   }
+});
+
+describe('ficha constructiva del módulo estándar en 3D', () => {
+  const by = (pieces: any[], name: string) => pieces.filter(p => p.name === name);
+  it('laterales enteros: laterales de piso a techo, tapa y base entre laterales', () => {
+    const { pieces } = placeModule(mod({ fullHeightSides: true, cntDoors: 2 }));
+    expect(by(pieces, 'Lateral').map(p => p.box)).toEqual([
+      { min: [0, 0, 0], max: [18, 720, 580] },
+      { min: [582, 0, 0], max: [600, 720, 580] },
+    ]);
+    expect(by(pieces, 'Tapa superior')[0].box).toEqual({ min: [18, 702, 0], max: [582, 720, 580] });
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+  });
+  it('frentes embutidos: dentro de la caja con 4 mm de luz y al ras (profundidad total D)', () => {
+    const { pieces } = placeModule(mod({ insetFronts: true, cntDoors: 2, height: 2000 }));
+    const doors = by(pieces, 'Puerta');
+    expect(doors.map(d => d.box.min[0])).toEqual([22, 302]);
+    doors.forEach(d => { expect(d.box.min[2]).toBe(562); expect(d.box.max[2]).toBe(580); expect(d.box.max[1]).toBe(1978); });
+    expect(findPieceOverlaps(pieces)).toEqual([]);   // estantes 18 mm más cortos: no chocan con las puertas
+    const a = buildAssembly('x', [mod({ insetFronts: true, cntDoors: 2 })]);
+    expect(a.size.d).toBe(580);
+  });
+  it('estante a 10 mm del frente según el fondo', () => {
+    const z = (backingType: string) => {
+      const sh = by(placeModule(mod({ backingType, height: 1200 })).pieces, 'Estante Interno')[0].box;
+      return [sh.min[2], sh.max[2]];
+    };
+    expect(z('3MM_WHITE')).toEqual([21, 570]);
+    expect(z('55_COLOR')).toEqual([5.5, 570]);
+    expect(z('18MM_STRUCTURE')).toEqual([18, 570]);
+    expect(z('NONE')).toEqual([0, 570]);
+  });
+  it('apertura: 3 puertas izquierda/derecha/derecha; 4 en pares', () => {
+    const h = (n: number) => by(placeModule(mod({ cntDoors: n, width: 1200 })).pieces, 'Puerta').map(p => p.hingeSide);
+    expect(h(3)).toEqual(['left', 'right', 'right']);
+    expect(h(4)).toEqual(['left', 'right', 'left', 'right']);
+  });
+  it('1 puerta sin lado elegido: abre hacia el lado del eje del mueble en que está el módulo', () => {
+    const a = buildAssembly('x', [mod({ id: 'i', cntDoors: 1 }), mod({ id: 'c', cntDoors: 2 }), mod({ id: 'd', cntDoors: 1 })]);
+    const side = (k: number) => a.modules[k].pieces.find(p => p.hingeSide)!.hingeSide;
+    expect(side(0)).toBe('left');
+    expect(side(2)).toBe('right');
+    const elegido = buildAssembly('x', [mod({ id: 'i', cntDoors: 1, doorHingeSide: 'RIGHT' }), mod({ id: 'c', cntDoors: 2 })]);
+    expect(elegido.modules[0].pieces.find(p => p.hingeSide)!.hingeSide).toBe('right');
+  });
+  it('patas: el módulo se eleva 120 mm y el alto total es H + 120', () => {
+    const a = buildAssembly('x', [mod({ hasLegs: true, cntDoors: 2 })]);
+    expect(a.size.h).toBe(840);
+    expect(Math.min(...a.modules[0].pieces.map(p => p.box.min[1]))).toBe(120);
+  });
+  it('caja de cajón: alto según el frente y detrás del frente embutido', () => {
+    const lat = (over: any) => placeModule(mod({ cntDrawers: 1, ...over })).pieces.filter(p => p.name === 'Lateral Cajón')[0].box;
+    const l = lat({ height: 300 });
+    expect(l.max[1] - l.min[1]).toBe(200);                 // frente de 296 → caja de 200
+    const e = lat({ height: 300, insetFronts: true });
+    expect(e.max[2]).toBe(562);                             // termina donde empieza el frente embutido
+  });
 });

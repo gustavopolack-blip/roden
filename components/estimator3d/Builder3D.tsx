@@ -268,7 +268,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                 {((isStandard && selMod.cntDoors === 1) || selMod.specialTemplateId === 'PUERTA_18MM') && (
                   <label className="flex flex-col gap-0.5">
                     <span className="text-[10px] text-gray-500 uppercase font-bold">Apertura (bisagra)</span>
-                    <select disabled={!editable} className="border border-gray-200 p-1.5 rounded text-xs" value={selMod.doorHingeSide || 'LEFT'} onChange={e => updateModule(selModIndex, { doorHingeSide: e.target.value })}>
+                    <select disabled={!editable} className="border border-gray-200 p-1.5 rounded text-xs" value={selMod.doorHingeSide || ''} onChange={e => updateModule(selModIndex, { doorHingeSide: e.target.value || undefined })}>
+                      <option value="">Automático (lado del eje del mueble)</option>
                       <option value="LEFT">Izquierda</option>
                       <option value="RIGHT">Derecha</option>
                     </select>
