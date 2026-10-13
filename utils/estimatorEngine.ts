@@ -11,7 +11,8 @@
  * motor único de costos (computeItemFinancials) y escenarios (getRecalculatedItemPrices).
  */
 import { CabinetModule, CalculatedPart, CostSettings } from '../types';
-import { SPECIAL_MANUAL_ID, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET } from './specialModules';
+import { SPECIAL_MANUAL_ID, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET, drawerBoxHeightFor } from './specialModules';
+export { drawerBoxHeightFor };
 
 export interface ModuleExtra {
     id: string;
@@ -49,7 +50,9 @@ export interface ExtendedCabinetModule extends CabinetModule {
     //  BAJO_HORNO: bajo mesada para horno (613 de ancho, sin fondo, estante de apoyo y faja inferior).
     //  ABIERTO / BIBLIOTECA: estándar sin frentes (biblioteca: 1 estante fijo cada 320 mm).
     //  BOTINERO_EXTRAIBLE / BOTINERO_FIJO: sin frentes, 1 bandeja cada 200 mm.
-    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO' | 'ABIERTO' | 'BIBLIOTECA' | 'BOTINERO_EXTRAIBLE' | 'BOTINERO_FIJO';
+    //  HORIZONTAL: N puertas o N cajones lado a lado, del mismo ancho, con divisiones verticales.
+    //  VERTICAL: estante si H > 800 y uno más cada 350 mm.
+    cabinetType?: 'BAJO' | 'ESQUINERO' | 'ALACENA' | 'BAJO_HORNO' | 'ABIERTO' | 'BIBLIOTECA' | 'BOTINERO_EXTRAIBLE' | 'BOTINERO_FIJO' | 'HORIZONTAL' | 'VERTICAL';
     neighborDepth?: number;          // esquinero: profundidad del bajo que llega de costado (vacío = D)
     cornerSide?: 'LEFT' | 'RIGHT';   // esquinero: lado del rincón (frente fijo)
     microwaveFloor?: boolean;        // alacena = módulo microondas: abierto, fondo 18 mm y piso de 420 mm
@@ -181,9 +184,6 @@ export const shoeTraysFor = (h: number): number => Math.floor(h / SHOE_TRAY_STEP
 // Estantes de alacena según el alto: hasta 600 → 1; hasta 900 → 2; más de 900 → 3.
 export const wallCabinetShelves = (h: number): number => (h <= 600 ? 1 : h <= 900 ? 2 : 3);
 export const legsFor = (width: number): number => (width <= 900 ? 4 : 6);
-// Alto interior de la caja de cajón (alto del lateral de 15 mm) según el alto del frente.
-export const drawerBoxHeightFor = (frontH: number): number =>
-    frontH < 160 ? 80 : frontH < 240 ? 120 : frontH < 340 ? 200 : 300;
 // Veta: con veta → paralela al lado mayor; lisa → libre; sin dato (módulo anterior) → la de antes.
 const grainOf = (hasGrain: boolean | undefined, w: number, h: number, legacy: CalculatedPart['grain']) =>
     hasGrain === undefined ? legacy : hasGrain ? (w >= h ? 'horizontal' : 'vertical') : 'free';
@@ -361,6 +361,8 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
           extraShelves = Math.floor(H / LIBRARY_SHELF_STEP);
       } else if (kind === 'BOTINERO_EXTRAIBLE' || kind === 'BOTINERO_FIJO') {
           extraShelves = 0;   // lleva bandejas en lugar de estantes
+      } else if (kind === 'VERTICAL') {
+          extraShelves = H > 800 ? Math.floor((H - 800) / 350) + 1 : 0;
       } else if (H > 850) {
           extraShelves = Math.floor((H - 850) / 350) + 1;
       }
@@ -393,7 +395,18 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
       const front = (name: string, w: number, h: number, qty: number): CalculatedPart =>
           ({ name, width: w, height: h, material: frontMat, quantity: qty, grain: grainOf(fG, w, h, 'horizontal') });
 
-      if (cntDrawers > 0) {
+      // Módulo horizontal: frentes lado a lado del mismo ancho; división entre cada par de cajones
+      // (y entre puertas si mide más de 900 mm).
+      const horizontal = kind === 'HORIZONTAL';
+      const colGap = (n: number) => (frontsW - (n - 1) * FRONT_GAP) / n;
+      const horizFrontH = Math.max(0, mod.insetFronts ? H - 36 - 2 * FRONT_GAP : H - 2 * FRONT_EDGE_GAP);
+      if (horizontal) {
+          const nDiv = cntDrawers > 0 ? cntDrawers - 1 : (cntDoors > 1 && W > 900 ? cntDoors - 1 : 0);
+          if (nDiv > 0) parts.push(carcass('División vertical', Math.max(0, D - backDepth), Math.max(0, H - 36), nDiv, 'height', 'vertical'));
+      }
+      if (cntDrawers > 0 && horizontal) {
+          parts.push(front('Frente Cajón', colGap(cntDrawers), horizFrontH, cntDrawers));
+      } else if (cntDrawers > 0) {
           parts.push(front('Frente Cajón', frontsW, layout.drawerH, cntDrawers));
       }
       if (kind === 'BAJO_HORNO') {
@@ -421,9 +434,12 @@ export const calculateModuleParts = (rawMod: ExtendedCabinetModule): CalculatedP
       //    caja exterior = hueco − 25. Alto interior según el alto del frente (80/120/200/300).
       //    Largo D − 20 (− 18 más con frentes embutidos: el frente ocupa esa profundidad).
       if (cntDrawers > 0) {
-          const drawerHeight = drawerBoxHeightFor(layout.drawerH);
+          // Horizontal: un hueco por cajón entre divisiones; el frente ocupa todo el alto.
+          const frontH = horizontal ? horizFrontH : layout.drawerH;
+          const opening = horizontal ? (innerW - (cntDrawers - 1) * 18) / cntDrawers : innerW;
+          const drawerHeight = drawerBoxHeightFor(frontH);
           const boxL = Math.max(0, D - 20 - (mod.insetFronts ? 18 : 0));
-          const boxOuterW = Math.max(0, W - 36 - SLIDE_GAP_TOTAL);          // W − 61
+          const boxOuterW = Math.max(0, opening - SLIDE_GAP_TOTAL);          // estándar: W − 61
           const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);   // W − 91
           parts.push({ name: 'Lateral Cajón', width: boxL, height: drawerHeight, material: '15mm_White', quantity: 2 * cntDrawers, grain: 'free' });
           // FRENTE Y TRASERO: entre los laterales de la caja
@@ -566,6 +582,10 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
         if (isStandard && (mod.adjustableShelves || mod.cabinetType === 'BAJO' || mod.cabinetType === 'ESQUINERO')) {
             const shelves = parts.filter(p => /^Estante/.test(p.name)).reduce((a, p) => a + (p.quantity || 1), 0);
             if (shelves > 0) detailedHardware[SHELF_SUPPORT_LABEL] = (detailedHardware[SHELF_SUPPORT_LABEL] || 0) + (4 * shelves * qty);
+        }
+        if (sh.pistons > 0) {
+            detailedHardware['Pistones a Gas'] = (detailedHardware['Pistones a Gas'] || 0) + (sh.pistons * qty);
+            modPistons += sh.pistons;
         }
         if (sh.brackets > 0) {
             const bracketName = bracketLabel(sh.bracketLength);

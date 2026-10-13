@@ -107,6 +107,8 @@ const STANDARD_VARIANTS: { id: string; name: string; cabinetType: NonNullable<Ex
     { id: 'VAR_ALACENA',   name: 'Alacena',                     cabinetType: 'ALACENA',   defaults: { depth: 320 } },
     { id: 'VAR_BAJO_HORNO', name: 'Bajo mesada para horno',     cabinetType: 'BAJO_HORNO', defaults: { width: 613, height: 740, depth: 560, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: 'NONE' } },
     // Módulos abiertos (sin frentes) sobre el estándar: reemplazan a las plantillas del mismo nombre.
+    { id: 'VAR_HORIZONTAL', name: 'Módulo horizontal',                      cabinetType: 'HORIZONTAL',         defaults: {} },
+    { id: 'VAR_VERTICAL',   name: 'Módulo vertical',                        cabinetType: 'VERTICAL',           defaults: { backingType: '55_COLOR' } },
     { id: 'VAR_ABIERTO',    name: 'Módulo abierto',                         cabinetType: 'ABIERTO',            defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0, backingType: '18MM_STRUCTURE' } },
     { id: 'VAR_BIBLIOTECA', name: 'Biblioteca',                             cabinetType: 'BIBLIOTECA',         defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0 } },
     { id: 'VAR_BOT_EXT',    name: 'Botinero con estantes extraíbles',       cabinetType: 'BOTINERO_EXTRAIBLE', defaults: { cntDoors: 0, cntDrawers: 0, cntFlaps: 0 } },

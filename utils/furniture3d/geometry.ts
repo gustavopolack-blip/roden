@@ -325,7 +325,28 @@ const placeCarcass: Placer = (mod, parts) => {
       pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, r.y0, r.y0 + p.height, zF0, zF1), 'front'));
     }
   });
-  idxOf(/^Frente Cajón/).forEach(i => {
+  // Módulo horizontal: cajones lado a lado (columnas iguales, frente de todo el alto) y
+  // divisiones verticales repartidas en partes iguales.
+  const horizontal = mod.cabinetType === 'HORIZONTAL';
+  const innerW = W - 36;
+  const nDivs = idxOf(/^División vertical/).reduce((a, i) => a + (parts[i].quantity || 1), 0);
+  const opening = (innerW - nDivs * 18) / (nDivs + 1);
+  idxOf(/^División vertical/).forEach(i => {
+    const p = parts[i];
+    for (let k = 0; k < (p.quantity || 1); k++) {
+      const x0 = 18 + (k + 1) * opening + k * 18;
+      pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + 18, 18, H - 18, D - p.width, D), 'carcass'));
+    }
+  });
+  const hFrontY0 = inset ? 18 + FRONT_GAP : FRONT_EDGE_GAP;
+  idxOf(/^Frente Cajón/).filter(() => horizontal).forEach(i => {
+    const p = parts[i];
+    for (let k = 0; k < (p.quantity || 1); k++) {
+      const x0 = frontsX0 + k * (p.width + FRONT_GAP);
+      pieces.push(makePiece(mod, parts, i, nextCopy(i), mkBox(x0, x0 + p.width, hFrontY0, hFrontY0 + p.height, zF0, zF1), 'front'));
+    }
+  });
+  idxOf(/^Frente Cajón/).filter(() => !horizontal).forEach(i => {
     const p = parts[i];
     for (let k = 0; k < (p.quantity || 1); k++) {
       const r = drawerRows[k]; if (!r) continue;
@@ -373,11 +394,16 @@ const placeCarcass: Placer = (mod, parts) => {
     const lat = parts[latIdx], testa = parts[testaIdx];
     const tSide = materialThickness(lat.material);
     const outerW = testa.width + 2 * tSide;
-    const bx0 = (W - outerW) / 2;
     const L = lat.width;                 // largo de la caja (D − 20; − 18 más con frentes embutidos)
     const bz1 = inset ? D - 18 : D, bz0 = bz1 - L;
     const bh = lat.height;               // alto de caja según el alto del frente (80/120/200/300)
-    drawerRows.forEach(r => {
+    // Una caja por fila (estándar) o por hueco entre divisiones (horizontal).
+    const nBoxes = Math.round((lat.quantity || 2) / 2);
+    const slots = horizontal
+      ? Array.from({ length: nBoxes }, (_, k) => ({ cx: 18 + k * (opening + 18) + opening / 2, y0: hFrontY0, y1: H - hFrontY0 }))
+      : drawerRows.map(r => ({ cx: W / 2, y0: r.y0, y1: r.y1 }));
+    slots.forEach(r => {
+      const bx0 = r.cx - outerW / 2;
       let yb = (r.y0 + r.y1) / 2 - bh / 2;
       yb = Math.max(18, Math.min(yb, H - 18 - bh));
       pieces.push(makePiece(mod, parts, latIdx, nextCopy(latIdx), mkBox(bx0, bx0 + tSide, yb, yb + bh, bz0, bz1), 'drawer'));
@@ -388,7 +414,7 @@ const placeCarcass: Placer = (mod, parts) => {
       pieces.push(makePiece(mod, parts, testaIdx, nextCopy(testaIdx), mkBox(tx0, tx0 + testa.width, yb, yb + bh, bz1 - tT, bz1), 'drawer'));
       if (fondoIdx !== undefined) {
         const f = parts[fondoIdx];
-        const fx0 = (W - f.width) / 2, fz0 = bz0 + (L - f.height) / 2;
+        const fx0 = r.cx - f.width / 2, fz0 = bz0 + (L - f.height) / 2;
         pieces.push(makePiece(mod, parts, fondoIdx, nextCopy(fondoIdx), mkBox(fx0, fx0 + f.width, yb + 10, yb + 13, fz0, fz0 + f.height), 'drawer', { groove: true }));
       }
     });
@@ -544,6 +570,7 @@ export const MODULE_PLACERS: Record<string, Placer> = {
   ESQUINERO_EN_L: placeCornerL,
   HORNO_EMPOTRADO: placeCarcass,
   MICROONDAS_COLUMNA: placeCarcass,
+  FRENTE_ABATIBLE_SUELTO: placeSinglePanel,
   COLUMNA: placeColumnSides,
   STANDARD: placeCarcass,
   MODULO_ABIERTO: placeCarcass,

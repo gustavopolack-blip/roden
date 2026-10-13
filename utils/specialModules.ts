@@ -16,6 +16,7 @@ export interface SpecialHardware {
   slideType?: string;
   hinges?: number;
   hingeType?: string;  // 'COMMON' | 'SOFT_CLOSE' | 'PUSH'
+  pistons?: number;    // pistones a gas (frente abatible suelto)
   brackets?: number;   // ménsulas metálicas ocultas (estante flotante)
   bracketLength?: 150 | 250; // largo de la ménsula (mm): según la profundidad del estante
 }
@@ -78,6 +79,11 @@ export const SLIDE_GAP_TOTAL = 25;   // 2 × 12,5mm
 export const DRAWER_BOX_SIDE = 15;   // espesor de los laterales de la caja
 // Fondo de cajón en ranura en las 4 caras de la caja: caja exterior − 4mm por lado.
 export const DRAWER_BOTTOM_INSET = 4;
+
+// Alto interior de la caja de cajón (alto del lateral de 15 mm) según el alto del frente
+// (ficha del módulo estándar, 13/10/2026). Lo usa también el motor (estimatorEngine).
+export const drawerBoxHeightFor = (frontH: number): number =>
+    frontH < 160 ? 80 : frontH < 240 ? 120 : frontH < 340 ? 200 : 300;
 
 // Bisagras por puerta según alto (misma regla que el módulo estándar):
 // ≤900mm → 2 | ≤1500mm → 3 | >1500mm → 4
@@ -492,6 +498,7 @@ const ESTANTE_FLOTANTE: SpecialModuleTemplate = {
 const MODULO_HORIZONTAL: SpecialModuleTemplate = {
   id: 'MODULO_HORIZONTAL',
   group: 'MODULO',
+  legacy: true,
   name: 'Módulo horizontal',
   description: 'Módulo bajo: puertas o cajones. Divisores = cantidad − 1. Cajones en mel. blanca 15mm.',
   params: ['width', 'height', 'depth'],
@@ -1176,6 +1183,44 @@ const MICROONDAS_COLUMNA: SpecialModuleTemplate = {
   }
 };
 
+// Frentes sueltos (Piezas, ficha del 13/10/2026).
+// Frente de cajón suelto: lleva su caja y guías, como si el frente estuviera sobre un hueco de su
+// mismo ancho (+ 4 de luz − 36 de laterales − 25 de guías). Largo de caja D − 20.
+const FRENTE_CAJON_SUELTO: SpecialModuleTemplate = {
+  id: 'FRENTE_CAJON_SUELTO',
+  group: 'PIEZA',
+  name: 'Frente de cajón suelto',
+  description: 'Frente de cajón con su caja (alto según el frente) y un par de guías. Prof. = la del hueco donde va.',
+  params: ['width', 'height', 'depth'],
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const parts: CalculatedPart[] = [];
+    const boxH = drawerBoxHeightFor(H);
+    const boxL = Math.max(0, D - 20);
+    const boxOuterW = Math.max(0, W + 4 - 36 - SLIDE_GAP_TOTAL);
+    const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);
+    parts.push({ name: 'Frente Cajón',        width: W,         height: H,    material: '18mm_Front', quantity: 1, grain: 'horizontal' });
+    parts.push({ name: 'Lateral Cajón',       width: boxL,      height: boxH, material: '15mm_White', quantity: 2, grain: 'free' });
+    parts.push({ name: 'Contra/Frente Cajón', width: boxInnerW, height: boxH, material: '15mm_White', quantity: 2, grain: 'free' });
+    parts.push({ name: 'Fondo Cajón', width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, boxL - 2 * DRAWER_BOTTOM_INSET), material: '3mm_White', quantity: 1, grain: 'free' });
+    return { parts, hardware: { slides: 1, slideLength: getSlideLength(D) }, laborDays: 0 };
+  }
+};
+
+// Frente abatible suelto: 2 bisagras y 1 pistón.
+const FRENTE_ABATIBLE_SUELTO: SpecialModuleTemplate = {
+  id: 'FRENTE_ABATIBLE_SUELTO',
+  group: 'PIEZA',
+  name: 'Frente abatible suelto',
+  description: 'Frente abatible 18 mm con 2 bisagras y 1 pistón a gas.',
+  params: ['width', 'height'],
+  fixedDims: () => ({ depth: 18 }),
+  calculate: ({ width: W, height: H }) => {
+    const parts: CalculatedPart[] = [];
+    parts.push({ name: 'Frente Abatible', width: W, height: H, material: '18mm_Front', quantity: 1, grain: 'horizontal' });
+    return { parts, hardware: { hinges: 2, pistons: 1 }, laborDays: 0 };
+  }
+};
+
 export const SPECIAL_MANUAL_ID = 'ESPECIAL_MANUAL';
 
 // No tiene template con calculate() — se maneja directamente
@@ -1213,6 +1258,8 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   HORNO_EMPOTRADO,
   COLUMNA,
   MICROONDAS_COLUMNA,
+  FRENTE_CAJON_SUELTO,
+  FRENTE_ABATIBLE_SUELTO,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>

@@ -248,3 +248,40 @@ describe('módulos abiertos y tapacantos (ficha del 13/10)', () => {
     }
   });
 });
+
+describe('módulo horizontal, módulo vertical y frentes sueltos (13/10)', () => {
+  const hz = (over: any) => mod({ cabinetType: 'HORIZONTAL', width: 1200, height: 500, depth: 450, ...over });
+  it('horizontal con 3 cajones: lado a lado, del mismo ancho, división entre cada par y caja por hueco', () => {
+    const p = calculateModuleParts(hz({ cntDrawers: 3 }) as any);
+    expect(size(p, 'División vertical')).toEqual([429, 464, 2]);
+    const f = p.find(x => x.name === 'Frente Cajón')!;
+    expect([f.width, f.height, f.quantity]).toEqual([(1196 - 8) / 3, 496, 3]);
+    const lat = p.find(x => x.name === 'Lateral Cajón')!;
+    expect([lat.height, lat.quantity]).toEqual([300, 6]);
+    expect(p.find(x => x.name === 'Contra/Frente Cajón')!.width).toBeCloseTo((1164 - 36) / 3 - 25 - 30);
+    const { pieces } = placeModule(hz({ cntDrawers: 3 }));
+    expect(findPieceOverlaps(pieces)).toEqual([]);
+  });
+  it('horizontal con puertas: divisiones entre puertas solo si mide más de 900 mm', () => {
+    expect(size(calculateModuleParts(hz({ cntDoors: 3 }) as any), 'División vertical')).toEqual([429, 464, 2]);
+    expect(calculateModuleParts(hz({ cntDoors: 2, width: 900 }) as any).some(x => x.name === 'División vertical')).toBe(false);
+    expect(findPieceOverlaps(placeModule(hz({ cntDoors: 3 })).pieces)).toEqual([]);
+  });
+  it('vertical: estante si mide más de 800 mm y uno más cada 350', () => {
+    const n = (h: number) => calculateModuleParts(mod({ cabinetType: 'VERTICAL', width: 250, height: h, depth: 400, cntDoors: 1 }) as any).find(x => x.name === 'Estante Interno')?.quantity || 0;
+    expect([n(800), n(801), n(1149), n(1150)]).toEqual([0, 1, 1, 2]);
+  });
+  it('frente de cajón suelto: caja según el frente y un par de guías', () => {
+    const m = special('FRENTE_CAJON_SUELTO', { width: 596, height: 236, depth: 580 });
+    const p = calculateModuleParts(m as any);
+    expect(size(p, 'Lateral Cajón')).toEqual([560, 120, 2]);
+    expect(size(p, 'Contra/Frente Cajón')).toEqual([509, 120, 2]);
+    expect(calculateItemQuantities([m as any]).totalSlides).toBe(1);
+  });
+  it('frente abatible suelto: 2 bisagras y 1 pistón', () => {
+    const m = special('FRENTE_ABATIBLE_SUELTO', { width: 600, height: 350, depth: 580 });
+    const q = calculateItemQuantities([m as any]);
+    expect([q.totalHinges, q.totalPistons, q.detailedHardware['Pistones a Gas']]).toEqual([2, 1, 1]);
+    expect(placeModule(m).status).toBe('placed');
+  });
+});
