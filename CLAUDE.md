@@ -179,5 +179,5 @@ dominio), `ROLES_PERMISSIONS.md`,
 **Skills del proyecto** (`.claude/skills/`, vendorizadas y fijadas a un commit; origen y
 adaptaciones en `.claude/skills/README.md`): `/grill-with-docs` (alinear un cambio antes de
 programarlo y actualizar `GLOSSARY.md`), `domain-modeling`, `tdd`, `diagnosing-bugs`,
-`diagram-design`. No instalar plugins o skills de terceros sin revisarlos primero: hooks y
+`diagram-design`, `/web-design-guidelines` (revisar UI: accesibilidad, formularios, formatos `es-AR`). No instalar plugins o skills de terceros sin revisarlos primero: hooks y
 MCP ejecutan código con tus permisos.
