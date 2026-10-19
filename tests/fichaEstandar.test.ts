@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  calculateModuleParts, calculateItemQuantities, visibleEdgeLength, hwPriceFor, drawerBoxHeightFor,
+  calculateModuleParts, calculateItemQuantities, getSheetSize, visibleEdgeLength, hwPriceFor, drawerBoxHeightFor,
   LEG_LABEL, SHELF_SUPPORT_LABEL,
 } from '../utils/estimatorEngine';
 
@@ -119,5 +119,27 @@ describe('opciones del estándar en plantillas', () => {
       specialHardware: {}, baseType: 'PATAS', adjustableShelves: true } as any]);
     expect(q.detailedHardware[LEG_LABEL]).toBeUndefined();
     expect(q.detailedHardware[SHELF_SUPPORT_LABEL]).toBeUndefined();
+  });
+});
+
+describe('placa del fondo blanco de 3 mm: 2600 × 1830 (lista de precios del proveedor)', () => {
+  it('el optimizador y el conteo de placas usan 2600 × 1830 para el fondo de 3 mm', () => {
+    expect(getSheetSize('Fondo Blanco 3mm')).toEqual({ width: 2600, height: 1830 });
+    expect(getSheetSize('Fondo Blanco (3mm)')).toEqual({ width: 2600, height: 1830 });
+    expect(getSheetSize('3mm_White')).toEqual({ width: 2600, height: 1830 });
+    expect(getSheetSize('Melamina Blanca 18mm MDP')).toEqual({ width: 2750, height: 1830 });
+  });
+  it('con un área justo en el límite cuenta las placas reales (antes daba una menos)', () => {
+    // 20 m² de fondo: con 20 % de desperdicio 24 m² → 24 / 4,758 = 5,04 → 6 placas (con 2750 daba 5)
+    const m: any = { id: 'f', width: 1028, height: 1028, depth: 580, quantity: 1, cntDoors: 0, cntDrawers: 0, cntFlaps: 0,
+      moduleType: 'MELAMINE_FULL', isWhiteStructure: true, backingType: '3MM_WHITE', edgeCategory: 'PVC_045',
+      structureCore: 'AGLO', frontsCore: 'AGLO', extras: [] };
+    const fondo = calculateModuleParts(m).find(p => p.material === '3mm_White')!;
+    const perUnit = (fondo.width * fondo.height) / 1e6;            // 1 m² por módulo
+    const n = Math.round(20 / perUnit);
+    const q = calculateItemQuantities([{ ...m, quantity: n }]);
+    const area = perUnit * n;
+    expect(q.detailedBoards['Fondo Blanco (3mm)']).toBe(Math.ceil(area * 1.2 / (2.6 * 1.83)));
+    expect(q.detailedBoards['Fondo Blanco (3mm)']).toBeGreaterThan(Math.ceil(area * 1.2 / (2.75 * 1.83)));
   });
 });
