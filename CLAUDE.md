@@ -144,6 +144,15 @@ por trigger `on_auth_user_created` — NO insertar manualmente. Roles en DB: `AD
 `WORKSHOP_MANAGER`, `USER`; en `types.ts` están en español (`administrador`,
 `gerente_taller`, etc.) — hay inconsistencia conocida, verificar mapeo antes de tocar auth.
 
+## Precios (reglas del dueño)
+
+- Las listas de precios de los proveedores vienen **sin IVA**. Gustavo carga en la app el precio
+  **con IVA: lista × 1,21**. Al extraer precios de una lista, pasarlos siempre con el 21 % sumado.
+- **Melamina color / texturada:** la app tiene un solo precio y hay varias líneas; se toma el de la
+  **línea más cara** (así nunca cotiza por debajo).
+- La app guarda placas por **hoja entera** y tapacantos por **metro lineal** (precio $/ml, no el de
+  rollo). Si un producto no figura en la lista o el nombre no coincide, se avisa: no se inventa.
+
 ## Roles
 
 - **administrador**: acceso total; único con Staff, Finanzas, IA.
