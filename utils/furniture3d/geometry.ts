@@ -777,7 +777,88 @@ const placeSlidingFront: Placer = (mod, parts) => {
   return { pieces, status: 'placed', notes: ['Puertas en dos rieles, alternadas (supuesto de dibujo).'] };
 };
 
+/**
+ * Interior de placard. Cajonera: laterales enteros, piso y techo entre ellos, 2 frentes embutidos
+ * arriba (luz de 4 mm) con su caja detrás y 3 bandejas extraíbles repartidas en el resto del
+ * alto, con la faja arriba y adelante. Estantes: techo entre laterales, estante fijo a media
+ * altura, divisor en dos tramos y estantes regulables repartidos a cada lado (reparto: supuesto
+ * de dibujo).
+ */
+const placePlacardDrawers: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const at = (name: string) => parts.findIndex(p => p.name === name);
+  const li = at('Lateral'), ti = at('Techo'), pi = at('Piso'), fi = at('Frente Cajón');
+  const bl = at('Lateral Cajón'), bt = at('Contra/Frente Cajón'), bf = at('Fondo Cajón');
+  const tri = at('Bandeja extraíble'), fji = at('Faja bandeja');
+  if ([li, ti, pi, fi, bl, bt, tri, fji].some(i => i < 0)) return null;
+  const D = parts[li].width;
+  const pieces: Piece3D[] = [
+    makePiece(mod, parts, li, 0, mkBox(0, 18, 0, H, 0, D), 'carcass'),
+    makePiece(mod, parts, li, 1, mkBox(W - 18, W, 0, H, 0, D), 'carcass'),
+    makePiece(mod, parts, ti, 0, mkBox(18, W - 18, H - 18, H, 0, D), 'carcass'),
+    makePiece(mod, parts, pi, 0, mkBox(18, W - 18, 0, 18, 0, D), 'carcass'),
+  ];
+  const f = parts[fi], lat = parts[bl], testa = parts[bt];
+  const tS = materialThickness(lat.material), tT = materialThickness(testa.material);
+  const outerW = testa.width + 2 * tS, bx0 = (W - outerW) / 2, bz1 = D - 18, bz0 = bz1 - lat.width;
+  let fTop = H - 18 - 4;
+  for (let k = 0; k < (f.quantity || 0); k++) {
+    const fy0 = fTop - f.height, fx0 = (W - f.width) / 2;
+    pieces.push(makePiece(mod, parts, fi, k, mkBox(fx0, fx0 + f.width, fy0, fTop, D - 18, D), 'front'));
+    const yb = fy0 + (f.height - lat.height) / 2;
+    pieces.push(makePiece(mod, parts, bl, 2 * k, mkBox(bx0, bx0 + tS, yb, yb + lat.height, bz0, bz1), 'drawer'));
+    pieces.push(makePiece(mod, parts, bl, 2 * k + 1, mkBox(bx0 + outerW - tS, bx0 + outerW, yb, yb + lat.height, bz0, bz1), 'drawer'));
+    pieces.push(makePiece(mod, parts, bt, 2 * k, mkBox(bx0 + tS, bx0 + tS + testa.width, yb, yb + lat.height, bz0, bz0 + tT), 'drawer'));
+    pieces.push(makePiece(mod, parts, bt, 2 * k + 1, mkBox(bx0 + tS, bx0 + tS + testa.width, yb, yb + lat.height, bz1 - tT, bz1), 'drawer'));
+    if (bf >= 0) {
+      const fb = parts[bf], fbx0 = (W - fb.width) / 2, fbz0 = bz0 + (lat.width - fb.height) / 2;
+      pieces.push(makePiece(mod, parts, bf, k, mkBox(fbx0, fbx0 + fb.width, yb + 10, yb + 13, fbz0, fbz0 + fb.height), 'drawer', { groove: true }));
+    }
+    fTop = fy0 - 4;
+  }
+  // Bandejas: repartidas entre el piso y el último frente.
+  const tr = parts[tri], fj = parts[fji], n = tr.quantity || 0, slot = (fTop - 18) / Math.max(1, n);
+  for (let k = 0; k < n; k++) {
+    const y = 18 + k * slot + 10, tx0 = (W - tr.width) / 2;
+    pieces.push(makePiece(mod, parts, tri, k, mkBox(tx0, tx0 + tr.width, y, y + 18, 0, tr.height), 'shelf'));
+    pieces.push(makePiece(mod, parts, fji, k, mkBox(tx0, tx0 + fj.width, y + 18, y + 18 + fj.height, tr.height - 18, tr.height), 'shelf'));
+  }
+  return { pieces, status: 'placed', notes: ['Bandejas repartidas en partes iguales debajo de los cajones (supuesto de dibujo).'] };
+};
+
+const placePlacardShelves: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const at = (name: string) => parts.findIndex(p => p.name === name);
+  const li = at('Lateral'), ti = at('Techo'), si = at('Estante fijo'), di = at('División vertical'), ri = at('Estante regulable');
+  if ([li, ti, si, di].some(i => i < 0)) return null;
+  const D = parts[li].width, inner = H - 18;
+  const sy0 = (inner - 18) / 2;                                    // estante fijo a media altura
+  const pieces: Piece3D[] = [
+    makePiece(mod, parts, li, 0, mkBox(0, 18, 0, H, 0, D), 'carcass'),
+    makePiece(mod, parts, li, 1, mkBox(W - 18, W, 0, H, 0, D), 'carcass'),
+    makePiece(mod, parts, ti, 0, mkBox(18, W - 18, H - 18, H, 0, D), 'carcass'),
+    makePiece(mod, parts, si, 0, mkBox(18, W - 18, sy0, sy0 + 18, 0, parts[si].height), 'shelf'),
+    makePiece(mod, parts, di, 0, mkBox(W / 2 - 9, W / 2 + 9, 0, sy0, 0, D), 'carcass'),
+    makePiece(mod, parts, di, 1, mkBox(W / 2 - 9, W / 2 + 9, sy0 + 18, inner, 0, D), 'carcass'),
+  ];
+  if (ri >= 0) {
+    const r = parts[ri], perSide = Math.round((r.quantity || 0) / 2);
+    const below = Math.floor(perSide / 2), above = perSide - below;
+    const levels = [
+      ...Array.from({ length: below }, (_, k) => (sy0 * (k + 1)) / (below + 1)),
+      ...Array.from({ length: above }, (_, k) => sy0 + 18 + ((inner - sy0 - 18) * (k + 1)) / (above + 1)),
+    ];
+    let copy = 0;
+    [[18, W / 2 - 9], [W / 2 + 9, W - 18]].forEach(([x0]) => levels.forEach(yc => {
+      pieces.push(makePiece(mod, parts, ri, copy++, mkBox(x0, x0 + r.width, yc - 9, yc + 9, 0, r.height), 'shelf'));
+    }));
+  }
+  return { pieces, status: 'placed', notes: ['Estantes regulables repartidos arriba y abajo del estante fijo (supuesto de dibujo).'] };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
+  CAJONERA_PLACARD: placePlacardDrawers,
+  ESTANTES_PLACARD: placePlacardShelves,
   FRENTE_PLACARD: placeSlidingFront,
   PANEL_LISO: placePlainPanel,
   PANEL_ENLISTONADO: placeSlattedPanel,

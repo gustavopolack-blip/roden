@@ -14,8 +14,8 @@ describe('grupos de plantillas', () => {
   });
   it('Módulos: las cajas', () => {
     expect(ids('MODULO')).toEqual([
-      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L', 'FRENTE_PLACARD',
-      'HORNO_EMPOTRADO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
+      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'CAJONERA_PLACARD', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L',
+      'ESTANTES_PLACARD', 'FRENTE_PLACARD', 'HORNO_EMPOTRADO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
     ]);
   });
   it('plantillas reemplazadas por variantes del estándar: ocultas en el formulario', () => {
@@ -137,5 +137,39 @@ describe('frente de placard corredizo', () => {
       expect(hwPriceFor(label, 2, S)).toBe(2 * price);
     });
     expect(hwPriceFor(wardrobeKitLabel(2), 1, {})).toBe(0);   // sin precio cargado
+  });
+});
+
+describe('interior de placard: cajonera y estantes sobre cajonera', () => {
+  const mod = (id: string, W = 870, D = 500) => {
+    const t = getTemplate(id)!;
+    const d = { width: W, depth: D, ...t.fixedDims!({}) } as any;
+    const r = t.calculate(d, {});
+    return { id, name: id, quantity: 1, ...d, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, extras: [], moduleType: 'SPECIAL',
+      isSpecialModule: true, specialTemplateId: id, specialOptions: {}, specialParts: r.parts, specialHardware: r.hardware,
+      isWhiteStructure: true, edgeCategory: 'PVC_045', calculateSlides: true } as any;
+  };
+  const part = (m: any, name: string) => calculateModuleParts(m).find(p => p.name === name)!;
+  it('cajonera: alto 1000, laterales enteros, sin fondo, 2 frentes embutidos de 150 y 3 bandejas', () => {
+    const m = mod('CAJONERA_PLACARD');
+    expect(m.height).toBe(1000);
+    expect(part(m, 'Lateral')).toMatchObject({ width: 500, height: 1000, quantity: 2 });
+    expect(part(m, 'Techo')).toMatchObject({ width: 834, height: 500 });
+    expect(part(m, 'Piso')).toMatchObject({ width: 834, height: 500 });
+    expect(part(m, 'Frente Cajón')).toMatchObject({ width: 826, height: 150, quantity: 2 });   // 834 − 2 × 4
+    expect(part(m, 'Lateral Cajón')).toMatchObject({ width: 462, height: 80, quantity: 4 });   // 500 − 20 − 18
+    expect(part(m, 'Bandeja extraíble')).toMatchObject({ width: 808, height: 490, quantity: 3 });
+    expect(part(m, 'Faja bandeja')).toMatchObject({ width: 808, height: 36, quantity: 3 });
+    expect(calculateModuleParts(m).some(p => /^Fondo (3|5|1)/.test(p.name))).toBe(false);
+    expect(calculateItemQuantities([m]).detailedHardware['Guías Telescópicas (450mm)']).toBe(5);
+  });
+  it('estantes sobre cajonera: alto 1100, sin base, divisor en dos tramos, 1 fijo y 3 regulables por lado', () => {
+    const m = mod('ESTANTES_PLACARD');
+    expect(m.height).toBe(1100);
+    const parts = calculateModuleParts(m);
+    expect(parts.some(p => /^(Piso|Base)/.test(p.name))).toBe(false);
+    expect(part(m, 'Estante fijo')).toMatchObject({ width: 834, height: 490, quantity: 1 });
+    expect(part(m, 'División vertical')).toMatchObject({ width: 500, height: 532, quantity: 2 });   // (1082 − 18) / 2
+    expect(part(m, 'Estante regulable')).toMatchObject({ width: 408, height: 490, quantity: 6 });  // floor(1100 / 350) por lado
   });
 });

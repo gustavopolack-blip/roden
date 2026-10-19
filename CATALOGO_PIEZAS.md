@@ -319,6 +319,22 @@ presupuesto nuevo. La columna vieja no tiene conversión (sus módulos se cargab
 Plantilla `FRENTE_PLACARD` (botón Módulos). En 3D las puertas van en dos rieles alternados
 (supuesto de dibujo).
 
+### Interior de placard (19/10/2026)
+
+Dos módulos apilados, del mismo ancho (lo carga el usuario): **como máximo el ancho de una puerta
+corrediza − 50 mm**, para que los cajones no choquen con las puertas. Profundidad típica 500
+(la carga el usuario). Sin fondo. Mano de obra: la calcula el taller aparte.
+
+| Módulo | Regla del taller |
+|---|---|
+| Cajonera interior (`CAJONERA_PLACARD`) | Alto **1000**. Laterales enteros; piso y techo entre laterales; apoya en el piso del placard. Arriba **2 cajones** con frente de **150** de 18 mm, embutido al ras de los laterales con luz de 4 mm (frente = interior − 8); caja según el frente (80 mm), 18 mm más corta por el embutido. Debajo **3 bandejas extraíbles** como las del botinero (interior − 26, profundidad D − 10, faja de 36). Guías telescópicas comunes: 5 pares. |
+| Estantes sobre cajonera (`ESTANTES_PLACARD`) | Alto **1100**, **sin base** (apoya en la cajonera). Laterales enteros, techo entre laterales, **divisor central**, **1 estante fijo completo** para rigidizar y estantes regulables: **floor(alto / 350) por lado**. |
+
+Supuestos míos a confirmar: los cajones usan las mismas guías telescópicas comunes que las
+bandejas; el estante fijo va a media altura (el divisor queda en dos tramos de (1082 − 18) / 2);
+los 3 regulables por lado son además del fijo. En 3D: bandejas repartidas en partes iguales
+debajo de los cajones y regulables repartidos arriba y abajo del fijo.
+
 ### Base: zócalo, banquina y patas (13/10/2026)
 
 | Tema | Regla del taller |
