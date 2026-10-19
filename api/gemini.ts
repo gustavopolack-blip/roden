@@ -14,6 +14,11 @@ import { createClient } from '@supabase/supabase-js';
 const ALLOWED_MODELS = ['gemini-2.5-flash'];
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
+// Cap on prompt text (systemInstruction + userMessage), which drives token cost.
+// The largest real caller (Budgets AI button, all saved_estimates) sends ~1 MB
+// today; 2 MB leaves headroom. Vercel's own body limit is 4.5 MB.
+const MAX_PROMPT_CHARS = 2_000_000;
+
 export default async function handler(req: any, res: any) {
   // Only allow POST
   if (req.method !== 'POST') {
@@ -73,6 +78,10 @@ export default async function handler(req: any, res: any) {
 
   if (!userMessage) {
     return res.status(400).json({ error: 'userMessage is required' });
+  }
+
+  if (String(systemInstruction ?? '').length + String(userMessage).length > MAX_PROMPT_CHARS) {
+    return res.status(413).json({ error: 'Prompt too large' });
   }
 
   try {

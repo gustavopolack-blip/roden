@@ -73,6 +73,15 @@ describe('api/gemini — control de acceso', () => {
     expect(generateContent).not.toHaveBeenCalled();
   });
 
+  it('admin con prompt de más de 2 MB → 413', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
+    maybeSingle.mockResolvedValue({ data: { role: 'administrador', status: 'ACTIVE' } });
+    const res = makeRes();
+    await handler(post({ authorization: 'Bearer t' }, { userMessage: 'x', systemInstruction: 'a'.repeat(2_000_000) }), res);
+    expect(res.statusCode).toBe(413);
+    expect(generateContent).not.toHaveBeenCalled();
+  });
+
   it('admin activo → 200 con el modelo por defecto', async () => {
     getUser.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
     maybeSingle.mockResolvedValue({ data: { role: 'administrador', status: 'ACTIVE' } });
