@@ -119,11 +119,13 @@ export const SLIDE_LABELS: Record<string, string> = {
 
 
 // Medidas de placa (mm), única fuente para costo y optimizador de corte.
-// Según el taller: todas 2750 × 1830 salvo el Trupan / fondo color 5.5mm, 2600 × 1830.
-// Antes el costo usaba 2750 para todo (Trupan) y el optimizador 2600 para el Kiri.
+// Según el taller: todas 2750 × 1830 salvo los fondos (Trupan / color 5.5mm y blanco 3mm),
+// 2600 × 1830 — así figuran en la lista de precios del proveedor (octubre 2026).
+// Antes el costo usaba 2750 para todo (Trupan) y el optimizador 2600 para el Kiri; el fondo
+// de 3 mm se contaba en placas de 2750 (≈ 5 % menos de placas que las reales: cotizaba de menos).
 export const getSheetSize = (materialName: string = ''): { width: number; height: number } => {
     const n = materialName.toLowerCase();
-    if (n.includes('5.5') || n.includes('55mm') || n.includes('trupan')) return { width: 2600, height: 1830 };
+    if (n.includes('5.5') || n.includes('55mm') || n.includes('trupan') || n.includes('3mm')) return { width: 2600, height: 1830 };
     return { width: 2750, height: 1830 };
 };
 export const getSheetArea = (materialName: string = ''): number => {
@@ -853,7 +855,7 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
         boards18MDF: Math.ceil(totalBoard18MDFArea * 1.2 / SHEET_AREA),
         boards15: Math.ceil(totalBoard15Area * 1.2 / SHEET_AREA),
         backing55: Math.ceil(totalBacking55Area * 1.1 / getSheetArea('5.5mm')),
-        backing3: Math.ceil(totalBacking3Area * 1.1 / SHEET_AREA),
+        backing3: Math.ceil(totalBacking3Area * 1.1 / getSheetArea('3mm')),
         linearWhite22: Math.ceil(linearWhite22 / 1000),
         linearWhite45: Math.ceil(linearWhite45 / 1000),
         linearColor22: Math.ceil(linearColor22 / 1000),

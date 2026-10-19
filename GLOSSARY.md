@@ -59,7 +59,7 @@
 | **Pieza** | Tapa superior, Base inferior, Lateral, Fondo, Estante Interno, Puerta, Frente Cajón, Frente Abatible, Lateral Cajón, Contra/Frente Cajón, Fondo Cajón. | `CalculatedPart.name` (los nombres son contrato: `isVisibleFrontPiece()` usa el prefijo `Frente`/`Puerta`) |
 | **Estructura / carcasa** | Tapa, base, laterales, estantes: el cuerpo del módulo. | `carcassMat`, `structureCore` |
 | **Frentes** | Puertas, frentes de cajón y abatibles: lo que se ve. | `frontMat`, `frontsCore` |
-| **Placa** | Tablero entero de 2750 × 1830 mm (salvo Trupan/fondo 5,5 mm: 2600 × 1830). | `getSheetSize()` |
+| **Placa** | Tablero entero de 2750 × 1830 mm (salvo los fondos —Trupan/color 5,5 mm y blanco 3 mm—: 2600 × 1830). | `getSheetSize()` |
 | **MDP / Aglo** | Aglomerado melamínico. **La UI dice "MDP"; el código dice `AGLO`**: son lo mismo. | `structureCore`/`frontsCore` = `'AGLO'` |
 | **MDF** | Fibra de densidad media. | `'MDF'`, material `18mm_MDF` |
 | **Core** | Alma del tablero (MDP o MDF), por separado para estructura y frentes. | `structureCore`, `frontsCore` (legacy: `isMDFCore`) |
