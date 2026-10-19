@@ -140,9 +140,10 @@ y explicá el cambio en el commit.
 **supabaseClient.ts**: instancia única. Nunca crear una segunda.
 
 **Convenciones DB:** código y DB en inglés, UI en español. `public.users` se sincroniza
-por trigger `on_auth_user_created` — NO insertar manualmente. Roles en DB: `ADMIN`,
-`WORKSHOP_MANAGER`, `USER`; en `types.ts` están en español (`administrador`,
-`gerente_taller`, etc.) — hay inconsistencia conocida, verificar mapeo antes de tocar auth.
+por trigger `on_auth_user_created` — NO insertar manualmente. Roles: `public.users.role`
+guarda los mismos valores que `types.ts` (`administrador`, `gerente_taller`,
+`operario_taller`; verificado en la DB de producción) y `userFromDB` los pasa sin mapear.
+Las policies RLS comparan contra `'administrador'`. `api/gemini.ts` exige ese rol.
 
 ## Precios (reglas del dueño)
 
