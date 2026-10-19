@@ -19,6 +19,7 @@ export interface SpecialHardware {
   pistons?: number;    // pistones a gas (frente abatible suelto)
   brackets?: number;   // ménsulas metálicas ocultas (estante flotante)
   bracketLength?: 150 | 250; // largo de la ménsula (mm): según la profundidad del estante
+  wardrobeKit?: 2 | 3 | 4;    // kit de perfilería del frente de placard corredizo (2, 3 o 4 puertas)
 }
 
 export interface SpecialModuleResult {
@@ -1190,6 +1191,34 @@ const MICROONDAS_COLUMNA: SpecialModuleTemplate = {
   }
 };
 
+// Frente de placard corredizo (regla del taller, 19/10/2026): solo puertas y kit de perfilería,
+// sin marco (el hueco ya existe). Cantidad de puertas según el ancho del hueco: hasta 2 m → 2,
+// hasta 3 m → 3, hasta 4 m → 4; más de 4 m se resuelve con módulos (el formulario no lo deja
+// cargar). Puertas de 18 mm del material de frente, SIN tapacanto, superpuestas 40 mm entre sí;
+// alto = hueco − 30 (rieles y carros). Mano de obra: la calcula el taller aparte.
+export const WARDROBE_DOOR_OVERLAP = 40;
+export const WARDROBE_DOOR_HEIGHT_DISCOUNT = 30;
+export const WARDROBE_MAX_WIDTH = 4000;
+export const wardrobeDoorsFor = (width: number): 2 | 3 | 4 => (width <= 2000 ? 2 : width <= 3000 ? 3 : 4);
+const FRENTE_PLACARD: SpecialModuleTemplate = {
+  id: 'FRENTE_PLACARD',
+  group: 'MODULO',
+  name: 'Frente de placard corredizo',
+  description: 'Puertas corredizas de 18 mm (sin canto, superpuestas 40 mm) + kit de perfilería. 2 puertas hasta 2 m, 3 hasta 3 m, 4 hasta 4 m.',
+  params: ['width', 'height'],
+  // Dos rieles: las puertas van en dos planos (dibujo); no cambia medidas ni costo.
+  fixedDims: () => ({ depth: 40 }),
+  calculate: ({ width: W, height: H }) => {
+    const n = wardrobeDoorsFor(W);
+    const doorW = (W + WARDROBE_DOOR_OVERLAP * (n - 1)) / n;
+    const doorH = Math.max(0, H - WARDROBE_DOOR_HEIGHT_DISCOUNT);
+    const parts: CalculatedPart[] = [
+      { name: 'Puerta corrediza', width: doorW, height: doorH, material: '18mm_Front', quantity: n, grain: 'vertical' },
+    ];
+    return { parts, hardware: { wardrobeKit: n }, laborDays: 0 };
+  }
+};
+
 // Frentes sueltos (Piezas, ficha del 13/10/2026).
 // Frente de cajón suelto: lleva su caja y guías, como si el frente estuviera sobre un hueco de su
 // mismo ancho (+ 4 de luz − 36 de laterales − 25 de guías). Largo de caja D − 20.
@@ -1267,6 +1296,7 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   MICROONDAS_COLUMNA,
   FRENTE_CAJON_SUELTO,
   FRENTE_ABATIBLE_SUELTO,
+  FRENTE_PLACARD,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>
