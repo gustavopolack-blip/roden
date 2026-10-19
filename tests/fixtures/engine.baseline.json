@@ -2079,11 +2079,20 @@
     "frontEdge": "width"
    },
    {
-    "name": "División vertical",
+    "name": "División vertical inferior",
     "width": 450,
-    "height": 532,
+    "height": 332,
     "material": "18mm_White",
-    "quantity": 2,
+    "quantity": 1,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "División vertical superior",
+    "width": 450,
+    "height": 732,
+    "material": "18mm_White",
+    "quantity": 1,
     "grain": "vertical",
     "frontEdge": "height"
    },
@@ -2092,7 +2101,45 @@
     "width": 423,
     "height": 440,
     "material": "18mm_White",
-    "quantity": 6,
+    "quantity": 4,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   }
+  ],
+  "sp27": [
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 2100,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "Techo",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Piso",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Estante intermedio",
+    "width": 864,
+    "height": 440,
+    "material": "18mm_MDF",
+    "quantity": 1,
     "grain": "horizontal",
     "frontEdge": "width"
    }
@@ -2436,7 +2483,14 @@
    "Melamina Blanca 18mm MDP",
    "Melamina Blanca 18mm MDP",
    "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
    "Melamina Blanca 18mm MDP"
+  ],
+  "sp27": [
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF"
   ],
   "man": []
  },
@@ -2556,13 +2610,13 @@
    "boards18Color": 4,
    "boards18White": 4,
    "boards18MDFMelamine": 0,
-   "boards18MDF": 2,
+   "boards18MDF": 3,
    "boards15": 2,
    "backing55": 1,
    "backing3": 2,
-   "linearWhite22": 66,
+   "linearWhite22": 65,
    "linearWhite45": 15,
-   "linearColor22": 47,
+   "linearColor22": 54,
    "linearColor45": 26,
    "linear2mm": 0,
    "lacquerAreaM2": 0,
@@ -2580,7 +2634,7 @@
     "Fondo Blanco (3mm)": 2,
     "Melamina Blanca 15mm MDP": 2,
     "Melamina Blanca 18mm MDP": 4,
-    "Melamina Color 18mm MDF": 1,
+    "Melamina Color 18mm MDF": 2,
     "Fondo Melamina Color (5.5mm)": 1
    },
    "detailedHardware": {
@@ -2588,7 +2642,9 @@
     "Bisagras Estándar": 8,
     "Bisagras Push-Open": 2,
     "Pistones a Gas": 1,
-    "Kit frente placard 2 puertas (hasta 2 m)": 1
+    "Kit frente placard 2 puertas (hasta 2 m)": 1,
+    "Barral de colgar (metros)": 1.73,
+    "Soporte de barral": 4
    },
    "avgComplexity": 1
   },
@@ -2695,16 +2751,16 @@
    "laborCost": 510000,
    "fixedCosts": 78000,
    "extrasCost": 0,
-   "tPlacas": 1635000,
-   "tTapac": 160280,
+   "tPlacas": 1786400,
+   "tTapac": 166580,
    "tHerrajes": 113000,
    "tFinish": 0,
    "finArea": 0,
    "finPrice": 0,
    "finishLines": [],
-   "costoDirecto": 2496280,
-   "precioTaller": 3369978,
-   "precioFinal": 4212472.5
+   "costoDirecto": 2653980,
+   "precioTaller": 3582873.0000000005,
+   "precioFinal": 4478591.250000001
   },
   "con_manual": {
    "laborCost": 510000,
@@ -2787,25 +2843,25 @@
    "veneer": 6507405
   },
   "especiales": {
-   "whiteAglo": 3305036.25,
-   "whiteMDF": 3651311.25,
-   "colorAglo": 3935351.25,
-   "colorMDF": 4342376.25,
-   "whiteLacqAglo": 7198115.625,
-   "whiteLacqMDF": 7467440.625,
-   "colorLacqAglo": 7629373.125,
-   "colorLacqMDF": 7945948.125,
-   "whiteVenrAglo": 7428290.625,
-   "whiteVenrMDF": 7697615.625,
-   "colorVenrAglo": 7859548.125,
-   "colorVenrMDF": 8176123.125,
-   "baseConfig": 3935351.25,
-   "totalDirectCost": 2332060,
-   "realConfig": 4212472.5,
-   "realConfigTaller": 3369978,
-   "realConfigDirect": 2496280,
-   "lacquer": 7198115.625,
-   "veneer": 7428290.625
+   "whiteAglo": 3311415,
+   "whiteMDF": 3657690,
+   "colorAglo": 3945375,
+   "colorMDF": 4352400,
+   "whiteLacqAglo": 7872406.875,
+   "whiteLacqMDF": 8180206.875,
+   "colorLacqAglo": 8362321.875,
+   "colorLacqMDF": 8724121.875,
+   "whiteVenrAglo": 8102581.875,
+   "whiteVenrMDF": 8410381.875,
+   "colorVenrAglo": 8592496.875,
+   "colorVenrMDF": 8954296.875000002,
+   "baseConfig": 3945375,
+   "totalDirectCost": 2338000,
+   "realConfig": 4478591.250000001,
+   "realConfigTaller": 3582873.0000000005,
+   "realConfigDirect": 2653980,
+   "lacquer": 7872406.875,
+   "veneer": 8102581.875
   },
   "con_manual": {
    "whiteAglo": 1742411.25,

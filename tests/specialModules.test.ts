@@ -14,7 +14,7 @@ describe('grupos de plantillas', () => {
   });
   it('Módulos: las cajas', () => {
     expect(ids('MODULO')).toEqual([
-      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'CAJONERA_PLACARD', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L',
+      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'CAJONERA_PLACARD', 'COLGADO_PLACARD', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L',
       'ESTANTES_PLACARD', 'FRENTE_PLACARD', 'HORNO_EMPOTRADO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
     ]);
   });
@@ -163,13 +163,29 @@ describe('interior de placard: cajonera y estantes sobre cajonera', () => {
     expect(calculateModuleParts(m).some(p => /^Fondo (3|5|1)/.test(p.name))).toBe(false);
     expect(calculateItemQuantities([m]).detailedHardware['Guías Telescópicas (450mm)']).toBe(5);
   });
-  it('estantes sobre cajonera: alto 1100, sin base, divisor en dos tramos, 1 fijo y 3 regulables por lado', () => {
+  it('estantes sobre cajonera: alto 1100, sin base, fijo abajo (cuenta como 1 de los 3 niveles) y 2 regulables por lado', () => {
     const m = mod('ESTANTES_PLACARD');
     expect(m.height).toBe(1100);
     const parts = calculateModuleParts(m);
     expect(parts.some(p => /^(Piso|Base)/.test(p.name))).toBe(false);
     expect(part(m, 'Estante fijo')).toMatchObject({ width: 834, height: 490, quantity: 1 });
-    expect(part(m, 'División vertical')).toMatchObject({ width: 500, height: 532, quantity: 2 });   // (1082 − 18) / 2
-    expect(part(m, 'Estante regulable')).toMatchObject({ width: 408, height: 490, quantity: 6 });  // floor(1100 / 350) por lado
+    expect(part(m, 'División vertical inferior')).toMatchObject({ width: 500, height: 332, quantity: 1 });  // 350 − 18
+    expect(part(m, 'División vertical superior')).toMatchObject({ width: 500, height: 732, quantity: 1 });  // 1082 − 350
+    expect(part(m, 'Estante regulable')).toMatchObject({ width: 408, height: 490, quantity: 4 });  // (floor(1100 / 350) − 1) por lado
+  });
+  it('colgado: alto 2100, laterales enteros, techo, piso, estante a 900 y 2 barrales, sin fondo', () => {
+    const m = mod('COLGADO_PLACARD', 900);
+    expect(m.height).toBe(2100);
+    const parts = calculateModuleParts(m);
+    expect(part(m, 'Lateral')).toMatchObject({ width: 500, height: 2100, quantity: 2 });
+    expect(part(m, 'Techo')).toMatchObject({ width: 864, height: 500 });
+    expect(part(m, 'Piso')).toMatchObject({ width: 864, height: 500 });
+    expect(part(m, 'Estante intermedio')).toMatchObject({ width: 864, height: 490, quantity: 1 });
+    expect(parts.some(p => /^Fondo (3|5|1)/.test(p.name))).toBe(false);
+    const hw = calculateItemQuantities([m]).detailedHardware;
+    expect(hw['Barral de colgar (metros)']).toBe(1.73);   // 2 × 864 mm
+    expect(hw['Soporte de barral']).toBe(4);
+    expect(hwPriceFor('Barral de colgar (metros)', 1.73, { priceHangingRail: 1000, priceRailSupport: 50 })).toBeCloseTo(1730);
+    expect(hwPriceFor('Soporte de barral', 4, { priceHangingRail: 1000, priceRailSupport: 50 })).toBe(200);
   });
 });

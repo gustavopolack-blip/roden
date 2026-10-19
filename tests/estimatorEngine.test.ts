@@ -19,9 +19,9 @@ const modules = [...buildStandardModules(), ...buildSpecialModules(SPECIAL_MODUL
 const items = buildItems(SPECIAL_MODULE_TEMPLATES);
 
 describe('motor del estimador: idéntico a la foto previa a la extracción', () => {
-  it('cubre la matriz completa (estándar, 27 plantillas especiales y manual)', () => {
+  it('cubre la matriz completa (estándar, 28 plantillas especiales y manual)', () => {
     expect(modules.length).toBe(Object.keys(baseline.parts).length);
-    expect(SPECIAL_MODULE_TEMPLATES.length).toBe(27);
+    expect(SPECIAL_MODULE_TEMPLATES.length).toBe(28);
   });
 
   it.each(modules.map(m => [m.id, m] as const))('despiece y etiquetas de placa de %s', (id, mod) => {

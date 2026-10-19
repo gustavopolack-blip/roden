@@ -25,7 +25,7 @@ import {
 
 /** Alacena sin posición guardada: base a 600 mm sobre la mesada (base 100 + bajo 740 + mesada 20 + 600). */
 export const WALL_CABINET_Y = 1460;
-import { SPECIAL_MANUAL_ID } from '../specialModules';
+import { PLACARD_HANGING_SHELF, SPECIAL_MANUAL_ID } from '../specialModules';
 
 export type Vec3 = [number, number, number];
 export interface Box { min: Vec3; max: Vec3 }
@@ -780,9 +780,10 @@ const placeSlidingFront: Placer = (mod, parts) => {
 /**
  * Interior de placard. Cajonera: laterales enteros, piso y techo entre ellos, 2 frentes embutidos
  * arriba (luz de 4 mm) con su caja detrás y 3 bandejas extraíbles repartidas en el resto del
- * alto, con la faja arriba y adelante. Estantes: techo entre laterales, estante fijo a media
- * altura, divisor en dos tramos y estantes regulables repartidos a cada lado (reparto: supuesto
- * de dibujo).
+ * alto, con la faja arriba y adelante. Estantes: techo entre laterales, estante fijo abajo (cara
+ * superior a 350 mm), divisor en dos tramos y estantes regulables cada 350 mm por encima, a cada
+ * lado. Colgado: laterales, techo, piso y estante intermedio a 900 mm; los barrales son herraje y
+ * no se dibujan.
  */
 const placePlacardDrawers: Placer = (mod, parts) => {
   const W = mod.width || 0, H = mod.height || 0;
@@ -829,35 +830,52 @@ const placePlacardDrawers: Placer = (mod, parts) => {
 const placePlacardShelves: Placer = (mod, parts) => {
   const W = mod.width || 0, H = mod.height || 0;
   const at = (name: string) => parts.findIndex(p => p.name === name);
-  const li = at('Lateral'), ti = at('Techo'), si = at('Estante fijo'), di = at('División vertical'), ri = at('Estante regulable');
-  if ([li, ti, si, di].some(i => i < 0)) return null;
+  const li = at('Lateral'), ti = at('Techo'), si = at('Estante fijo'), ri = at('Estante regulable');
+  const dlo = at('División vertical inferior'), dhi = at('División vertical superior');
+  if ([li, ti, si, dlo, dhi].some(i => i < 0)) return null;
   const D = parts[li].width, inner = H - 18;
-  const sy0 = (inner - 18) / 2;                                    // estante fijo a media altura
+  const sy1 = parts[dlo].height + 18;                              // cara superior del estante fijo
   const pieces: Piece3D[] = [
     makePiece(mod, parts, li, 0, mkBox(0, 18, 0, H, 0, D), 'carcass'),
     makePiece(mod, parts, li, 1, mkBox(W - 18, W, 0, H, 0, D), 'carcass'),
     makePiece(mod, parts, ti, 0, mkBox(18, W - 18, H - 18, H, 0, D), 'carcass'),
-    makePiece(mod, parts, si, 0, mkBox(18, W - 18, sy0, sy0 + 18, 0, parts[si].height), 'shelf'),
-    makePiece(mod, parts, di, 0, mkBox(W / 2 - 9, W / 2 + 9, 0, sy0, 0, D), 'carcass'),
-    makePiece(mod, parts, di, 1, mkBox(W / 2 - 9, W / 2 + 9, sy0 + 18, inner, 0, D), 'carcass'),
+    makePiece(mod, parts, si, 0, mkBox(18, W - 18, sy1 - 18, sy1, 0, parts[si].height), 'shelf'),
+    makePiece(mod, parts, dlo, 0, mkBox(W / 2 - 9, W / 2 + 9, 0, sy1 - 18, 0, D), 'carcass'),
+    makePiece(mod, parts, dhi, 0, mkBox(W / 2 - 9, W / 2 + 9, sy1, inner, 0, D), 'carcass'),
   ];
   if (ri >= 0) {
     const r = parts[ri], perSide = Math.round((r.quantity || 0) / 2);
-    const below = Math.floor(perSide / 2), above = perSide - below;
-    const levels = [
-      ...Array.from({ length: below }, (_, k) => (sy0 * (k + 1)) / (below + 1)),
-      ...Array.from({ length: above }, (_, k) => sy0 + 18 + ((inner - sy0 - 18) * (k + 1)) / (above + 1)),
-    ];
+    const levels = Array.from({ length: perSide }, (_, k) => sy1 + ((inner - sy1) * (k + 1)) / (perSide + 1));
     let copy = 0;
     [[18, W / 2 - 9], [W / 2 + 9, W - 18]].forEach(([x0]) => levels.forEach(yc => {
       pieces.push(makePiece(mod, parts, ri, copy++, mkBox(x0, x0 + r.width, yc - 9, yc + 9, 0, r.height), 'shelf'));
     }));
   }
-  return { pieces, status: 'placed', notes: ['Estantes regulables repartidos arriba y abajo del estante fijo (supuesto de dibujo).'] };
+  return { pieces, status: 'placed', notes: ['Estantes regulables repartidos en partes iguales sobre el estante fijo (supuesto de dibujo).'] };
+};
+
+const placePlacardHanging: Placer = (mod, parts) => {
+  const W = mod.width || 0, H = mod.height || 0;
+  const at = (name: string) => parts.findIndex(p => p.name === name);
+  const li = at('Lateral'), ti = at('Techo'), pi = at('Piso'), si = at('Estante intermedio');
+  if ([li, ti, pi, si].some(i => i < 0)) return null;
+  const D = parts[li].width, sy1 = PLACARD_HANGING_SHELF;
+  return {
+    pieces: [
+      makePiece(mod, parts, li, 0, mkBox(0, 18, 0, H, 0, D), 'carcass'),
+      makePiece(mod, parts, li, 1, mkBox(W - 18, W, 0, H, 0, D), 'carcass'),
+      makePiece(mod, parts, ti, 0, mkBox(18, W - 18, H - 18, H, 0, D), 'carcass'),
+      makePiece(mod, parts, pi, 0, mkBox(18, W - 18, 0, 18, 0, D), 'carcass'),
+      makePiece(mod, parts, si, 0, mkBox(18, W - 18, sy1 - 18, sy1, 0, parts[si].height), 'shelf'),
+    ],
+    status: 'placed',
+    notes: ['Barrales de colgar: herraje, no se dibujan.'],
+  };
 };
 
 export const MODULE_PLACERS: Record<string, Placer> = {
   CAJONERA_PLACARD: placePlacardDrawers,
+  COLGADO_PLACARD: placePlacardHanging,
   ESTANTES_PLACARD: placePlacardShelves,
   FRENTE_PLACARD: placeSlidingFront,
   PANEL_LISO: placePlainPanel,

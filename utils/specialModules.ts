@@ -20,6 +20,8 @@ export interface SpecialHardware {
   brackets?: number;   // ménsulas metálicas ocultas (estante flotante)
   bracketLength?: 150 | 250; // largo de la ménsula (mm): según la profundidad del estante
   wardrobeKit?: 2 | 3 | 4;    // kit de perfilería del frente de placard corredizo (2, 3 o 4 puertas)
+  hangingRailMm?: number;     // barral de colgar: largo total en mm (se cobra por metro)
+  railSupports?: number;      // soportes de barral (por unidad)
 }
 
 export interface SpecialModuleResult {
@@ -1267,28 +1269,55 @@ const CAJONERA_PLACARD: SpecialModuleTemplate = {
 };
 
 // Estantes sobre cajonera: apoya sobre la cajonera (sin base). Laterales enteros, techo entre
-// laterales, divisor central, 1 estante fijo completo a media altura para rigidizar (el divisor
-// queda en dos tramos) y estantes regulables: floor(alto / 350) por lado. Sin fondo.
+// laterales, divisor central, 1 estante fijo completo ABAJO (primer nivel, a 350 mm) para
+// rigidizar —el divisor queda en dos tramos— y los regulables arriba. floor(alto / 350) niveles
+// por lado, y el fijo cuenta como uno: regulables = floor(alto / 350) − 1 por lado. Sin fondo.
 const ESTANTES_PLACARD: SpecialModuleTemplate = {
   id: 'ESTANTES_PLACARD',
   group: 'MODULO',
   name: 'Estantes sobre cajonera (placard)',
-  description: 'Alto 1100, sin base (apoya en la cajonera). Divisor central, 1 estante fijo y estantes regulables cada 350 mm por lado. Sin fondo.',
+  description: 'Alto 1100, sin base (apoya en la cajonera). Divisor central, 1 estante fijo abajo y estantes regulables arriba (cada 350 mm). Sin fondo.',
   params: ['width', 'depth'],
   fixedDims: () => ({ height: PLACARD_SHELVES_HEIGHT }),
   calculate: ({ width: W, height: H, depth: D }) => {
     const innerW = Math.max(0, W - 36);
     const innerH = Math.max(0, H - 18);                            // del piso (techo de la cajonera) al techo
-    const divH = Math.max(0, (innerH - 18) / 2);                   // dos tramos, separados por el estante fijo
-    const perSide = Math.floor(H / PLACARD_SHELF_STEP);
+    const fixedTop = PLACARD_SHELF_STEP;                           // cara superior del estante fijo
+    const perSide = Math.max(0, Math.floor(H / PLACARD_SHELF_STEP) - 1);
     const parts: CalculatedPart[] = [
       { name: 'Lateral', width: D, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical', frontEdge: 'height' },
       { name: 'Techo', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
       { name: 'Estante fijo', width: innerW, height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
-      { name: 'División vertical', width: D, height: divH, material: '18mm_Carcass', quantity: 2, grain: 'vertical', frontEdge: 'height' },
+      { name: 'División vertical inferior', width: D, height: Math.max(0, fixedTop - 18), material: '18mm_Carcass', quantity: 1, grain: 'vertical', frontEdge: 'height' },
+      { name: 'División vertical superior', width: D, height: Math.max(0, innerH - fixedTop), material: '18mm_Carcass', quantity: 1, grain: 'vertical', frontEdge: 'height' },
       { name: 'Estante regulable', width: Math.max(0, (innerW - 18) / 2), height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 2 * perSide, grain: 'horizontal', frontEdge: 'width' },
     ];
     return { parts, hardware: {}, laborDays: 0 };
+  }
+};
+
+// Módulo de colgado: va junto a la columna cajonera + estantes (a la derecha o a la izquierda).
+// Alto 2100. Laterales enteros, techo y piso entre laterales, estante intermedio a 900 mm (cara
+// superior) y 2 barrales de colgar (uno bajo el techo y otro bajo el estante). Sin fondo.
+// Barral: se cobra por metro (largo = ancho interior); 2 soportes por barral.
+export const PLACARD_HANGING_HEIGHT = 2100;
+export const PLACARD_HANGING_SHELF = 900;
+const COLGADO_PLACARD: SpecialModuleTemplate = {
+  id: 'COLGADO_PLACARD',
+  group: 'MODULO',
+  name: 'Módulo de colgado (placard)',
+  description: 'Alto 2100. Laterales enteros, techo, piso, estante intermedio a 900 mm y 2 barrales de colgar. Sin fondo.',
+  params: ['width', 'depth'],
+  fixedDims: () => ({ height: PLACARD_HANGING_HEIGHT }),
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const innerW = Math.max(0, W - 36);
+    const parts: CalculatedPart[] = [
+      { name: 'Lateral', width: D, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical', frontEdge: 'height' },
+      { name: 'Techo', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Piso', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Estante intermedio', width: innerW, height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+    ];
+    return { parts, hardware: { hangingRailMm: 2 * innerW, railSupports: 4 }, laborDays: 0 };
   }
 };
 
@@ -1372,6 +1401,7 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   FRENTE_PLACARD,
   CAJONERA_PLACARD,
   ESTANTES_PLACARD,
+  COLGADO_PLACARD,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>
