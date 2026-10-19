@@ -758,7 +758,27 @@ const placePlainPanel: Placer = (mod, parts) => {
   };
 };
 
+/**
+ * Frente de placard corredizo: puertas en dos rieles (planos alternados, adelante y atrás),
+ * superpuestas 40 mm y centradas en el alto del hueco (15 mm de rieles arriba y abajo).
+ * Qué puerta va adelante: supuesto de dibujo.
+ */
+const placeSlidingFront: Placer = (mod, parts) => {
+  const H = mod.height || 0, D = mod.depth || 0;
+  const di = parts.findIndex(p => p.name === 'Puerta corrediza');
+  if (di < 0 || parts.length !== 1) return null;
+  const d = parts[di], n = d.quantity || 0, y0 = (H - d.height) / 2;
+  const pieces: Piece3D[] = [];
+  for (let k = 0; k < n; k++) {
+    const x0 = k * (d.width - 40);
+    const front = k % 2 === 0;
+    pieces.push(makePiece(mod, parts, di, k, mkBox(x0, x0 + d.width, y0, y0 + d.height, front ? D - 18 : 0, front ? D : 18), 'front'));
+  }
+  return { pieces, status: 'placed', notes: ['Puertas en dos rieles, alternadas (supuesto de dibujo).'] };
+};
+
 export const MODULE_PLACERS: Record<string, Placer> = {
+  FRENTE_PLACARD: placeSlidingFront,
   PANEL_LISO: placePlainPanel,
   PANEL_ENLISTONADO: placeSlattedPanel,
   ZOCALO_ESTRUCTURAL: placeStructuralPlinth,

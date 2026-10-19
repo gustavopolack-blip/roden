@@ -306,6 +306,19 @@ Se convierten a melamina (las plantillas viejas se costeaban así) y con bisagra
 si hay puertas o cajones. No se convierte nada solo: lo decide quien edita, y se guarda como un
 presupuesto nuevo. La columna vieja no tiene conversión (sus módulos se cargaban aparte).
 
+### Frente de placard corredizo (19/10/2026)
+
+| Tema | Regla del taller |
+|---|---|
+| Qué es | Solo puertas corredizas + **kit de perfilería**; sin marco (el hueco ya existe). Los módulos interiores van aparte. |
+| Puertas | 2 hasta 2 m de ancho, 3 hasta 3 m, 4 hasta 4 m. Más de 4 m: se arma con módulos (el formulario no deja cargar más). |
+| Medidas | Placa de 18 mm del material de frente, **sin tapacanto**. Ancho = (hueco + 40 × (n − 1)) / n (superposición de 40 mm); alto = hueco − 30 (rieles y carros). |
+| Kit | Uno por frente según la cantidad de puertas: precios `priceWardrobeKit2/3/4` en la lista. |
+| Mano de obra | La calcula el taller aparte (0 en la plantilla). |
+
+Plantilla `FRENTE_PLACARD` (botón Módulos). En 3D las puertas van en dos rieles alternados
+(supuesto de dibujo).
+
 ### Base: zócalo, banquina y patas (13/10/2026)
 
 | Tema | Regla del taller |

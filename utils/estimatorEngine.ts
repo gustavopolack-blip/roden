@@ -105,6 +105,8 @@ export const HINGE_LABELS: Record<string, string> = {
 // Herraje del estante 36mm flotante (template ESTANTE_FLOTANTE), en dos largos.
 // Precio: priceFloatingBracket15 / priceFloatingBracket25.
 export const bracketLabel = (length: 150 | 250): string => `Ménsula metálica oculta ${length / 10}cm`;
+// Kit de perfilería del frente de placard corredizo. Precio: priceWardrobeKit2 / 3 / 4.
+export const wardrobeKitLabel = (doors: 2 | 3 | 4): string => `Kit frente placard ${doors} puertas (hasta ${doors} m)`;
 // Patas regulables del módulo estándar (precio priceLeg) y soportes de estante regulable (sin precio).
 export const LEG_LABEL = 'Pata regulable';
 export const SHELF_SUPPORT_LABEL = 'Soporte de estante (sin costo)';
@@ -563,6 +565,7 @@ export const isVisibleFrontPiece = (name: string = ''): boolean => /^(Frente|Pue
 // Fondos de 3 / 5.5mm no llevan canto (se excluyen más abajo por material).
 export const visibleEdgeLength = (p: CalculatedPart): number => {
     const w = p.width || 0, h = p.height || 0;
+    if (/^Puerta corrediza/.test(p.name || '')) return 0;  // puertas del frente de placard: sin canto
     if (isVisibleFrontPiece(p.name)) return (w + h) * 2;
     if ((p.material || '').includes('15mm')) return w;
     if (/^Fondo/.test(p.name || '')) return 0;
@@ -677,6 +680,11 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
         if (sh.brackets > 0) {
             const bracketName = bracketLabel(sh.bracketLength);
             detailedHardware[bracketName] = (detailedHardware[bracketName] || 0) + (sh.brackets * qty);
+        }
+        // Frente de placard corredizo: un kit de perfilería según la cantidad de puertas.
+        if (sh.wardrobeKit) {
+            const kitName = wardrobeKitLabel(sh.wardrobeKit);
+            detailedHardware[kitName] = (detailedHardware[kitName] || 0) + qty;
         }
         // Botinero con bandejas extraíbles: un par de guías telescópicas simples por bandeja.
         if (isStandard && mod.calculateSlides && mod.cabinetType === 'BOTINERO_EXTRAIBLE') {
@@ -908,6 +916,7 @@ export const hwPriceFor = (name: string, qty: number, S: any): number => {
     else if (n.includes('guías') || n.includes('guia')) unitPrice = resolveSlidePrice(name, S).price;
     else if (n.includes('pata regulable'))                          unitPrice = S.priceLeg || 0;
     else if (n.includes('ménsula'))                                 unitPrice = (n.includes('25cm') ? S.priceFloatingBracket25 : S.priceFloatingBracket15) || 0;
+    else if (n.includes('kit frente placard'))                      unitPrice = S[`priceWardrobeKit${n.match(/(\d) puertas/)?.[1] || ''}`] || 0;
     return unitPrice * qty;
 };
 

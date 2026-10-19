@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SPECIAL_MODULE_TEMPLATES, getTemplate, floatingShelfBrackets, floatingShelfBracketLength } from '../utils/specialModules';
-import { calculateItemQuantities, hwPriceFor, bracketLabel, legacyToVariant, calculateModuleParts } from '../utils/estimatorEngine';
+import { calculateItemQuantities, hwPriceFor, bracketLabel, legacyToVariant, calculateModuleParts, visibleEdgeLength, wardrobeKitLabel } from '../utils/estimatorEngine';
 
 const ids = (g: string) => SPECIAL_MODULE_TEMPLATES.filter(t => t.group === g).map(t => t.id).sort();
 
@@ -14,7 +14,7 @@ describe('grupos de plantillas', () => {
   });
   it('Módulos: las cajas', () => {
     expect(ids('MODULO')).toEqual([
-      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L',
+      'BIBLIOTECA', 'BOTINERO_EXTRAIBLE', 'BOTINERO_FIJO', 'COLUMNA', 'ESQUINERO', 'ESQUINERO_EN_L', 'FRENTE_PLACARD',
       'HORNO_EMPOTRADO', 'MICROONDAS_COLUMNA', 'MODULO_ABIERTO', 'MODULO_BAJO_MESADA', 'MODULO_HORIZONTAL',
     ]);
   });
@@ -103,5 +103,39 @@ describe('conversión de plantillas viejas a la ficha nueva (legacyToVariant)', 
     expect(legacyToVariant(legacy('ESTANTE_18MM'))).toBeNull();
     expect(legacyToVariant(legacy('COLUMNA'))).toBeNull();
     expect(legacyToVariant({ id: 's', width: 600, height: 720, depth: 560, quantity: 1 } as any)).toBeNull();
+  });
+});
+
+describe('frente de placard corredizo', () => {
+  const frente = (W: number, H = 2400) => {
+    const t = getTemplate('FRENTE_PLACARD')!;
+    const d = { width: W, height: H, ...t.fixedDims!({}) };
+    const r = t.calculate(d as any, {});
+    return { id: 'fp', name: 'Frente', quantity: 1, ...d, cntDoors: 0, cntDrawers: 0, cntFlaps: 0, extras: [],
+      moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: 'FRENTE_PLACARD', specialOptions: {},
+      specialParts: r.parts, specialHardware: r.hardware, isWhiteStructure: true, edgeCategory: 'PVC_045' } as any;
+  };
+  it('puertas según el ancho: 2 hasta 2 m, 3 hasta 3 m, 4 hasta 4 m; superpuestas 40 mm y 30 mm más bajas', () => {
+    const doors = (W: number) => calculateModuleParts(frente(W)).find(p => p.name === 'Puerta corrediza')!;
+    expect(doors(1800)).toMatchObject({ quantity: 2, width: 920, height: 2370 });   // (1800 + 40) / 2
+    expect(doors(2000).quantity).toBe(2);
+    expect(doors(2700)).toMatchObject({ quantity: 3, width: (2700 + 80) / 3 });
+    expect(doors(3600)).toMatchObject({ quantity: 4, width: (3600 + 120) / 4 });
+  });
+  it('las puertas no llevan canto y son del material de frente', () => {
+    const p = calculateModuleParts(frente(1800))[0];
+    expect(visibleEdgeLength(p)).toBe(0);
+    expect(p.material).toBe('18mm_White');
+    expect(calculateItemQuantities([frente(1800)]).linearWhite45).toBe(0);
+  });
+  it('cobra un kit de perfilería según la cantidad de puertas, con su precio', () => {
+    const S = { priceWardrobeKit2: 100, priceWardrobeKit3: 200, priceWardrobeKit4: 300 };
+    [[1800, 2, 100], [2700, 3, 200], [3600, 4, 300]].forEach(([W, n, price]) => {
+      const hw = calculateItemQuantities([frente(W)]).detailedHardware;
+      const label = wardrobeKitLabel(n as 2 | 3 | 4);
+      expect(hw[label]).toBe(1);
+      expect(hwPriceFor(label, 2, S)).toBe(2 * price);
+    });
+    expect(hwPriceFor(wardrobeKitLabel(2), 1, {})).toBe(0);   // sin precio cargado
   });
 });

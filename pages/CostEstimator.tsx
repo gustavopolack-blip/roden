@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { generateCutPlan, Sheet } from '../utils/cutOptimizer';
-import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET } from '../utils/specialModules';
+import { SPECIAL_MODULE_TEMPLATES, getTemplate, getFixedDims, calculateSpecialModuleCost, SPECIAL_MANUAL_ID, SpecialModuleParams, ManualItem, SLIDE_GAP_TOTAL, DRAWER_BOX_SIDE, DRAWER_BOTTOM_INSET, WARDROBE_MAX_WIDTH } from '../utils/specialModules';
 import { supabase } from '../services/supabaseClient';
 import {
     ModuleExtra, ExtendedCabinetModule, EstimatorItem,
@@ -1386,7 +1386,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
 
   const handleAddModule = (e: React.FormEvent) => {
       e.preventDefault();
-      if (combinedFrontsBlocked || shoeRackTooLow) return;
+      if (combinedFrontsBlocked || shoeRackTooLow || wardrobeTooWide) return;
       if (activeVariant) {
           // Variante de cocina: módulo estándar con su construcción (cabinetType).
           const variantMod = {
@@ -1479,6 +1479,8 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       && [moduleForm.cntDoors, moduleForm.cntDrawers, moduleForm.cntFlaps].filter(n => (n || 0) > 0).length > 1;
   // Botinero con bandejas fijas inclinadas: alto mínimo de 500 mm (regla del taller).
   const shoeRackTooLow = activeVariant?.cabinetType === 'BOTINERO_FIJO' && (moduleForm.height || 0) < SHOE_FIXED_MIN_HEIGHT;
+  // Frente de placard corredizo: hasta 4 m; más ancho se resuelve con módulos (regla del taller).
+  const wardrobeTooWide = moduleKind === 'SPECIAL' && specialTemplateId === 'FRENTE_PLACARD' && (moduleForm.width || 0) > WARDROBE_MAX_WIDTH;
 
   const handleInputChange = (field: keyof ExtendedCabinetModule, value: any) => {
       setModuleForm(prev => {
@@ -3346,6 +3348,9 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     <div><label className="text-xs block font-bold text-gray-400 mb-2">Otros</label></div>
                                     <div><label className="text-xs block">Pistón a gas</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGasPiston} onChange={e => setSettings({...settings, priceGasPiston: Number(e.target.value)})} /></div>
                                     <div><label className="text-xs block">Pata regulable</label><input type="number" className="border p-1 w-full rounded" value={settings.priceLeg ?? ''} onChange={e => setSettings({...settings, priceLeg: Number(e.target.value) || undefined})} /></div>
+                                    <div><label className="text-xs block">Kit frente placard 2 puertas (hasta 2 m)</label><input type="number" className="border p-1 w-full rounded" value={settings.priceWardrobeKit2 ?? ''} onChange={e => setSettings({...settings, priceWardrobeKit2: Number(e.target.value) || undefined})} /></div>
+                                    <div><label className="text-xs block">Kit frente placard 3 puertas (hasta 3 m)</label><input type="number" className="border p-1 w-full rounded" value={settings.priceWardrobeKit3 ?? ''} onChange={e => setSettings({...settings, priceWardrobeKit3: Number(e.target.value) || undefined})} /></div>
+                                    <div><label className="text-xs block">Kit frente placard 4 puertas (hasta 4 m)</label><input type="number" className="border p-1 w-full rounded" value={settings.priceWardrobeKit4 ?? ''} onChange={e => setSettings({...settings, priceWardrobeKit4: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Ménsula metálica estante 15cm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket15 ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket15: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Ménsula metálica estante 25cm</label><input type="number" className="border p-1 w-full rounded" value={settings.priceFloatingBracket25 ?? ''} onChange={e => setSettings({...settings, priceFloatingBracket25: Number(e.target.value) || undefined})} /></div>
                                     <div><label className="text-xs block">Lata cemento contacto 2.8kg</label><input type="number" className="border p-1 w-full rounded" value={settings.priceGlueTin} onChange={e => setSettings({...settings, priceGlueTin: Number(e.target.value)})} /></div>
@@ -3885,7 +3890,10 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                     {shoeRackTooLow && (
                                         <span className="text-[11px] text-red-600 font-bold max-w-[260px] leading-tight">El botinero con bandejas inclinadas mide como mínimo {SHOE_FIXED_MIN_HEIGHT} mm de alto.</span>
                                     )}
-                                    <button type="submit" disabled={combinedFrontsBlocked || shoeRackTooLow} className="disabled:opacity-40 disabled:cursor-not-allowed bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
+                                    {wardrobeTooWide && (
+                                        <span className="text-[11px] text-red-600 font-bold max-w-[260px] leading-tight">El frente de placard corredizo llega hasta {WARDROBE_MAX_WIDTH / 1000} m de ancho; más ancho se arma con módulos.</span>
+                                    )}
+                                    <button type="submit" disabled={combinedFrontsBlocked || shoeRackTooLow || wardrobeTooWide} className="disabled:opacity-40 disabled:cursor-not-allowed bg-black text-white px-6 py-2 rounded-lg font-bold flex justify-center items-center gap-2 hover:bg-gray-800 transition-colors shadow-lg">
                                         {editingId ? <Save size={16}/> : <Plus size={16}/>} {editingId ? 'Actualizar' : 'Agregar'}
                                     </button>
                                 </div>
