@@ -20,7 +20,8 @@ export interface SpecialHardware {
   brackets?: number;   // ménsulas metálicas ocultas (estante flotante)
   bracketLength?: 150 | 250; // largo de la ménsula (mm): según la profundidad del estante
   wardrobeKit?: 2 | 3 | 4;    // kit de perfilería del frente de placard corredizo (2, 3 o 4 puertas)
-  hangingRailMm?: number;     // barral de colgar: largo total en mm (se cobra por metro)
+  hangingRails?: number;      // barrales de colgar: cantidad de tramos
+  hangingRailLength?: number; // largo de cada tramo (mm); se cobran barrales enteros de 3 m
   railSupports?: number;      // soportes de barral (por unidad)
 }
 
@@ -1299,7 +1300,7 @@ const ESTANTES_PLACARD: SpecialModuleTemplate = {
 // Módulo de colgado: va junto a la columna cajonera + estantes (a la derecha o a la izquierda).
 // Alto 2100. Laterales enteros, techo y piso entre laterales, estante intermedio a 900 mm (cara
 // superior) y 2 barrales de colgar (uno bajo el techo y otro bajo el estante). Sin fondo.
-// Barral: se cobra por metro (largo = ancho interior); 2 soportes por barral.
+// Barral: cada tramo mide el ancho interior; se cobran barrales enteros de 3 m. 2 soportes por tramo.
 export const PLACARD_HANGING_HEIGHT = 2100;
 export const PLACARD_HANGING_SHELF = 900;
 const COLGADO_PLACARD: SpecialModuleTemplate = {
@@ -1317,7 +1318,7 @@ const COLGADO_PLACARD: SpecialModuleTemplate = {
       { name: 'Piso', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
       { name: 'Estante intermedio', width: innerW, height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
     ];
-    return { parts, hardware: { hangingRailMm: 2 * innerW, railSupports: 4 }, laborDays: 0 };
+    return { parts, hardware: { hangingRails: 2, hangingRailLength: innerW, railSupports: 4 }, laborDays: 0 };
   }
 };
 

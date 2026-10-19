@@ -2643,8 +2643,8 @@
     "Bisagras Push-Open": 2,
     "Pistones a Gas": 1,
     "Kit frente placard 2 puertas (hasta 2 m)": 1,
-    "Barral de colgar (metros)": 1.73,
-    "Soporte de barral": 4
+    "Soporte de barral": 4,
+    "Barral de colgar (3 m)": 1
    },
    "avgComplexity": 1
   },

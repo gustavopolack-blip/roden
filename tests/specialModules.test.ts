@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SPECIAL_MODULE_TEMPLATES, getTemplate, floatingShelfBrackets, floatingShelfBracketLength } from '../utils/specialModules';
-import { calculateItemQuantities, hwPriceFor, bracketLabel, legacyToVariant, calculateModuleParts, visibleEdgeLength, wardrobeKitLabel } from '../utils/estimatorEngine';
+import { calculateItemQuantities, hwPriceFor, bracketLabel, legacyToVariant, calculateModuleParts, visibleEdgeLength, wardrobeKitLabel, hangingRailsFor } from '../utils/estimatorEngine';
 
 const ids = (g: string) => SPECIAL_MODULE_TEMPLATES.filter(t => t.group === g).map(t => t.id).sort();
 
@@ -173,6 +173,14 @@ describe('interior de placard: cajonera y estantes sobre cajonera', () => {
     expect(part(m, 'División vertical superior')).toMatchObject({ width: 500, height: 732, quantity: 1 });  // 1082 − 350
     expect(part(m, 'Estante regulable')).toMatchObject({ width: 408, height: 490, quantity: 4 });  // (floor(1100 / 350) − 1) por lado
   });
+  it('barrales enteros de 3 m: nunca faltan tramos', () => {
+    expect(hangingRailsFor([864, 864])).toBe(1);
+    expect(hangingRailsFor([1600, 1600, 1600])).toBe(3);        // no entran dos de 1600 en 3000
+    expect(hangingRailsFor([1500, 1500, 1500, 1500])).toBe(2);
+    expect(hangingRailsFor([2000, 1000, 1000, 2000])).toBe(2);
+    const m = mod('COLGADO_PLACARD', 1600);
+    expect(calculateItemQuantities([{ ...m, quantity: 2 }]).detailedHardware['Barral de colgar (3 m)']).toBe(4);   // 4 tramos de 1564
+  });
   it('colgado: alto 2100, laterales enteros, techo, piso, estante a 900 y 2 barrales, sin fondo', () => {
     const m = mod('COLGADO_PLACARD', 900);
     expect(m.height).toBe(2100);
@@ -183,9 +191,9 @@ describe('interior de placard: cajonera y estantes sobre cajonera', () => {
     expect(part(m, 'Estante intermedio')).toMatchObject({ width: 864, height: 490, quantity: 1 });
     expect(parts.some(p => /^Fondo (3|5|1)/.test(p.name))).toBe(false);
     const hw = calculateItemQuantities([m]).detailedHardware;
-    expect(hw['Barral de colgar (metros)']).toBe(1.73);   // 2 × 864 mm
+    expect(hw['Barral de colgar (3 m)']).toBe(1);   // 2 tramos de 864 salen de un barral
     expect(hw['Soporte de barral']).toBe(4);
-    expect(hwPriceFor('Barral de colgar (metros)', 1.73, { priceHangingRail: 1000, priceRailSupport: 50 })).toBeCloseTo(1730);
+    expect(hwPriceFor('Barral de colgar (3 m)', 1, { priceHangingRail: 1000, priceRailSupport: 50 })).toBe(1000);
     expect(hwPriceFor('Soporte de barral', 4, { priceHangingRail: 1000, priceRailSupport: 50 })).toBe(200);
   });
 });

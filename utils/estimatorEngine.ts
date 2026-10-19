@@ -105,8 +105,20 @@ export const HINGE_LABELS: Record<string, string> = {
 // Herraje del estante 36mm flotante (template ESTANTE_FLOTANTE), en dos largos.
 // Precio: priceFloatingBracket15 / priceFloatingBracket25.
 export const bracketLabel = (length: 150 | 250): string => `Ménsula metálica oculta ${length / 10}cm`;
-// Barral de colgar: se cobra por metro (priceHangingRail); soportes por unidad (priceRailSupport).
-export const HANGING_RAIL_LABEL = 'Barral de colgar (metros)';
+// Barral de colgar: se compra entero (3 m) y se cobra entero (priceHangingRail), aunque se use una
+// fracción; soportes por unidad (priceRailSupport).
+export const HANGING_RAIL_LENGTH = 3000;
+export const HANGING_RAIL_LABEL = 'Barral de colgar (3 m)';
+// Cantidad de barrales enteros para cortar los tramos: primero el más largo, en el primer barral
+// donde entre. Puede sobrar un barral frente al óptimo, nunca faltar.
+export const hangingRailsFor = (cuts: number[]): number => {
+    const free: number[] = [];
+    [...cuts].sort((a, b) => b - a).forEach(c => {
+        const i = free.findIndex(f => f >= c);
+        if (i >= 0) free[i] -= c; else free.push(Math.max(0, HANGING_RAIL_LENGTH - c));
+    });
+    return free.length;
+};
 export const RAIL_SUPPORT_LABEL = 'Soporte de barral';
 // Kit de perfilería del frente de placard corredizo. Precio: priceWardrobeKit2 / 3 / 4.
 export const wardrobeKitLabel = (doors: 2 | 3 | 4): string => `Kit frente placard ${doors} puertas (hasta ${doors} m)`;
@@ -617,6 +629,7 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
 
     const detailedMaterialsArea: Record<string, number> = {};
     const detailedHardware: Record<string, number> = {};
+    const railCuts: number[] = [];
 
     // La columna se cuenta por sus módulos (herrajes, patas y estantes de cada uno).
     currentModules.flatMap(m => isColumn(m) ? expandColumn(m) : [m]).forEach(rawMod => {
@@ -684,9 +697,9 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
             const bracketName = bracketLabel(sh.bracketLength);
             detailedHardware[bracketName] = (detailedHardware[bracketName] || 0) + (sh.brackets * qty);
         }
-        // Barral de colgar (por metro) y sus soportes.
-        if (sh.hangingRailMm > 0) {
-            detailedHardware[HANGING_RAIL_LABEL] = Math.round(((detailedHardware[HANGING_RAIL_LABEL] || 0) + (sh.hangingRailMm / 1000) * qty) * 100) / 100;
+        // Barral de colgar: se juntan los tramos del ítem y se cuentan barrales enteros al final.
+        if (sh.hangingRails > 0 && sh.hangingRailLength > 0) {
+            for (let k = 0; k < sh.hangingRails * qty; k++) railCuts.push(sh.hangingRailLength);
         }
         if (sh.railSupports > 0) {
             detailedHardware[RAIL_SUPPORT_LABEL] = (detailedHardware[RAIL_SUPPORT_LABEL] || 0) + sh.railSupports * qty;
@@ -858,6 +871,8 @@ export const calculateItemQuantities = (currentModules: ExtendedCabinetModule[],
             }
         });
     });
+
+    if (railCuts.length > 0) detailedHardware[HANGING_RAIL_LABEL] = hangingRailsFor(railCuts);
 
     const SHEET_AREA = 2750 * 1830;
     
