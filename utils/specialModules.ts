@@ -20,6 +20,9 @@ export interface SpecialHardware {
   brackets?: number;   // ménsulas metálicas ocultas (estante flotante)
   bracketLength?: 150 | 250; // largo de la ménsula (mm): según la profundidad del estante
   wardrobeKit?: 2 | 3 | 4;    // kit de perfilería del frente de placard corredizo (2, 3 o 4 puertas)
+  hangingRails?: number;      // barrales de colgar: cantidad de tramos
+  hangingRailLength?: number; // largo de cada tramo (mm); se cobran barrales enteros de 3 m
+  railSupports?: number;      // soportes de barral (por unidad)
 }
 
 export interface SpecialModuleResult {
@@ -1219,6 +1222,106 @@ const FRENTE_PLACARD: SpecialModuleTemplate = {
   }
 };
 
+// ── Interior de placard (regla del taller, 19/10/2026) ──────────────────────────────────
+// Dos módulos apilados del mismo ancho, que carga el usuario: como máximo el ancho de UNA
+// puerta corrediza − 50 mm (para que los cajones no choquen con las puertas). Profundidad
+// típica 500 (la carga el usuario). Sin fondo. Mano de obra: la calcula el taller aparte.
+export const PLACARD_DRAWERS_HEIGHT = 1000;
+export const PLACARD_SHELVES_HEIGHT = 1100;
+export const PLACARD_DRAWER_FRONT = 150;
+export const PLACARD_TRAYS = 3;
+export const PLACARD_SHELF_STEP = 350;
+// Guía telescópica según la profundidad (misma regla que el módulo estándar).
+const standardSlideLength = (depth: number): number =>
+  [600, 500, 450, 400, 350, 300, 250].find(s => s <= depth - 30) || 250;
+
+// Cajonera interior: laterales enteros, piso y techo entre laterales, sin fondo. Arriba 2 cajones
+// con frente de 150 mm embutido (al ras de los laterales, luz de 4 mm); debajo 3 bandejas
+// extraíbles como las del botinero (ancho interior − 26, faja de 36). Guías telescópicas comunes.
+const CAJONERA_PLACARD: SpecialModuleTemplate = {
+  id: 'CAJONERA_PLACARD',
+  group: 'MODULO',
+  name: 'Cajonera interior de placard',
+  description: 'Alto 1000. Laterales enteros, sin fondo. 2 cajones (frente 150 embutido) + 3 bandejas extraíbles. Ancho máx. = puerta corrediza − 50.',
+  params: ['width', 'depth'],
+  fixedDims: () => ({ height: PLACARD_DRAWERS_HEIGHT }),
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const innerW = Math.max(0, W - 36);
+    const boxH = drawerBoxHeightFor(PLACARD_DRAWER_FRONT);
+    const boxL = Math.max(0, D - 20 - 18);                         // frente embutido: caja 18 más corta
+    const boxOuterW = Math.max(0, innerW - SLIDE_GAP_TOTAL);
+    const boxInnerW = Math.max(0, boxOuterW - 2 * DRAWER_BOX_SIDE);
+    const trayW = Math.max(0, innerW - 26);
+    const parts: CalculatedPart[] = [
+      { name: 'Lateral', width: D, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical', frontEdge: 'height' },
+      { name: 'Techo', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Piso', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Frente Cajón', width: Math.max(0, innerW - 8), height: PLACARD_DRAWER_FRONT, material: '18mm_Front', quantity: 2, grain: 'horizontal' },
+      { name: 'Lateral Cajón', width: boxL, height: boxH, material: '15mm_White', quantity: 4, grain: 'free' },
+      { name: 'Contra/Frente Cajón', width: boxInnerW, height: boxH, material: '15mm_White', quantity: 4, grain: 'free' },
+      { name: 'Fondo Cajón', width: Math.max(0, boxOuterW - 2 * DRAWER_BOTTOM_INSET), height: Math.max(0, boxL - 2 * DRAWER_BOTTOM_INSET), material: '3mm_White', quantity: 2, grain: 'free' },
+      { name: 'Bandeja extraíble', width: trayW, height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: PLACARD_TRAYS, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Faja bandeja', width: trayW, height: 36, material: '18mm_Carcass', quantity: PLACARD_TRAYS, grain: 'horizontal', frontEdge: 'width' },
+    ];
+    // 2 cajones + 3 bandejas: telescópicas comunes. Largo según la profundidad de la bandeja
+    // (la caja del cajón es 18 mm más corta: nunca necesita una guía más larga).
+    return { parts, hardware: { slides: 2 + PLACARD_TRAYS, slideLength: standardSlideLength(D), slideType: 'TELESCOPIC' }, laborDays: 0 };
+  }
+};
+
+// Estantes sobre cajonera: apoya sobre la cajonera (sin base). Laterales enteros, techo entre
+// laterales, divisor central, 1 estante fijo completo ABAJO (primer nivel, a 350 mm) para
+// rigidizar —el divisor queda en dos tramos— y los regulables arriba. floor(alto / 350) niveles
+// por lado, y el fijo cuenta como uno: regulables = floor(alto / 350) − 1 por lado. Sin fondo.
+const ESTANTES_PLACARD: SpecialModuleTemplate = {
+  id: 'ESTANTES_PLACARD',
+  group: 'MODULO',
+  name: 'Estantes sobre cajonera (placard)',
+  description: 'Alto 1100, sin base (apoya en la cajonera). Divisor central, 1 estante fijo abajo y estantes regulables arriba (cada 350 mm). Sin fondo.',
+  params: ['width', 'depth'],
+  fixedDims: () => ({ height: PLACARD_SHELVES_HEIGHT }),
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const innerW = Math.max(0, W - 36);
+    const innerH = Math.max(0, H - 18);                            // del piso (techo de la cajonera) al techo
+    const fixedTop = PLACARD_SHELF_STEP;                           // cara superior del estante fijo
+    const perSide = Math.max(0, Math.floor(H / PLACARD_SHELF_STEP) - 1);
+    const parts: CalculatedPart[] = [
+      { name: 'Lateral', width: D, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical', frontEdge: 'height' },
+      { name: 'Techo', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Estante fijo', width: innerW, height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'División vertical inferior', width: D, height: Math.max(0, fixedTop - 18), material: '18mm_Carcass', quantity: 1, grain: 'vertical', frontEdge: 'height' },
+      { name: 'División vertical superior', width: D, height: Math.max(0, innerH - fixedTop), material: '18mm_Carcass', quantity: 1, grain: 'vertical', frontEdge: 'height' },
+      { name: 'Estante regulable', width: Math.max(0, (innerW - 18) / 2), height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 2 * perSide, grain: 'horizontal', frontEdge: 'width' },
+    ];
+    return { parts, hardware: {}, laborDays: 0 };
+  }
+};
+
+// Módulo de colgado: va junto a la columna cajonera + estantes (a la derecha o a la izquierda).
+// Alto 2100. Laterales enteros, techo y piso entre laterales, estante intermedio a 900 mm (cara
+// superior) y 2 barrales de colgar (uno bajo el techo y otro bajo el estante). Sin fondo.
+// Barral: cada tramo mide el ancho interior; se cobran barrales enteros de 3 m. 2 soportes por tramo.
+export const PLACARD_HANGING_HEIGHT = 2100;
+export const PLACARD_HANGING_SHELF = 900;
+const COLGADO_PLACARD: SpecialModuleTemplate = {
+  id: 'COLGADO_PLACARD',
+  group: 'MODULO',
+  name: 'Módulo de colgado (placard)',
+  description: 'Alto 2100. Laterales enteros, techo, piso, estante intermedio a 900 mm y 2 barrales de colgar. Sin fondo.',
+  params: ['width', 'depth'],
+  fixedDims: () => ({ height: PLACARD_HANGING_HEIGHT }),
+  calculate: ({ width: W, height: H, depth: D }) => {
+    const innerW = Math.max(0, W - 36);
+    const parts: CalculatedPart[] = [
+      { name: 'Lateral', width: D, height: H, material: '18mm_Carcass', quantity: 2, grain: 'vertical', frontEdge: 'height' },
+      { name: 'Techo', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Piso', width: innerW, height: D, material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+      { name: 'Estante intermedio', width: innerW, height: Math.max(0, D - 10), material: '18mm_Carcass', quantity: 1, grain: 'horizontal', frontEdge: 'width' },
+    ];
+    return { parts, hardware: { hangingRails: 2, hangingRailLength: innerW, railSupports: 4 }, laborDays: 0 };
+  }
+};
+
 // Frentes sueltos (Piezas, ficha del 13/10/2026).
 // Frente de cajón suelto: lleva su caja y guías, como si el frente estuviera sobre un hueco de su
 // mismo ancho (+ 4 de luz − 36 de laterales − 25 de guías). Largo de caja D − 20.
@@ -1297,6 +1400,9 @@ export const SPECIAL_MODULE_TEMPLATES: SpecialModuleTemplate[] = [
   FRENTE_CAJON_SUELTO,
   FRENTE_ABATIBLE_SUELTO,
   FRENTE_PLACARD,
+  CAJONERA_PLACARD,
+  ESTANTES_PLACARD,
+  COLGADO_PLACARD,
 ];
 
 export const getTemplate = (id: string): SpecialModuleTemplate | undefined =>

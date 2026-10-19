@@ -1971,6 +1971,179 @@
     "grain": "vertical"
    }
   ],
+  "sp25": [
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 1000,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "Techo",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Piso",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_Color",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Frente Cajón",
+    "width": 856,
+    "height": 150,
+    "material": "18mm_Color",
+    "quantity": 2,
+    "grain": "horizontal"
+   },
+   {
+    "name": "Lateral Cajón",
+    "width": 412,
+    "height": 80,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "free"
+   },
+   {
+    "name": "Contra/Frente Cajón",
+    "width": 809,
+    "height": 80,
+    "material": "15mm_White",
+    "quantity": 4,
+    "grain": "free"
+   },
+   {
+    "name": "Fondo Cajón",
+    "width": 831,
+    "height": 404,
+    "material": "3mm_White",
+    "quantity": 2,
+    "grain": "free"
+   },
+   {
+    "name": "Bandeja extraíble",
+    "width": 838,
+    "height": 440,
+    "material": "18mm_Color",
+    "quantity": 3,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Faja bandeja",
+    "width": 838,
+    "height": 36,
+    "material": "18mm_Color",
+    "quantity": 3,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   }
+  ],
+  "sp26": [
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 1100,
+    "material": "18mm_White",
+    "quantity": 2,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "Techo",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Estante fijo",
+    "width": 864,
+    "height": 440,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "División vertical inferior",
+    "width": 450,
+    "height": 332,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "División vertical superior",
+    "width": 450,
+    "height": 732,
+    "material": "18mm_White",
+    "quantity": 1,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "Estante regulable",
+    "width": 423,
+    "height": 440,
+    "material": "18mm_White",
+    "quantity": 4,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   }
+  ],
+  "sp27": [
+   {
+    "name": "Lateral",
+    "width": 450,
+    "height": 2100,
+    "material": "18mm_MDF",
+    "quantity": 2,
+    "grain": "vertical",
+    "frontEdge": "height"
+   },
+   {
+    "name": "Techo",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Piso",
+    "width": 864,
+    "height": 450,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   },
+   {
+    "name": "Estante intermedio",
+    "width": 864,
+    "height": 440,
+    "material": "18mm_MDF",
+    "quantity": 1,
+    "grain": "horizontal",
+    "frontEdge": "width"
+   }
+  ],
   "man": []
  },
  "labels": {
@@ -2294,6 +2467,31 @@
   "sp24": [
    "Melamina Blanca 18mm MDP"
   ],
+  "sp25": [
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP",
+   "Melamina Blanca 15mm (cajón)",
+   "Melamina Blanca 15mm (cajón)",
+   "Fondo Blanco 3mm",
+   "Melamina Color 18mm MDP",
+   "Melamina Color 18mm MDP"
+  ],
+  "sp26": [
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP",
+   "Melamina Blanca 18mm MDP"
+  ],
+  "sp27": [
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF",
+   "Melamina Color 18mm MDF"
+  ],
   "man": []
  },
  "quantities": {
@@ -2409,17 +2607,17 @@
    "avgComplexity": 1
   },
   "especiales": {
-   "boards18Color": 3,
-   "boards18White": 3,
+   "boards18Color": 4,
+   "boards18White": 4,
    "boards18MDFMelamine": 0,
-   "boards18MDF": 2,
+   "boards18MDF": 3,
    "boards15": 2,
    "backing55": 1,
    "backing3": 2,
-   "linearWhite22": 54,
+   "linearWhite22": 65,
    "linearWhite45": 15,
-   "linearColor22": 38,
-   "linearColor45": 22,
+   "linearColor22": 54,
+   "linearColor45": 26,
    "linear2mm": 0,
    "lacquerAreaM2": 0,
    "veneerAreaM2": 0,
@@ -2427,24 +2625,26 @@
    "veneerGlossAreaM2": 0,
    "totalHinges": 10,
    "totalPistons": 1,
-   "totalSlides": 9,
+   "totalSlides": 14,
    "totalExtrasCost": 0,
    "detailedBoards": {
     "Melamina Blanca 18mm MDF": 2,
     "Fondo Melamina Blanca (5.5mm)": 1,
-    "Melamina Color 18mm MDP": 3,
+    "Melamina Color 18mm MDP": 4,
     "Fondo Blanco (3mm)": 2,
     "Melamina Blanca 15mm MDP": 2,
-    "Melamina Blanca 18mm MDP": 3,
-    "Melamina Color 18mm MDF": 1,
+    "Melamina Blanca 18mm MDP": 4,
+    "Melamina Color 18mm MDF": 2,
     "Fondo Melamina Color (5.5mm)": 1
    },
    "detailedHardware": {
-    "Guías Telescópicas (400mm)": 9,
+    "Guías Telescópicas (400mm)": 14,
     "Bisagras Estándar": 8,
     "Bisagras Push-Open": 2,
     "Pistones a Gas": 1,
-    "Kit frente placard 2 puertas (hasta 2 m)": 1
+    "Kit frente placard 2 puertas (hasta 2 m)": 1,
+    "Soporte de barral": 4,
+    "Barral de colgar (3 m)": 1
    },
    "avgComplexity": 1
   },
@@ -2551,16 +2751,16 @@
    "laborCost": 510000,
    "fixedCosts": 78000,
    "extrasCost": 0,
-   "tPlacas": 1418400,
-   "tTapac": 135130,
-   "tHerrajes": 80500,
+   "tPlacas": 1786400,
+   "tTapac": 166580,
+   "tHerrajes": 113000,
    "tFinish": 0,
    "finArea": 0,
    "finPrice": 0,
    "finishLines": [],
-   "costoDirecto": 2222030,
-   "precioTaller": 2999740.5,
-   "precioFinal": 3749675.625
+   "costoDirecto": 2653980,
+   "precioTaller": 3582873.0000000005,
+   "precioFinal": 4478591.250000001
   },
   "con_manual": {
    "laborCost": 510000,
@@ -2643,25 +2843,25 @@
    "veneer": 6507405
   },
   "especiales": {
-   "whiteAglo": 2910279.375,
-   "whiteMDF": 3179604.375,
-   "colorAglo": 3412681.875,
-   "colorMDF": 3729256.875,
-   "whiteLacqAglo": 6438386.25,
-   "whiteLacqMDF": 6669236.25,
-   "colorLacqAglo": 6805974.375,
-   "colorLacqMDF": 7077324.375,
-   "whiteVenrAglo": 6668561.25,
-   "whiteVenrMDF": 6899411.25,
-   "colorVenrAglo": 7036149.375,
-   "colorVenrMDF": 7307499.375,
-   "baseConfig": 3412681.875,
-   "totalDirectCost": 2022330,
-   "realConfig": 3749675.625,
-   "realConfigTaller": 2999740.5,
-   "realConfigDirect": 2222030,
-   "lacquer": 6438386.25,
-   "veneer": 6668561.25
+   "whiteAglo": 3311415,
+   "whiteMDF": 3657690,
+   "colorAglo": 3945375,
+   "colorMDF": 4352400,
+   "whiteLacqAglo": 7872406.875,
+   "whiteLacqMDF": 8180206.875,
+   "colorLacqAglo": 8362321.875,
+   "colorLacqMDF": 8724121.875,
+   "whiteVenrAglo": 8102581.875,
+   "whiteVenrMDF": 8410381.875,
+   "colorVenrAglo": 8592496.875,
+   "colorVenrMDF": 8954296.875000002,
+   "baseConfig": 3945375,
+   "totalDirectCost": 2338000,
+   "realConfig": 4478591.250000001,
+   "realConfigTaller": 3582873.0000000005,
+   "realConfigDirect": 2653980,
+   "lacquer": 7872406.875,
+   "veneer": 8102581.875
   },
   "con_manual": {
    "whiteAglo": 1742411.25,

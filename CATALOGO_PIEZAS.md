@@ -319,6 +319,25 @@ presupuesto nuevo. La columna vieja no tiene conversión (sus módulos se cargab
 Plantilla `FRENTE_PLACARD` (botón Módulos). En 3D las puertas van en dos rieles alternados
 (supuesto de dibujo).
 
+### Interior de placard (19/10/2026)
+
+Una columna de dos módulos apilados (cajonera + estantes) y, al lado, a la derecha o a la
+izquierda, el módulo de colgado. Ancho de cada módulo: lo carga el usuario, **como máximo el ancho
+de una puerta corrediza − 50 mm**, para que no choquen con las puertas. Profundidad típica 500
+(la carga el usuario). Sin fondo. Mano de obra: la calcula el taller aparte.
+
+| Módulo | Regla del taller |
+|---|---|
+| Cajonera interior (`CAJONERA_PLACARD`) | Alto **1000**. Laterales enteros; piso y techo entre laterales; apoya en el piso del placard. Arriba **2 cajones** con frente de **150** de 18 mm, embutido al ras de los laterales con luz de 4 mm (frente = interior − 8); caja según el frente (80 mm), 18 mm más corta por el embutido. Debajo **3 bandejas extraíbles** como las del botinero (interior − 26, profundidad D − 10, faja de 36). Cajones y bandejas con guías telescópicas comunes: 5 pares. |
+| Estantes sobre cajonera (`ESTANTES_PLACARD`) | Alto **1100**, **sin base** (apoya en la cajonera). Laterales enteros, techo entre laterales, **divisor central** y **1 estante fijo completo abajo** para rigidizar. Niveles por lado: floor(alto / 350) = 3; **el fijo cuenta como uno**, así que van **2 regulables por lado** (4 en total), arriba del fijo. |
+| Módulo de colgado (`COLGADO_PLACARD`) | Alto **2100**. Laterales enteros, techo y piso entre laterales, **estante intermedio a 900 mm** y **2 barrales de colgar**. Sin fondo. El barral se compra entero (**3 m**) y se cobra entero aunque se use una fracción: los tramos de todo el ítem se reparten en barrales enteros (`priceHangingRail` = precio del barral). |
+
+Supuestos míos a confirmar: el estante fijo queda en el primer nivel (cara superior a 350 mm), así
+el divisor va en dos tramos (332 abajo, 732 arriba); los 900 mm del estante del colgado son a su
+cara superior; cada barral mide el ancho interior y lleva 2 soportes; los soportes se cobran por
+unidad (`priceRailSupport`). El precio de los soportes lo carga el taller a mano. En 3D: bandejas repartidas en partes iguales debajo de los cajones,
+regulables repartidos en partes iguales sobre el fijo, barrales sin dibujar (son herraje).
+
 ### Base: zócalo, banquina y patas (13/10/2026)
 
 | Tema | Regla del taller |
