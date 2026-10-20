@@ -334,8 +334,9 @@ de una puerta corrediza − 50 mm**, para que no choquen con las puertas. Profun
 
 Supuestos míos a confirmar: el estante fijo queda en el primer nivel (cara superior a 350 mm), así
 el divisor va en dos tramos (332 abajo, 732 arriba); los 900 mm del estante del colgado son a su
-cara superior; cada barral mide el ancho interior y lleva 2 soportes; los soportes se cobran por
-unidad (`priceRailSupport`). El precio de los soportes lo carga el taller a mano. En 3D: bandejas repartidas en partes iguales debajo de los cajones,
+cara superior; cada barral mide el ancho interior. Soportes: **siempre 2 por barral**, sin
+soporte central (confirmado por Gustavo, 20/10/2026: el costo no influye); se cobran por unidad
+(`priceRailSupport`). El precio de los soportes lo carga el taller a mano. En 3D: bandejas repartidas en partes iguales debajo de los cajones,
 regulables repartidos en partes iguales sobre el fijo, barrales sin dibujar (son herraje).
 
 ### Base: zócalo, banquina y patas (13/10/2026)
