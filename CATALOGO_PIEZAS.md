@@ -332,10 +332,13 @@ de una puerta corrediza − 50 mm**, para que no choquen con las puertas. Profun
 | Estantes sobre cajonera (`ESTANTES_PLACARD`) | Alto **1100**, **sin base** (apoya en la cajonera). Laterales enteros, techo entre laterales, **divisor central** y **1 estante fijo completo abajo** para rigidizar. Niveles por lado: floor(alto / 350) = 3; **el fijo cuenta como uno**, así que van **2 regulables por lado** (4 en total), arriba del fijo. |
 | Módulo de colgado (`COLGADO_PLACARD`) | Alto **2100**. Laterales enteros, techo y piso entre laterales, **estante intermedio a 900 mm** y **2 barrales de colgar**. Sin fondo. El barral se compra entero (**3 m**) y se cobra entero aunque se use una fracción: los tramos de todo el ítem se reparten en barrales enteros (`priceHangingRail` = precio del barral). |
 
-Supuestos míos a confirmar: el estante fijo queda en el primer nivel (cara superior a 350 mm), así
-el divisor va en dos tramos (332 abajo, 732 arriba); los 900 mm del estante del colgado son a su
-cara superior; cada barral mide el ancho interior y lleva 2 soportes; los soportes se cobran por
-unidad (`priceRailSupport`). El precio de los soportes lo carga el taller a mano. En 3D: bandejas repartidas en partes iguales debajo de los cajones,
+Confirmado por Gustavo (20/10/2026): el estante fijo queda en el primer nivel (cara superior a
+350 mm), así el divisor va en dos tramos (332 abajo, 732 arriba); los 900 mm del estante del
+colgado son a su cara superior; cada barral mide el ancho interior. Soportes: **siempre 2 por
+barral**, sin soporte central (el costo no influye); se cobran por unidad (`priceRailSupport`).
+Cualquier placard se cotiza sumando estos módulos con los estándar o extras.
+
+Supuestos de dibujo (solo 3D): bandejas repartidas en partes iguales debajo de los cajones,
 regulables repartidos en partes iguales sobre el fijo, barrales sin dibujar (son herraje).
 
 ### Base: zócalo, banquina y patas (13/10/2026)

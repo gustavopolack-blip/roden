@@ -124,6 +124,37 @@ export const overlapVolume = (a: Box, b: Box, tol = 0.01): number => {
 };
 
 /**
+ * Imán al arrastrar un módulo en el visor: `delta` es el desplazamiento crudo (mm) del módulo cuya
+ * caja (antes de mover) es `moving`. En cada eje, si una cara queda a `threshold` mm o menos de
+ * una cara de otro módulo vecino (que se superpone en los otros dos ejes), se pega a esa cara;
+ * en altura también se pega al piso y nunca baja de él. Sin imán, se redondea al mm.
+ */
+export const SNAP_DISTANCE = 30;
+export const snapModuleMove = (moving: Box, others: Box[], delta: Vec3, threshold = SNAP_DISTANCE): Vec3 => {
+  const moved: Box = {
+    min: [moving.min[0] + delta[0], moving.min[1] + delta[1], moving.min[2] + delta[2]],
+    max: [moving.max[0] + delta[0], moving.max[1] + delta[1], moving.max[2] + delta[2]],
+  };
+  const near = (o: Box, axis: number) => [0, 1, 2].filter(i => i !== axis)
+    .every(i => Math.min(moved.max[i], o.max[i]) - Math.max(moved.min[i], o.min[i]) > -threshold);
+  const out: Vec3 = [delta[0], delta[1], delta[2]];
+  for (let axis = 0; axis < 3; axis++) {
+    let best: number | null = null;
+    const consider = (shift: number) => { if (Math.abs(shift) <= threshold && (best === null || Math.abs(shift) < Math.abs(best))) best = shift; };
+    others.filter(o => near(o, axis)).forEach(o => {
+      consider(o.max[axis] - moved.min[axis]);   // pegado a continuación del otro
+      consider(o.min[axis] - moved.max[axis]);   // pegado antes del otro
+      consider(o.min[axis] - moved.min[axis]);   // caras alineadas
+      consider(o.max[axis] - moved.max[axis]);
+    });
+    if (axis === 1) consider(-moved.min[1]);      // piso
+    out[axis] = best !== null ? delta[axis] + best : Math.round(delta[axis]);
+  }
+  if (moving.min[1] + out[1] < 0) out[1] = -moving.min[1];
+  return out;
+};
+
+/**
  * Distancia de cámara para que la caja entre completa en pantalla desde cualquier dirección:
  * se encuadra la esfera que la contiene con el menor de los dos ángulos de visión (vertical u
  * horizontal, según la proporción del visor). Con margen 1 la esfera toca el borde.

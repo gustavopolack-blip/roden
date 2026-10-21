@@ -28,6 +28,16 @@ En el constructor:
   (el seleccionado en la lista, solo), cada una **Ensamblada** o en **Despiece** con control de
   separación. Al cambiar de vista la cámara encuadra todo lo visible según la proporción del visor.
 - Clic en una pieza: nombre, placa, medidas y veta (las mismas del despiece y la planilla de cortes).
+- **Mover módulos con el mouse** (Ítem completo, Ensamblado, no en solo lectura): clic en un
+  módulo y aparecen las flechas de mover, como el gizmo de 3ds Max (rojo X, verde Y, azul Z; los
+  cuadraditos mueven en un plano). Imán: al soltar a **30 mm o menos** de la cara de un módulo
+  vecino (que esté a la par en los otros dos ejes) se pega a esa cara o la alinea; en altura se
+  pega al piso y nunca baja de él. Sin imán, se redondea al mm. Las copias (Cant.) se mueven
+  juntas. La posición queda en X/Y/Z del panel, como si se cargara a mano. Si queda superpuesto,
+  Validación lo marca y no deja aplicar.
+- **Pantalla completa**: el visor y su barra ocupan toda la pantalla (pantalla completa del
+  navegador; Esc o "Salir de pantalla completa" vuelve). En iPhone, donde el navegador no lo
+  permite, el visor igual tapa toda la ventana.
 - La validación marca módulos superpuestos, separaciones chicas (≤ 5 mm), medidas inválidas,
   frentes que no entran y piezas que chocan por reglas pendientes. Con errores no se puede aplicar.
 

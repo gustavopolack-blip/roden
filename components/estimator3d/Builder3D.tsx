@@ -8,13 +8,13 @@
  * El despiece, herrajes y precios salen del motor del estimador (utils/estimatorEngine):
  * acá no se calcula ninguna medida ni costo propio. Se carga bajo demanda (React.lazy).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp,
+  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink,
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
-  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY,
+  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE,
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
@@ -84,6 +84,26 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const [selPieceKey, setSelPieceKey] = useState<string | null>(null);
   const [fitToken, setFitToken] = useState(0);
   const [showRules, setShowRules] = useState(false);
+  // Visor a pantalla completa: pantalla completa del navegador sobre el visor y su barra; donde el
+  // navegador no lo permite (iPhone), el visor igual tapa toda la ventana.
+  const [maximized, setMaximized] = useState(false);
+  const viewerRef = useRef<HTMLElement>(null);
+  const toggleMaximized = () => {
+    if (maximized) {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      setMaximized(false);
+    } else {
+      setMaximized(true);
+      viewerRef.current?.requestFullscreen?.().catch(() => {});
+    }
+    setTimeout(() => setFitToken(t => t + 1), 150);
+  };
+  useEffect(() => {
+    // Esc del navegador sale de pantalla completa: el visor vuelve a su lugar.
+    const onChange = () => { if (!document.fullscreenElement) { setMaximized(false); setTimeout(() => setFitToken(t => t + 1), 150); } };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
 
   const active = furnitures.find(f => f.id === activeId) || furnitures[0];
   const modules = drafts[active.id] || [];
@@ -139,6 +159,16 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     }));
     setDirty(true);
   };
+  /** Arrastre en el visor: mueve el módulo (y sus copias) el desplazamiento ya ajustado por el imán. */
+  const moveModule = (idx: number, delta: Vec3) => {
+    const pm = assembly.modules.find(m => m.moduleIndex === idx && m.instance === 0);
+    if (!pm) return;
+    const r = (v: number) => Math.round(v * 10) / 10;
+    updateLayout(idx, { x: r(pm.layout.x + delta[0]), y: r(pm.layout.y + delta[1]), z: r(pm.layout.z + delta[2]) });
+  };
+  // Las flechas de mover solo en el ítem completo armado (en despiece las posiciones no son las reales).
+  const moveEnabled = editable && scope === 'item' && presentation === 'assembled';
+
   const resetLayouts = () => {
     setDrafts(prev => ({ ...prev, [active.id]: prev[active.id].map(m => { const { layout3d, ...rest } = m as any; return rest; }) }));
     setDirty(true);
@@ -324,7 +354,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
           </aside>
 
           {/* Centro: visor */}
-          <main className="flex-1 flex flex-col min-w-0">
+          <main ref={viewerRef} className={maximized ? 'fixed inset-0 z-[310] bg-white flex flex-col' : 'flex-1 flex flex-col min-w-0'}>
             <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-200">
               <div className="flex rounded-lg border border-gray-200 p-0.5">
                 {([['item', 'Ítem completo'], ['module', 'Módulo']] as const).map(([k, label]) => (
@@ -351,6 +381,14 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                 </label>
               )}
               <button onClick={() => setFitToken(t => t + 1)} className="px-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-gray-100 flex items-center gap-1.5"><Maximize2 size={14} /> Encuadrar</button>
+              <button onClick={toggleMaximized} className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 border border-gray-200 hover:bg-gray-100 flex items-center gap-1.5">
+                {maximized ? <><Shrink size={14} /> Salir de pantalla completa</> : <><Expand size={14} /> Pantalla completa</>}
+              </button>
+              {moveEnabled && (
+                <span className="text-[10px] text-gray-500">
+                  {selModuleKey ? `Mover: arrastrá las flechas (imán a ${SNAP_DISTANCE} mm)` : 'Clic en un módulo para moverlo'}
+                </span>
+              )}
               <div className="flex-1" />
               <span className="text-[10px] text-gray-400 hidden xl:inline">3ds Max: File → Import → .fbx (unidades del archivo: mm)</span>
               <button onClick={() => doExport('fbx')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"><Download size={14} /> FBX ensamblado</button>
@@ -363,6 +401,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   scene={viewScene} bbox={viewPlaced ? viewPlaced.localBox : assembly.bbox}
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
+                  moveEnabled={moveEnabled} onMoveModule={moveModule}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}
                 />
               ) : (
