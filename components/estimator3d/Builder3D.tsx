@@ -10,13 +10,14 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink, Square, Image as ImageIcon,
+  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink, Square, Image as ImageIcon, Smartphone,
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
   buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, ModuleLayout3D, transformBox,
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
+import { exportViewerHtml, exportUsdz } from '../../utils/furniture3d/webExport';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
 import { getTemplate, getFixedDims } from '../../utils/specialModules';
 
@@ -91,6 +92,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   // Vista de frente: la pared de apoyo es el plano de la pantalla; los módulos se arrastran directo.
   const [frontView, setFrontView] = useState(false);
   const captureRef = useRef<((caption: string) => Promise<Blob | null>) | null>(null);
+  const modelRef = useRef<(() => any) | null>(null);
   const viewerRef = useRef<HTMLElement>(null);
   const toggleMaximized = () => {
     if (maximized) {
@@ -241,27 +243,22 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   };
 
   /**
-   * Imagen JPG de lo que se ve en el visor, como una captura, para la documentación técnica. La
-   * imagen se toma en el clic, antes de abrir el cuadro de "Guardar como" (que puede sacar al
-   * navegador de pantalla completa). Chrome y Edge: cuadro para elegir carpeta y nombre; Firefox y
-   * Safari: se descarga con el nombre sugerido.
+   * Guarda un archivo: en Chrome y Edge, cuadro de "Guardar como" (carpeta y nombre); en Firefox y
+   * Safari, descarga con el nombre sugerido. `content` ya tiene que estar en marcha antes de abrir
+   * el cuadro (que puede sacar al navegador de pantalla completa y cambiar el visor).
    */
-  const saveImage = async () => {
-    const fileName = `${exportFileBase(active.name, presentation === 'exploded')}.jpg`;
-    const caption = [projectName && `Obra: ${projectName}`, `Mueble: ${active.name}`].filter(Boolean).join('   ·   ');
-    const shot = captureRef.current?.(caption);
-    if (!shot) return;
+  const saveFile = async (content: Promise<Blob | null>, fileName: string, description: string, mime: string, exts: string[]) => {
     const picker = (window as any).showSaveFilePicker;
     let handle: any = null;
     if (picker) {
       try {
-        handle = await picker({ suggestedName: fileName, types: [{ description: 'Imagen JPG', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }] });
+        handle = await picker({ suggestedName: fileName, types: [{ description, accept: { [mime]: exts } }] });
       } catch (e: any) {
         if (e?.name === 'AbortError') return;   // canceló el cuadro
         handle = null;
       }
     }
-    const blob = await shot;
+    const blob = await content;
     if (!blob) return;
     if (handle) {
       const w = await handle.createWritable();
@@ -274,6 +271,34 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     a.href = url; a.download = fileName;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
+  /** Imagen JPG de lo que se ve en el visor, como una captura, tomada en el clic. */
+  const saveImage = () => {
+    const caption = [projectName && `Obra: ${projectName}`, `Mueble: ${active.name}`].filter(Boolean).join('   ·   ');
+    const shot = captureRef.current?.(caption);
+    if (!shot) return;
+    saveFile(shot, `${exportFileBase(active.name, presentation === 'exploded')}.jpg`, 'Imagen JPG', 'image/jpeg', ['.jpg', '.jpeg']);
+  };
+
+  /**
+   * Maqueta para ver y girar en el celular, la tablet o la PC: HTML (cualquier navegador, sin
+   * internet) o USDZ (iPhone/iPad, con realidad aumentada a tamaño real). Copia de lo que se ve.
+   */
+  const saveWebModel = (kind: 'html' | 'usdz') => {
+    const model = modelRef.current?.();
+    if (!model) return;
+    const base = exportFileBase(active.name, presentation === 'exploded');
+    const s = viewPlaced ? viewPlaced.localBox : assembly.bbox;
+    const dims = `${Math.round(s.max[0] - s.min[0])} × ${Math.round(s.max[1] - s.min[1])} × ${Math.round(s.max[2] - s.min[2])} mm`;
+    const caption = [projectName && `Obra: ${projectName}`, `Mueble: ${active.name}`, dims].filter(Boolean).join('  ·  ');
+    if (kind === 'html') {
+      const html = exportViewerHtml(model, { title: `${active.name} — rødën`, caption }).then(t => new Blob([t], { type: 'text/html' }));
+      saveFile(html, `${base}.html`, 'Maqueta 3D (página web)', 'text/html', ['.html']);
+    } else {
+      const usdz = exportUsdz(model).then(b => new Blob([b], { type: 'model/vnd.usdz+zip' }));
+      saveFile(usdz, `${base}.usdz`, 'Maqueta 3D (iPhone/iPad)', 'model/vnd.usdz+zip', ['.usdz']);
+    }
   };
 
   const errors = assembly.issues.filter(i => i.level === 'error');
@@ -489,6 +514,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
               <div className="flex-1" />
               <span className="text-[10px] text-gray-400 hidden xl:inline">3ds Max: File → Import → .fbx (unidades del archivo: mm)</span>
               <button onClick={saveImage} title="Imagen de lo que se ve en el visor, para la documentación técnica" className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><ImageIcon size={14} /> Imagen JPG</button>
+              <button onClick={() => saveWebModel('html')} title="Un archivo que se abre en cualquier navegador (celular, tablet o PC) para girar la maqueta con el dedo o el mouse. Funciona sin internet." className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Smartphone size={14} /> Maqueta web (.html)</button>
+              <button onClick={() => saveWebModel('usdz')} title="Formato de Apple: en iPhone/iPad se abre solo, se gira y se ve en el ambiente con realidad aumentada, a tamaño real." className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Smartphone size={14} /> iPhone/iPad (.usdz)</button>
               <button onClick={() => doExport('fbx')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"><Download size={14} /> FBX ensamblado</button>
               <button onClick={() => doExport('fbx-exploded')} className="px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5"><Download size={14} /> FBX despiece</button>
               <button onClick={() => doExport('obj')} className="px-3 py-1.5 rounded-lg text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Download size={14} /> OBJ + MTL</button>
@@ -499,7 +526,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   scene={viewScene} bbox={viewPlaced ? viewPlaced.localBox : assembly.bbox}
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
-                  moveEnabled={moveEnabled} frontView={frontView} onMoveModule={moveModule} captureRef={captureRef}
+                  moveEnabled={moveEnabled} frontView={frontView} onMoveModule={moveModule} captureRef={captureRef} modelRef={modelRef}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}
                 />
               ) : (

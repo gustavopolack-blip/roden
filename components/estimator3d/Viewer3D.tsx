@@ -36,6 +36,8 @@ interface Viewer3DProps {
   onMoveModule?: (moduleIndex: number, instance: number, delta: Vec3) => void;   // al soltar: desplazamiento (mm) ya con imán; instance 0 = el módulo con sus copias no separadas
   /** El visor deja acá la función que saca una imagen JPG de lo que se ve (con un rótulo abajo). */
   captureRef?: React.MutableRefObject<((caption: string) => Promise<Blob | null>) | null>;
+  /** El visor deja acá la función que copia lo que se ve (en mm) para exportar la maqueta. */
+  modelRef?: React.MutableRefObject<(() => THREE.Group | null) | null>;
 }
 
 const disposeTree = (obj: THREE.Object3D) => {
@@ -54,7 +56,7 @@ const setOrthoFrustum = (c: { ortho: THREE.OrthographicCamera; camera: THREE.Per
   c.ortho.updateProjectionMatrix();
 };
 
-const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule, captureRef }) => {
+const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule, captureRef, modelRef }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
@@ -383,6 +385,23 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     return new Promise(res => out.toBlob(b => res(b), 'image/jpeg', 0.92));
   };
   if (captureRef) captureRef.current = capture;
+
+  /** Copia de lo que se ve (en mm), sin marcas de selección ni resaltado, para exportar. */
+  const cloneModel = (): THREE.Group | null => {
+    const c = ctx.current;
+    if (!c) return null;
+    const copy = c.content.clone(true);
+    const drop: THREE.Object3D[] = [];
+    copy.traverse(o => {
+      if (o.userData.overlay) { drop.push(o); return; }
+      const m = (o as any).material;
+      if (m && !Array.isArray(m) && m.emissiveIntensity) { (o as any).material = m.clone(); (o as any).material.emissiveIntensity = 0; }
+    });
+    drop.forEach(o => o.parent?.remove(o));
+    copy.updateMatrixWorld(true);
+    return copy;
+  };
+  if (modelRef) modelRef.current = cloneModel;
 
   // Cambio de vista: de frente no se orbita (solo desplazar y acercar).
   useEffect(() => {
