@@ -175,14 +175,30 @@ const collectNodes = (scene: FurnitureScene): ModuleNode[] => {
 // ─────────────────────────────────────────────────────────────
 export const FBX_UNIT_SCALE_FACTOR = 0.1; // cm por unidad → la unidad es el milímetro
 
-export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): string => {
+/**
+ * Material de la biblioteca para el FBX, por etiqueta de placa: color (0..1), brillo y, si hay,
+ * la imagen de textura que va al lado del .fbx (3ds Max la busca en la carpeta del archivo).
+ */
+export interface FbxMaterialInfo {
+  color?: [number, number, number];
+  gloss?: number;
+  texture?: { fileName: string; widthMm: number; heightMm: number; grainVertical: boolean };
+}
+
+/** UV en metros (U a lo largo de la veta) → coordenadas de la imagen, a escala real (como el visor). */
+const textureUvs = (uvs: [number, number][], t: NonNullable<FbxMaterialInfo['texture']>): [number, number][] => {
+  const w = t.widthMm / 1000, h = t.heightMm / 1000;
+  return uvs.map(([along, across]) => (t.grainVertical ? [across / w, along / h] : [along / w, across / h]));
+};
+
+export const exportFBX = (scene: FurnitureScene, opts: { date?: Date; materials?: (boardLabel: string) => FbxMaterialInfo | null } = {}): string => {
   const date = opts.date || new Date();
   const modules = collectNodes(scene);
   let nextId = 100000;
   const id = () => nextId++;
   const objects: string[] = [];
   const connections: string[] = [];
-  const counts = { model: 0, geometry: 0, material: 0, attr: 0 };
+  const counts = { model: 0, geometry: 0, material: 0, attr: 0, texture: 0, video: 0 };
   const rootName = safeName(`Amoblamiento_${scene.name}${scene.exploded ? '_despiece' : ''}`);
 
   const props70 = (lines: string[]) => `\t\tProperties70:  {\n${lines.map(l => `\t\t\t${l}`).join('\n')}\n\t\t}`;
@@ -205,16 +221,31 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
   const materialLabel = new Map<string, string>();
   scene.modules.forEach(sm => sm.pieces.forEach(sp => materialLabel.set(safeName(sp.piece.boardLabel), sp.piece.boardLabel)));
   if (scene.modules.some(sm => sm.placeholder)) materialLabel.set('Volumen_pendiente', 'Volumen pendiente');
+  const materialInfo = new Map<string, FbxMaterialInfo | null>();
   materialLabel.forEach((label, name) => {
     const mid = id(); counts.material++;
     materialIds.set(name, mid);
-    const [r, g, b] = materialColorFor(label);
+    const info = opts.materials?.(label) || null;
+    materialInfo.set(name, info);
+    // Con textura, el difuso es blanco (lo da la imagen); sin textura, el color de la biblioteca o el de referencia.
+    const [r, g, b] = info?.texture ? [1, 1, 1] : info?.color || materialColorFor(label);
+    const gloss = info?.gloss ?? 0.1;
+    const spec = 0.05 + 0.4 * gloss;
     objects.push(`\tMaterial: ${mid}, "Material::${name}", "" {\n\t\tVersion: 102\n\t\tShadingModel: "phong"\n\t\tMultiLayer: 0\n${props70([
       `P: "DiffuseColor", "Color", "", "A",${n(r)},${n(g)},${n(b)}`,
       `P: "Diffuse", "Vector3D", "Vector", "",${n(r)},${n(g)},${n(b)}`,
-      `P: "SpecularColor", "Color", "", "A",0.1,0.1,0.1`,
-      `P: "Shininess", "double", "Number", "",8`,
+      `P: "SpecularColor", "Color", "", "A",${n(spec)},${n(spec)},${n(spec)}`,
+      `P: "Shininess", "double", "Number", "",${n(8 + 72 * gloss)}`,
     ])}\n\t}`);
+    if (info?.texture) {
+      // Textura (difuso) con su imagen: Video → Texture → DiffuseColor del material.
+      const tid = id(), vid = id(); counts.texture++; counts.video++;
+      const f = info.texture.fileName;
+      objects.push(`\tVideo: ${vid}, "Video::${name}", "Clip" {\n\t\tType: "Clip"\n${props70([`P: "Path", "KString", "XRefUrl", "", "${f}"`])}\n\t\tUseMipMap: 0\n\t\tFilename: "${f}"\n\t\tRelativeFilename: "${f}"\n\t}`);
+      objects.push(`\tTexture: ${tid}, "Texture::${name}", "" {\n\t\tType: "TextureVideoClip"\n\t\tVersion: 202\n\t\tTextureName: "Texture::${name}"\n${props70([`P: "UseMaterial", "bool", "", "",1`])}\n\t\tMedia: "Video::${name}"\n\t\tFileName: "${f}"\n\t\tRelativeFilename: "${f}"\n\t\tModelUVTranslation: 0,0\n\t\tModelUVScaling: 1,1\n\t\tTexture_Alpha_Source: "None"\n\t\tCropping: 0,0,0,0\n\t}`);
+      connections.push(`\tC: "OO",${vid},${tid}`);
+      connections.push(`\tC: "OP",${tid},${mid}, "DiffuseColor"`);
+    }
   });
 
   // Raíz → módulos → piezas
@@ -234,7 +265,8 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
       const idx = bm.polys.map(q => q.map((i, k) => (k === q.length - 1 ? -i - 1 : i)).join(',')).join(',');
       const nIdx = bm.polys.reduce((a, q) => a + q.length, 0);
       const norms = bm.polys.flatMap(q => q.map(i => bm.normals[i])).flat().map(n).join(',');
-      const uvs = bm.uvs.flat().map(n).join(',');
+      const tex = mesh.shape === 'cylinder' ? undefined : materialInfo.get(mesh.material)?.texture;
+      const uvs = (tex ? textureUvs(bm.uvs, tex) : bm.uvs).flat().map(n).join(',');
       const uvIdx = bm.polys.flat().join(',');
       objects.push(`\tGeometry: ${gid}, "Geometry::${mesh.name}", "Mesh" {
 \t\tVertices: *${bm.positions.length * 3} {
@@ -302,7 +334,7 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
   });
 
   const ts = date;
-  const total = counts.model + counts.geometry + counts.material + counts.attr + 1;
+  const total = counts.model + counts.geometry + counts.material + counts.attr + counts.texture + counts.video + 1;
   return `; FBX 7.4.0 project file
 ; ----------------------------------------------------
 ; rodenOS - Constructor 3D. Unidades: milimetros (UnitScaleFactor 0.1 cm).
@@ -369,7 +401,13 @@ Definitions:  {
 \t}
 \tObjectType: "Material" {
 \t\tCount: ${counts.material}
+\t}${counts.texture ? `
+\tObjectType: "Texture" {
+\t\tCount: ${counts.texture}
 \t}
+\tObjectType: "Video" {
+\t\tCount: ${counts.video}
+\t}` : ''}
 }
 
 Objects:  {

@@ -16,9 +16,10 @@ import Viewer3D from './Viewer3D';
 import {
   buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, ModuleLayout3D, transformBox,
 } from '../../utils/furniture3d/geometry';
-import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
+import { exportFBX, exportOBJ, exportFileBase, safeName } from '../../utils/furniture3d/exporters';
 import { exportViewerHtml, exportUsdz } from '../../utils/furniture3d/webExport';
-import { LibraryMaterial, TEXTURE_BUCKET } from '../../utils/furniture3d/materialLibrary';
+import { LibraryMaterial, TEXTURE_BUCKET, matchMaterial } from '../../utils/furniture3d/materialLibrary';
+import { zipSync, strToU8 } from 'three/examples/jsm/libs/fflate.module.js';
 import { supabase } from '../../services/supabaseClient';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
 import { getTemplate, getFixedDims } from '../../utils/specialModules';
@@ -93,6 +94,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const [maximized, setMaximized] = useState(false);
   // Vista de frente: la pared de apoyo es el plano de la pantalla; los módulos se arrastran directo.
   const [frontView, setFrontView] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const captureRef = useRef<((caption: string) => Promise<Blob | null>) | null>(null);
   const modelRef = useRef<(() => any) | null>(null);
   // Biblioteca de materiales (Configuración → Materiales 3D). Si no carga, se dibuja como antes.
@@ -251,7 +253,42 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
       download(obj, `${base}.obj`, 'text/plain');
       download(mtl, `${base}.mtl`, 'text/plain');
     } else {
-      download(exportFBX(scene), `${base}.fbx`, 'application/octet-stream');
+      // Con materiales de la biblioteca: colores y brillo en el FBX; si alguno tiene imagen, ZIP
+      // con el .fbx y las imágenes en la misma carpeta (3ds Max las busca al lado del archivo).
+      const files = new Map<string, LibraryMaterial>();   // nombre de archivo → material
+      const used = new Set<string>();
+      const fileFor = (m: LibraryMaterial) => {
+        for (const [f, mm] of files) if (mm.id === m.id) return f;
+        let f = `${safeName(m.name)}.jpg`, i = 2;
+        while (used.has(f)) f = `${safeName(m.name)}_${i++}.jpg`;
+        used.add(f); files.set(f, m);
+        return f;
+      };
+      const hex = (h: string): [number, number, number] => {
+        const c = parseInt((h || '#cccccc').replace('#', ''), 16);
+        return [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255];
+      };
+      const fbx = exportFBX(scene, {
+        materials: label => {
+          const m = matchMaterial(label, library);
+          if (!m) return null;
+          return {
+            color: hex(m.color), gloss: m.gloss,
+            texture: m.texture_path ? { fileName: fileFor(m), widthMm: m.texture_width_mm, heightMm: m.texture_height_mm, grainVertical: m.grain_vertical } : undefined,
+          };
+        },
+      });
+      if (files.size === 0) { download(fbx, `${base}.fbx`, 'application/octet-stream'); return; }
+      const zip = (async () => {
+        const entries: Record<string, Uint8Array> = { [`${base}.fbx`]: strToU8(fbx) };
+        await Promise.all([...files].map(async ([f, m]) => {
+          const r = await fetch(textureUrl(m.texture_path!));
+          if (!r.ok) throw new Error(`No se pudo bajar la imagen de "${m.name}" (${r.status}).`);
+          entries[f] = new Uint8Array(await r.arrayBuffer());
+        }));
+        return new Blob([zipSync(entries, { level: 0 })], { type: 'application/zip' });
+      })().catch(e => { setExportError(e.message); return null; });
+      saveFile(zip, `${base}.zip`, 'FBX con texturas (ZIP)', 'application/zip', ['.zip']);
     }
   };
 
@@ -529,8 +566,9 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
               <button onClick={saveImage} title="Imagen de lo que se ve en el visor, para la documentación técnica" className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><ImageIcon size={14} /> Imagen JPG</button>
               <button onClick={() => saveWebModel('html')} title="Un archivo que se abre en cualquier navegador (celular, tablet o PC) para girar la maqueta con el dedo o el mouse. Funciona sin internet." className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Smartphone size={14} /> Maqueta web (.html)</button>
               <button onClick={() => saveWebModel('usdz')} title="Formato de Apple: en iPhone/iPad se abre solo, se gira y se ve en el ambiente con realidad aumentada, a tamaño real." className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Smartphone size={14} /> iPhone/iPad (.usdz)</button>
-              <button onClick={() => doExport('fbx')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"><Download size={14} /> FBX ensamblado</button>
-              <button onClick={() => doExport('fbx-exploded')} className="px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5"><Download size={14} /> FBX despiece</button>
+              {exportError && <span className="text-[11px] text-red-700 font-bold" onClick={() => setExportError(null)} title="Clic para ocultar">{exportError}</span>}
+              <button onClick={() => { setExportError(null); doExport('fbx'); }} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"><Download size={14} /> FBX ensamblado</button>
+              <button onClick={() => { setExportError(null); doExport('fbx-exploded'); }} className="px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5"><Download size={14} /> FBX despiece</button>
               <button onClick={() => doExport('obj')} className="px-3 py-1.5 rounded-lg text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Download size={14} /> OBJ + MTL</button>
             </div>
             <div className="flex-1 min-h-0">
