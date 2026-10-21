@@ -22,6 +22,8 @@ interface Viewer3DProps {
   moveEnabled?: boolean;   // se pueden mover módulos (flechas en 3D, arrastre directo de frente)
   frontView?: boolean;     // vista de frente sin perspectiva: la pared de apoyo es el plano de la pantalla
   onMoveModule?: (moduleIndex: number, delta: Vec3) => void;   // al soltar: desplazamiento (mm) ya con imán
+  /** El visor deja acá la función que saca una imagen JPG de lo que se ve (con un rótulo abajo). */
+  captureRef?: React.MutableRefObject<((caption: string) => Promise<Blob | null>) | null>;
 }
 
 const disposeTree = (obj: THREE.Object3D) => {
@@ -40,7 +42,7 @@ const setOrthoFrustum = (c: { ortho: THREE.OrthographicCamera; camera: THREE.Per
   c.ortho.updateProjectionMatrix();
 };
 
-const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule }) => {
+const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule, captureRef }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
@@ -277,6 +279,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       if (moduleSelected || hasIssue) {
         const b = sm.module.localBox;
         const helper = new THREE.Box3Helper(new THREE.Box3(new THREE.Vector3(...b.min), new THREE.Vector3(...b.max)), hasIssue ? 0xdc2626 : 0x4f46e5);
+        helper.userData.overlay = true;   // marca de selección: no sale en la imagen exportada
         g.add(helper);
       }
       parent.add(g);
@@ -324,6 +327,51 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     c.camera.updateProjectionMatrix();
   };
   useEffect(() => { fit(); }, [fitToken]);
+
+  /**
+   * Imagen JPG de la vista actual (misma cámara), al doble de resolución, fondo blanco, sin
+   * flechas ni resaltado de selección, con un rótulo abajo. Se dibuja y se copia en el mismo
+   * paso, así no hace falta conservar el buffer de WebGL.
+   */
+  const capture = (caption: string): Promise<Blob | null> => {
+    const c = ctx.current;
+    if (!c) return Promise.resolve(null);
+    const { renderer } = c;
+    const restore: (() => void)[] = [];
+    const helper = c.transform.getHelper();
+    const helperVisible = helper.visible;
+    helper.visible = false;
+    restore.push(() => { helper.visible = helperVisible; });
+    c.content.traverse(o => {
+      if (o.userData.overlay && o.visible) { o.visible = false; restore.push(() => { o.visible = true; }); }
+      const m = (o as any).material;
+      if (m && !Array.isArray(m) && m.emissiveIntensity) { const v = m.emissiveIntensity; m.emissiveIntensity = 0; restore.push(() => { m.emissiveIntensity = v; }); }
+    });
+    const bg = c.scene.background;
+    c.scene.background = new THREE.Color('#ffffff');
+    restore.push(() => { c.scene.background = bg; });
+    const ratio = renderer.getPixelRatio();
+    renderer.setPixelRatio(Math.max(2, ratio));
+    renderer.render(c.scene, c.front ? c.ortho : c.camera);
+
+    const src = renderer.domElement;
+    const scale = src.width / Math.max(1, src.clientWidth);
+    const band = Math.round(44 * scale);
+    const out = document.createElement('canvas');
+    out.width = src.width; out.height = src.height + band;
+    const g = out.getContext('2d')!;
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, out.width, out.height);
+    g.drawImage(src, 0, 0);
+    g.fillStyle = '#e5e7eb'; g.fillRect(0, src.height, out.width, Math.max(1, Math.round(scale)));
+    g.fillStyle = '#111827'; g.font = `${Math.round(15 * scale)}px sans-serif`; g.textBaseline = 'middle';
+    g.fillText(caption, Math.round(16 * scale), src.height + band / 2);
+
+    restore.forEach(f => f());
+    renderer.setPixelRatio(ratio);
+    renderer.render(c.scene, c.front ? c.ortho : c.camera);
+    return new Promise(res => out.toBlob(b => res(b), 'image/jpeg', 0.92));
+  };
+  if (captureRef) captureRef.current = capture;
 
   // Cambio de vista: de frente no se orbita (solo desplazar y acercar).
   useEffect(() => {

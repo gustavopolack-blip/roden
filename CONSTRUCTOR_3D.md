@@ -39,6 +39,11 @@ En el constructor:
   pega al piso y nunca baja de él. Sin imán, se redondea al mm. Las copias (Cant.) se mueven
   juntas. La posición queda en X/Y/Z del panel, como si se cargara a mano. Si queda superpuesto,
   Validación lo marca y no deja aplicar.
+- **Imagen JPG** (barra del visor): guarda lo que se ve (misma vista y ángulo; para el mueble
+  armado, *Ítem completo + Ensamblado*) para la documentación técnica: fondo blanco, el doble de la
+  resolución de pantalla, sin flechas ni resaltado de selección, con un rótulo abajo (nombre,
+  medidas totales y fecha). En Chrome y Edge abre el cuadro "Guardar como" (carpeta y nombre); en
+  Firefox y Safari el navegador no lo permite y se descarga con el nombre sugerido.
 - **Pantalla completa**: el visor y su barra ocupan toda la pantalla (pantalla completa del
   navegador; Esc o "Salir de pantalla completa" vuelve). En iPhone, donde el navegador no lo
   permite, el visor igual tapa toda la ventana.
