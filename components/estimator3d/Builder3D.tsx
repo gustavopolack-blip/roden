@@ -10,11 +10,11 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink, Square,
+  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink, Square, Image as ImageIcon,
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
-  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE,
+  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, boxSize,
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
@@ -89,6 +89,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const [maximized, setMaximized] = useState(false);
   // Vista de frente: la pared de apoyo es el plano de la pantalla; los módulos se arrastran directo.
   const [frontView, setFrontView] = useState(false);
+  const captureRef = useRef<((caption: string) => Promise<Blob | null>) | null>(null);
   const viewerRef = useRef<HTMLElement>(null);
   const toggleMaximized = () => {
     if (maximized) {
@@ -194,6 +195,41 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     } else {
       download(exportFBX(scene), `${base}.fbx`, 'application/octet-stream');
     }
+  };
+
+  /**
+   * Imagen JPG de lo que se ve en el visor, para la documentación técnica. Donde el navegador lo
+   * permite (Chrome, Edge) abre el cuadro de "Guardar como" para elegir carpeta y nombre; si no
+   * (Firefox, Safari), la descarga con el nombre sugerido.
+   */
+  const saveImage = async () => {
+    const fileName = `${exportFileBase(active.name, presentation === 'exploded')}.jpg`;
+    const picker = (window as any).showSaveFilePicker;
+    let handle: any = null;
+    if (picker) {
+      try {
+        handle = await picker({ suggestedName: fileName, types: [{ description: 'Imagen JPG', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }] });
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return;   // canceló el cuadro
+        handle = null;
+      }
+    }
+    const s = boxSize(viewPlaced ? viewPlaced.localBox : assembly.bbox);
+    const what = viewPlaced ? (modules[viewPlaced.moduleIndex]?.name || viewPlaced.name) : active.name;
+    const caption = `rødën · ${what} · ${Math.round(s[0])} × ${Math.round(s[1])} × ${Math.round(s[2])} mm (ancho × alto × prof.) · ${new Date().toLocaleDateString('es-AR')}`;
+    const blob = await captureRef.current?.(caption);
+    if (!blob) return;
+    if (handle) {
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
   const errors = assembly.issues.filter(i => i.level === 'error');
@@ -398,6 +434,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
               )}
               <div className="flex-1" />
               <span className="text-[10px] text-gray-400 hidden xl:inline">3ds Max: File → Import → .fbx (unidades del archivo: mm)</span>
+              <button onClick={saveImage} title="Imagen de lo que se ve en el visor, para la documentación técnica" className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><ImageIcon size={14} /> Imagen JPG</button>
               <button onClick={() => doExport('fbx')} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5"><Download size={14} /> FBX ensamblado</button>
               <button onClick={() => doExport('fbx-exploded')} className="px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5"><Download size={14} /> FBX despiece</button>
               <button onClick={() => doExport('obj')} className="px-3 py-1.5 rounded-lg text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"><Download size={14} /> OBJ + MTL</button>
@@ -408,7 +445,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   scene={viewScene} bbox={viewPlaced ? viewPlaced.localBox : assembly.bbox}
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
-                  moveEnabled={moveEnabled} frontView={frontView} onMoveModule={moveModule}
+                  moveEnabled={moveEnabled} frontView={frontView} onMoveModule={moveModule} captureRef={captureRef}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}
                 />
               ) : (
