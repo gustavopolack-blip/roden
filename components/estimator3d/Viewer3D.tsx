@@ -8,7 +8,19 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { FurnitureScene, Box, Vec3, boxCenter, boxSize, fitCameraDistance, snapModuleMove, unionBox } from '../../utils/furniture3d/geometry';
+import { FurnitureScene, Box, Vec3, PlacedModule, boxCenter, boxSize, fitCameraDistance, snapModuleMove, unionBox } from '../../utils/furniture3d/geometry';
+
+/** Lo que se mueve junto: el módulo con sus copias en fila, o una copia ubicada por separado. */
+const groupOf = (m: PlacedModule) => (m.ownLayout ? `${m.moduleIndex}#${m.instance}` : `${m.moduleIndex}`);
+type DragTarget = { group: string; moduleIndex: number; instance: number; moving: Box; others: Box[] };
+const dragTarget = (scene: FurnitureScene, m: PlacedModule): DragTarget => {
+  const group = groupOf(m);
+  return {
+    group, moduleIndex: m.moduleIndex, instance: m.ownLayout ? m.instance : 0,
+    moving: unionBox(scene.modules.filter(sm => groupOf(sm.module) === group).map(sm => sm.module.worldBox)),
+    others: scene.modules.filter(sm => groupOf(sm.module) !== group).map(sm => sm.module.worldBox),
+  };
+};
 import { materialColorFor } from '../../utils/furniture3d/exporters';
 
 interface Viewer3DProps {
@@ -21,7 +33,7 @@ interface Viewer3DProps {
   fitToken: number; // cambia para pedir "encuadrar"
   moveEnabled?: boolean;   // se pueden mover módulos (flechas en 3D, arrastre directo de frente)
   frontView?: boolean;     // vista de frente sin perspectiva: la pared de apoyo es el plano de la pantalla
-  onMoveModule?: (moduleIndex: number, delta: Vec3) => void;   // al soltar: desplazamiento (mm) ya con imán
+  onMoveModule?: (moduleIndex: number, instance: number, delta: Vec3) => void;   // al soltar: desplazamiento (mm) ya con imán; instance 0 = el módulo con sus copias no separadas
   /** El visor deja acá la función que saca una imagen JPG de lo que se ve (con un rótulo abajo). */
   captureRef?: React.MutableRefObject<((caption: string) => Promise<Blob | null>) | null>;
 }
@@ -49,8 +61,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     ortho: THREE.OrthographicCamera; orthoHalfH: number; front: boolean;
     controls: OrbitControls; content: THREE.Group; raf: number; fitted: boolean;
     transform: TransformControls;
-    drag: { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null;
-    parents: Map<number, THREE.Group>;
+    drag: (DragTarget & { origin: Vec3 }) | null;
+    parents: Map<string, THREE.Group>;
   } | null>(null);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
@@ -95,8 +107,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     s.add(transform.getHelper());
     const state = {
       renderer, scene: s, camera, ortho, orthoHalfH: 1000, front: false, controls, content, raf: 0, fitted: false, transform,
-      drag: null as { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null,
-      parents: new Map<number, THREE.Group>(),
+      drag: null as (DragTarget & { origin: Vec3 }) | null,
+      parents: new Map<string, THREE.Group>(),
     };
     const activeCam = () => (state.front ? ortho : camera);
     ctx.current = state;
@@ -112,7 +124,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       const obj = transform.object, d = state.drag;
       if (!obj || !d) return;
       const delta: Vec3 = [obj.position.x - d.origin[0], obj.position.y - d.origin[1], obj.position.z - d.origin[2]];
-      if (delta.some(v => Math.abs(v) > 0.01)) onMoveRef.current?.(d.moduleIndex, delta);
+      if (delta.some(v => Math.abs(v) > 0.01)) onMoveRef.current?.(d.moduleIndex, d.instance, delta);
     });
     const loop = () => { controls.update(); renderer.render(s, activeCam()); state.raf = requestAnimationFrame(loop); };
     loop();
@@ -134,7 +146,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const pickAt = (e: PointerEvent) => rayAt(e).intersectObjects(content.children, true).find(h => h.object.userData.pickable);
 
     // Vista de frente: arrastre directo de un módulo sobre el plano de la pared (solo X e Y).
-    let wall: { moduleIndex: number; moduleKey: string; plane: THREE.Plane; start: THREE.Vector3; origin: Vec3; moving: Box; others: Box[]; delta: Vec3 } | null = null;
+    let wall: (DragTarget & { moduleKey: string; plane: THREE.Plane; start: THREE.Vector3; origin: Vec3; delta: Vec3 }) | null = null;
     const wallPoint = (e: PointerEvent, plane: THREE.Plane) => rayAt(e).ray.intersectPlane(plane, new THREE.Vector3());
 
     // Selección por clic (ignora arrastres de órbita)
@@ -143,16 +155,15 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       down = { x: e.clientX, y: e.clientY };
       if (!state.front || !moveRef.current || e.button !== 0) return;
       const hit = pickAt(e);
-      const mi = hit?.object.userData.moduleIndex;
-      const parent = typeof mi === 'number' ? state.parents.get(mi) : undefined;
-      if (!hit || !parent) return;
-      const mods = sceneRef.current.modules;
+      const pm = hit && sceneRef.current.modules.find(sm => sm.module.key === hit.object.userData.moduleKey)?.module;
+      if (!hit || !pm) return;
+      const target = dragTarget(sceneRef.current, pm);
+      const parent = state.parents.get(target.group);
+      if (!parent) return;
       const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -hit.point.z);
       wall = {
-        moduleIndex: mi, moduleKey: hit.object.userData.moduleKey, plane, start: hit.point.clone(),
+        ...target, moduleKey: pm.key, plane, start: hit.point.clone(),
         origin: parent.position.toArray() as Vec3, delta: [0, 0, 0],
-        moving: unionBox(mods.filter(sm => sm.module.moduleIndex === mi).map(sm => sm.module.worldBox)),
-        others: mods.filter(sm => sm.module.moduleIndex !== mi).map(sm => sm.module.worldBox),
       };
       controls.enabled = false;
       renderer.domElement.setPointerCapture(e.pointerId);
@@ -164,7 +175,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
         return;
       }
       const p = wallPoint(e, wall.plane);
-      const parent = state.parents.get(wall.moduleIndex);
+      const parent = state.parents.get(wall.group);
       if (!p || !parent) return;
       const d = snapModuleMove(wall.moving, wall.others, [p.x - wall.start.x, p.y - wall.start.y, 0]);
       wall.delta = [d[0], d[1], 0];   // la profundidad no cambia: el módulo sigue contra la pared
@@ -179,7 +190,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
         renderer.domElement.style.cursor = '';
         if (renderer.domElement.hasPointerCapture(e.pointerId)) renderer.domElement.releasePointerCapture(e.pointerId);
         if (w.delta.some(v => Math.abs(v) > 0.01)) {
-          onMoveRef.current?.(w.moduleIndex, w.delta);
+          onMoveRef.current?.(w.moduleIndex, w.instance, w.delta);
           onPickRef.current({ pieceKey: null, moduleKey: w.moduleKey });
           return;
         }
@@ -200,7 +211,10 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerup', onUp);
       transform.detach();
-      transform.dispose();
+      // No dispose(): en three r169 llama a this.traverse, que TransformControls ya no tiene, y
+      // rompe el cierre del visor. disconnect() saca los eventos; sus mallas cuelgan de la escena
+      // y las libera disposeTree.
+      transform.disconnect();
       disposeTree(s);
       controls.dispose();
       renderer.dispose();
@@ -220,19 +234,20 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
 
     // Las copias (Cant.) de un módulo cuelgan de un mismo grupo, ubicado en la primera copia
     // (ahí aparecen las flechas): se mueven juntas.
-    const parents = new Map<number, THREE.Group>();
+    const parents = new Map<string, THREE.Group>();
     c.parents = parents;
-    const parentOf = (mi: number, at: { x: number; y: number; z: number }) => {
-      let p = parents.get(mi);
-      if (!p) { p = new THREE.Group(); p.position.set(at.x, at.y, at.z); parents.set(mi, p); c.content.add(p); }
+    const parentOf = (key: string, at: { x: number; y: number; z: number }) => {
+      let p = parents.get(key);
+      if (!p) { p = new THREE.Group(); p.position.set(at.x, at.y, at.z); parents.set(key, p); c.content.add(p); }
       return p;
     };
 
     scene.modules.forEach(sm => {
       const g = new THREE.Group();
-      const parent = parentOf(sm.module.moduleIndex, sm.layout);
+      const parent = parentOf(groupOf(sm.module), sm.layout);
       g.position.set(sm.layout.x - parent.position.x, sm.layout.y - parent.position.y, sm.layout.z - parent.position.z);
-      g.rotation.y = THREE.MathUtils.degToRad(sm.layout.rotY);
+      const rad = THREE.MathUtils.degToRad;
+      g.rotation.set(rad(sm.layout.rotX || 0), rad(sm.layout.rotY), rad(sm.layout.rotZ || 0), 'YXZ');
       const moduleSelected = sm.module.key === selectedModuleKey;
       const hasIssue = issueModuleKeys.has(sm.module.key);
 
@@ -251,7 +266,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
         const mesh = new THREE.Mesh(geom, mat);
         mesh.position.set(center[0], center[1], center[2]);
         if (sp.piece.rotX) mesh.rotation.x = THREE.MathUtils.degToRad(sp.piece.rotX);
-        mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key, moduleIndex: sm.module.moduleIndex };
+        mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key };
         // Cilindro: solo el contorno de las tapas (sin las aristas de cada segmento).
         const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, sp.piece.shape === 'cylinder' ? 30 : 1), new THREE.LineBasicMaterial({ color: isSel ? 0x4f46e5 : 0x6b7280 }));
         mesh.add(edges);
@@ -271,7 +286,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
           new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: moduleSelected ? 0.45 : 0.25 }),
         );
         mesh.position.set(center[0], center[1], center[2]);
-        mesh.userData = { pickable: true, pieceKey: null, moduleKey: sm.module.key, moduleIndex: sm.module.moduleIndex };
+        mesh.userData = { pickable: true, pieceKey: null, moduleKey: sm.module.key };
         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x2563eb })));
         g.add(mesh);
       }
@@ -287,14 +302,10 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
 
     const sel = scene.modules.find(sm => sm.module.key === selectedModuleKey);
     if (moveEnabled && !frontView && sel) {
-      const mi = sel.module.moduleIndex;
-      c.drag = {
-        moduleIndex: mi,
-        moving: unionBox(scene.modules.filter(sm => sm.module.moduleIndex === mi).map(sm => sm.module.worldBox)),
-        others: scene.modules.filter(sm => sm.module.moduleIndex !== mi).map(sm => sm.module.worldBox),
-        origin: parents.get(mi)!.position.toArray() as Vec3,
-      };
-      c.transform.attach(parents.get(mi)!);
+      const target = dragTarget(scene, sel.module);
+      const parent = parents.get(target.group)!;
+      c.drag = { ...target, origin: parent.position.toArray() as Vec3 };
+      c.transform.attach(parent);
     }
 
     if (!c.fitted && scene.modules.length) { fit(); c.fitted = true; }

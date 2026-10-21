@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { buildSpecialModules } from './fixtures/moduleMatrix.mjs';
 import { SPECIAL_MODULE_TEMPLATES } from '../utils/specialModules';
-import { buildAssembly, buildScene, boxCenter, rotateY } from '../utils/furniture3d/geometry';
+import { buildAssembly, buildScene, boxCenter, rotateY, transformBox } from '../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, FBX_UNIT_SCALE_FACTOR, safeName } from '../utils/furniture3d/exporters';
 
 const BASE = {
@@ -163,5 +163,39 @@ describe('bandejas inclinadas en la exportación', () => {
     const ys = block.split('\n').filter(l => l.startsWith('v ')).map(l => Number(l.split(' ')[2]));
     const L = 350 - 21 - 10;   // fondo 3 mm: profundidad del estante D − 31
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(L * 0.5 + 18 * Math.cos(Math.PI / 6), 3);
+  });
+});
+
+describe('giros en X/Z y copias separadas en la exportación', () => {
+  const rot = buildAssembly('Giros', [
+    mod({ id: 'r1', name: 'Volcado', cntDoors: 1, layout3d: { x: 0, y: 0, z: 0, rotY: 90, rotX: 90, rotZ: 0 } }),
+    mod({ id: 'r2', name: 'De costado', width: 720, height: 18, depth: 100, quantity: 2,
+      layout3d: { x: 2000, y: 0, z: 0, rotY: 0, rotZ: 90 }, layout3dCopies: { 1: { x: 2600, y: 0, z: 0, rotY: 180, rotZ: 270 } } }),
+  ]);
+  const scene = buildScene(rot, 0);
+  it('FBX: cada módulo, releído con FBXLoader, ocupa la misma caja que en el visor', () => {
+    const root = parseFbx(exportFBX(scene));
+    root.updateMatrixWorld(true);
+    const top = topOf(root);
+    expect(top.children.length).toBe(rot.modules.length);
+    rot.modules.forEach((pm, i) => {
+      const bb = new THREE.Box3().setFromObject(top.children[i]);
+      // la caja de piezas puede ser menor que el volumen del módulo (frentes, fondo): se compara contra las piezas
+      const expected = new THREE.Box3();
+      pm.pieces.forEach(p => {
+        const wb = transformBox(p.box, pm.layout);
+        expected.union(new THREE.Box3(new THREE.Vector3(...wb.min), new THREE.Vector3(...wb.max)));
+      });
+      ['x', 'y', 'z'].forEach(k => {
+        expect((bb.min as any)[k]).toBeCloseTo((expected.min as any)[k], 2);
+        expect((bb.max as any)[k]).toBeCloseTo((expected.max as any)[k], 2);
+      });
+    });
+  });
+  it('OBJ: los vértices quedan dentro de la caja del mueble', () => {
+    const { obj } = exportOBJ(scene, 'x.mtl');
+    const vs = obj.split('\n').filter(l => l.startsWith('v ')).map(l => l.slice(2).split(' ').map(Number));
+    const b = rot.bbox;
+    vs.forEach(v => v.forEach((c, k) => { expect(c).toBeGreaterThanOrEqual(b.min[k] - 1e-3); expect(c).toBeLessThanOrEqual(b.max[k] + 1e-3); }));
   });
 });

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
-  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, boxSize,
+  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, boxSize, ModuleLayout3D, transformBox,
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
@@ -126,6 +126,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const issueModuleKeys = useMemo(() => new Set(assembly.issues.filter(i => i.level === 'error').flatMap(i => i.moduleKeys || [])), [assembly]);
 
   const selModIndex = selectedPlaced ? selectedPlaced.moduleIndex : -1;
+  // Lo que se edita: la copia, si está ubicada por separado; si no, el módulo con sus copias.
+  const selInst = selectedPlaced?.ownLayout ? selectedPlaced.instance : 0;
   const selMod: any = selModIndex >= 0 ? modules[selModIndex] : null;
   const selPiece = selectedPlaced?.pieces.find(p => p.key === selPieceKey)
     || selectedPlaced?.gridPieces.find(p => p.key === selPieceKey) || null;
@@ -146,34 +148,73 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     });
     setDirty(true);
   };
-  const updateLayout = (idx: number, patch: Partial<{ x: number; y: number; z: number; rotY: RotY }>) => {
-    const pm = assembly.modules.find(m => m.moduleIndex === idx && m.instance === 0);
-    const cur = (modules[idx] as any).layout3d || (pm ? { x: pm.layout.x, y: pm.layout.y, z: pm.layout.z, rotY: pm.layout.rotY } : { x: 0, y: 0, z: 0, rotY: 0 });
-    // Al ubicar un módulo a mano, los demás quedan fijos donde se ven: si no, los módulos sin
-    // posición guardada se re-acomodarían en fila detrás del que se movió.
+  /**
+   * Cambia la ubicación del módulo (inst 0: el módulo y sus copias en fila) o de una copia
+   * ubicada por separado (inst > 0, en layout3dCopies).
+   */
+  const updateLayout = (idx: number, patch: Partial<ModuleLayout3D>, inst = 0) => {
+    const base = assembly.modules.find(m => m.moduleIndex === idx && m.instance === 0);
+    const copy = assembly.modules.find(m => m.moduleIndex === idx && m.instance === inst);
     setDrafts(prev => ({
       ...prev,
-      [active.id]: prev[active.id].map((m: any, i) => {
-        if (i === idx) return { ...m, layout3d: { ...cur, ...patch } };
-        if (m.layout3d || isManualModule(m)) return m;
-        const p = assembly.modules.find(x => x.moduleIndex === i && x.instance === 0);
-        return p ? { ...m, layout3d: { x: p.layout.x, y: p.layout.y, z: p.layout.z, rotY: p.layout.rotY } } : m;
+      [active.id]: freezeOthers(prev[active.id], idx).map((m: any, i) => {
+        if (i !== idx) return m;
+        const layout3d = m.layout3d || (base ? { ...base.layout } : { x: 0, y: 0, z: 0, rotY: 0 });
+        if (inst === 0) return { ...m, layout3d: { ...layout3d, ...patch } };
+        return { ...m, layout3d, layout3dCopies: { ...(m.layout3dCopies || {}), [inst]: { ...(copy ? copy.layout : layout3d), ...patch } } };
       }),
     }));
     setDirty(true);
   };
-  /** Arrastre en el visor: mueve el módulo (y sus copias) el desplazamiento ya ajustado por el imán. */
-  const moveModule = (idx: number, delta: Vec3) => {
-    const pm = assembly.modules.find(m => m.moduleIndex === idx && m.instance === 0);
+  /**
+   * Al ubicar un módulo a mano, los demás quedan fijos donde se ven: si no, los módulos sin
+   * posición guardada se re-acomodarían en fila detrás del que se movió.
+   */
+  const freezeOthers = (list: ExtendedCabinetModule[], idx: number) => list.map((m: any, i) => {
+    if (i === idx || m.layout3d || isManualModule(m)) return m;
+    const p = assembly.modules.find(x => x.moduleIndex === i && x.instance === 0);
+    return p ? { ...m, layout3d: { ...p.layout } } : m;
+  });
+  /** Copias (Cant.) ubicadas por separado: cada una se mueve y gira sola, desde donde está ahora. */
+  const separateCopies = (idx: number) => {
+    const copies = assembly.modules.filter(m => m.moduleIndex === idx && m.instance > 0);
+    const base = assembly.modules.find(m => m.moduleIndex === idx && m.instance === 0);
+    setDrafts(prev => ({
+      ...prev,
+      [active.id]: freezeOthers(prev[active.id], idx).map((m: any, i) => i !== idx ? m : {
+        ...m, layout3d: m.layout3d || (base ? { ...base.layout } : undefined),
+        layout3dCopies: Object.fromEntries(copies.map(c => [c.instance, { ...c.layout }])),
+      }),
+    }));
+    setDirty(true);
+  };
+  const joinCopies = (idx: number) => {
+    setDrafts(prev => ({ ...prev, [active.id]: prev[active.id].map((m: any, i) => { if (i !== idx) return m; const { layout3dCopies, ...rest } = m; return rest; }) }));
+    setDirty(true);
+  };
+  /**
+   * Giro en su lugar: la caja girada arranca en la misma esquina (mínimo X/Y/Z) que antes, así no
+   * se mete en el vecino ni baja del piso.
+   */
+  const rotateInPlace = (idx: number, inst: number, patch: Partial<ModuleLayout3D>) => {
+    const pm = assembly.modules.find(m => m.moduleIndex === idx && m.instance === inst);
+    if (!pm) return;
+    const b = transformBox(pm.localBox, { ...pm.layout, ...patch, x: 0, y: 0, z: 0 });
+    const r = (v: number) => Math.round(v * 10) / 10;
+    updateLayout(idx, { ...patch, x: r(pm.worldBox.min[0] - b.min[0]), y: r(pm.worldBox.min[1] - b.min[1]), z: r(pm.worldBox.min[2] - b.min[2]) }, inst);
+  };
+  /** Arrastre en el visor: mueve el módulo (o la copia separada) el desplazamiento ya ajustado por el imán. */
+  const moveModule = (idx: number, inst: number, delta: Vec3) => {
+    const pm = assembly.modules.find(m => m.moduleIndex === idx && m.instance === inst);
     if (!pm) return;
     const r = (v: number) => Math.round(v * 10) / 10;
-    updateLayout(idx, { x: r(pm.layout.x + delta[0]), y: r(pm.layout.y + delta[1]), z: r(pm.layout.z + delta[2]) });
+    updateLayout(idx, { x: r(pm.layout.x + delta[0]), y: r(pm.layout.y + delta[1]), z: r(pm.layout.z + delta[2]) }, inst);
   };
   // Las flechas de mover solo en el ítem completo armado (en despiece las posiciones no son las reales).
   const moveEnabled = editable && scope === 'item' && presentation === 'assembled';
 
   const resetLayouts = () => {
-    setDrafts(prev => ({ ...prev, [active.id]: prev[active.id].map(m => { const { layout3d, ...rest } = m as any; return rest; }) }));
+    setDrafts(prev => ({ ...prev, [active.id]: prev[active.id].map(m => { const { layout3d, layout3dCopies, ...rest } = m as any; return rest; }) }));
     setDirty(true);
     setFitToken(t => t + 1);
   };
@@ -283,16 +324,17 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                 {editable && <button onClick={resetLayouts} className="text-[11px] text-indigo-600 hover:underline flex items-center gap-1"><RefreshCw size={11} /> Alinear en fila</button>}
               </div>
               <div className="space-y-1">
-                {assembly.modules.filter(m => m.instance === 0).map(m => (
+                {assembly.modules.filter(m => m.instance === 0 || m.ownLayout).map(m => (
                   <button key={m.key}
                     onClick={() => { setSelModuleKey(m.key); setSelPieceKey(null); if (scope === 'module') setFitToken(t => t + 1); }}
                     className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${selModuleKey === m.key ? 'bg-indigo-50 border-indigo-400' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}>
                     <div className="flex justify-between gap-2">
-                      <span className="font-bold truncate">{modules[m.moduleIndex]?.name || m.name}</span>
+                      <span className="font-bold truncate">{(modules[m.moduleIndex] as any)?.layout3dCopies ? m.name : (modules[m.moduleIndex]?.name || m.name)}</span>
                       <span className="font-mono text-gray-500 shrink-0">{fmt(m.dims.w)}×{fmt(m.dims.h)}×{fmt(m.dims.d)}</span>
                     </div>
                     <div className="flex gap-2 mt-0.5 text-[10px]">
-                      {(modules[m.moduleIndex]?.quantity || 1) > 1 && <span className="text-gray-500">×{modules[m.moduleIndex]?.quantity}</span>}
+                      {!(modules[m.moduleIndex] as any)?.layout3dCopies && (modules[m.moduleIndex]?.quantity || 1) > 1 && <span className="text-gray-500">×{modules[m.moduleIndex]?.quantity}</span>}
+                      {m.ownLayout && <span className="text-gray-500">copia separada</span>}
                       {m.status === 'approximate' && <span className="text-amber-600">aproximado</span>}
                       {m.status === 'unplaced' && <span className="text-blue-600">sin ubicación de piezas</span>}
                       {issueModuleKeys.has(m.key) && <span className="text-red-600 font-bold">con error</span>}
@@ -349,23 +391,32 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   <div className="grid grid-cols-3 gap-2 mt-1">
                     {(['x', 'y', 'z'] as const).map(k => (
                       <NumField key={k} label={k.toUpperCase()} value={Math.round(selectedPlaced.layout[k] * 10) / 10} disabled={!editable}
-                        onChange={v => updateLayout(selModIndex, { [k]: v })} />
+                        onChange={v => updateLayout(selModIndex, { [k]: v }, selInst)} />
                     ))}
                   </div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <span className="text-[10px] text-gray-500 mr-1">Giro:</span>
-                    {([0, 90, 180, 270] as RotY[]).map(r => (
-                      <button key={r} disabled={!editable} onClick={() => updateLayout(selModIndex, { rotY: r })}
-                        className={`px-2 py-1 rounded text-[11px] border ${selectedPlaced.layout.rotY === r ? 'bg-black text-white border-black' : 'bg-white border-gray-200'} disabled:opacity-50`}>
-                        {r}°
-                      </button>
-                    ))}
-                    <RotateCw size={12} className="text-gray-400 ml-1" />
-                  </div>
+                  {([['rotY', 'Girar en planta (Y)'], ['rotX', 'Volcar al frente (X)'], ['rotZ', 'Volcar de costado (Z)']] as const).map(([axis, label]) => (
+                    <div key={axis} className="flex items-center gap-1 mt-2">
+                      <span className="text-[10px] text-gray-500 w-28 shrink-0">{label}</span>
+                      {([0, 90, 180, 270] as RotY[]).map(r => (
+                        <button key={r} disabled={!editable} onClick={() => rotateInPlace(selModIndex, selInst, { [axis]: r })}
+                          className={`px-2 py-1 rounded text-[11px] border ${(selectedPlaced.layout[axis] || 0) === r ? 'bg-black text-white border-black' : 'bg-white border-gray-200'} disabled:opacity-50`}>
+                          {r}°
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1"><RotateCw size={11} /> Gira en su lugar; después ubicalo arrastrando o con X/Y/Z.</p>
+                  {editable && (selMod.quantity || 1) > 1 && (
+                    selMod.layout3dCopies && Object.keys(selMod.layout3dCopies).length > 0 ? (
+                      <button onClick={() => joinCopies(selModIndex)} className="mt-2 text-[11px] text-indigo-600 hover:underline block">Volver a poner las copias en fila</button>
+                    ) : (
+                      <button onClick={() => separateCopies(selModIndex)} className="mt-2 text-[11px] text-indigo-600 hover:underline block">Ubicar las {selMod.quantity} copias por separado</button>
+                    )
+                  )}
                   {editable && (
                     <button onClick={() => snapRight(selModIndex)} className="mt-2 text-[11px] text-indigo-600 hover:underline">Pegar a la derecha del módulo anterior</button>
                   )}
-                  <p className="text-[10px] text-gray-400 mt-1">X: izquierda → derecha · Y: altura desde el piso · Z: hacia el frente. Las copias (Cant.) se ubican una al lado de la otra.</p>
+                  <p className="text-[10px] text-gray-400 mt-1">X: izquierda → derecha · Y: altura desde el piso · Z: hacia el frente. Las copias (Cant.) van una al lado de la otra salvo que se ubiquen por separado (cada una se mueve y gira sola; el despiece y el costo no cambian).</p>
                 </div>
 
                 {selectedPlaced.notes.length > 0 && (

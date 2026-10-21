@@ -23,7 +23,13 @@ despiece explotado para el taller y exportar la maqueta a **FBX** (3ds Max) u **
 En el constructor:
 
 - Elegí un módulo en la lista para editar medidas, puertas, cajones, abatibles, alto de frentes
-  combinados, apertura (bisagra) y posición X/Y/Z (mm) y giro (0/90/180/270°).
+  combinados, apertura (bisagra), posición X/Y/Z (mm) y giros en pasos de 90°: **en planta (Y)**,
+  **volcar al frente (X)** y **volcar de costado (Z)** (ej.: un ajuste que viene acostado se para
+  con Z 90°). Gira **en su lugar**: la caja girada arranca en la misma esquina que antes.
+- **Copias (Cant.)**: van una al lado de la otra. "Ubicar las N copias por separado" las
+  independiza: cada una aparece en la lista, se mueve y gira sola (ej.: 4 ajustes, cada uno en su
+  lugar). "Volver a poner las copias en fila" lo deshace. El despiece, las cantidades y el costo no
+  cambian: sigue siendo un módulo con Cant. N.
 - Se abre a pantalla completa. Dos vistas: **Ítem completo** (todos los módulos) y **Módulo**
   (el seleccionado en la lista, solo), cada una **Ensamblada** o en **Despiece** con control de
   separación. Al cambiar de vista la cámara encuadra todo lo visible según la proporción del visor.
@@ -50,7 +56,8 @@ En el constructor:
 - La validación marca módulos superpuestos, separaciones chicas (≤ 5 mm), medidas inválidas,
   frentes que no entran y piezas que chocan por reglas pendientes. Con errores no se puede aplicar.
 
-La posición (`layout3d`) y el sentido de apertura (`doorHingeSide`) se guardan dentro del módulo
+La posición y los giros (`layout3d`, y `layout3dCopies` para copias separadas, por número de
+copia) y el sentido de apertura (`doorHingeSide`) se guardan dentro del módulo
 (JSON `items` de `saved_estimates`). No hizo falta migración ni cambios de RLS. Los módulos sin
 posición (todos los anteriores) se ubican automáticamente en fila sobre el piso.
 
