@@ -200,7 +200,10 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerup', onUp);
       transform.detach();
-      transform.dispose();
+      // No dispose(): en three r169 llama a this.traverse, que TransformControls ya no tiene, y
+      // rompe el cierre del visor. disconnect() saca los eventos; sus mallas cuelgan de la escena
+      // y las libera disposeTree.
+      transform.disconnect();
       disposeTree(s);
       controls.dispose();
       renderer.dispose();
