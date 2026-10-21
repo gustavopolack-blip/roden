@@ -28,7 +28,11 @@ En el constructor:
   (el seleccionado en la lista, solo), cada una **Ensamblada** o en **Despiece** con control de
   separación. Al cambiar de vista la cámara encuadra todo lo visible según la proporción del visor.
 - Clic en una pieza: nombre, placa, medidas y veta (las mismas del despiece y la planilla de cortes).
-- **Mover módulos con el mouse** (Ítem completo, Ensamblado, no en solo lectura): clic en un
+- **Vista de frente (pared)** (botón en la barra del visor): cámara de frente, sin perspectiva;
+  la pared de apoyo es el plano de la pantalla. Se **arrastra cada módulo directo con el mouse**,
+  solo a los costados y arriba/abajo: la profundidad (Z) no cambia. Mismo imán que abajo. No se
+  orbita (sí desplazar y acercar). Volviendo a apretar el botón, vuelve la vista 3D.
+- **Mover módulos con el mouse en 3D** (Ítem completo, Ensamblado, no en solo lectura): clic en un
   módulo y aparecen las flechas de mover, como el gizmo de 3ds Max (rojo X, verde Y, azul Z; los
   cuadraditos mueven en un plano). Imán: al soltar a **30 mm o menos** de la cara de un módulo
   vecino (que esté a la par en los otros dos ejes) se pega a esa cara o la alinea; en altura se

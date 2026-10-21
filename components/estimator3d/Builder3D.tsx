@@ -10,7 +10,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink,
+  X, Download, Box as BoxIcon, Layers, Maximize2, RotateCw, AlertTriangle, Info, Check, RefreshCw, ChevronDown, ChevronUp, Expand, Shrink, Square,
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
@@ -87,6 +87,8 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   // Visor a pantalla completa: pantalla completa del navegador sobre el visor y su barra; donde el
   // navegador no lo permite (iPhone), el visor igual tapa toda la ventana.
   const [maximized, setMaximized] = useState(false);
+  // Vista de frente: la pared de apoyo es el plano de la pantalla; los módulos se arrastran directo.
+  const [frontView, setFrontView] = useState(false);
   const viewerRef = useRef<HTMLElement>(null);
   const toggleMaximized = () => {
     if (maximized) {
@@ -381,12 +383,17 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                 </label>
               )}
               <button onClick={() => setFitToken(t => t + 1)} className="px-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-gray-100 flex items-center gap-1.5"><Maximize2 size={14} /> Encuadrar</button>
+              <button onClick={() => setFrontView(v => !v)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border flex items-center gap-1.5 ${frontView ? 'bg-black text-white border-black' : 'text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+                <Square size={14} /> Vista de frente (pared)
+              </button>
               <button onClick={toggleMaximized} className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 border border-gray-200 hover:bg-gray-100 flex items-center gap-1.5">
                 {maximized ? <><Shrink size={14} /> Salir de pantalla completa</> : <><Expand size={14} /> Pantalla completa</>}
               </button>
               {moveEnabled && (
                 <span className="text-[10px] text-gray-500">
-                  {selModuleKey ? `Mover: arrastrá las flechas (imán a ${SNAP_DISTANCE} mm)` : 'Clic en un módulo para moverlo'}
+                  {frontView ? `Arrastrá un módulo: a los costados o arriba/abajo (imán a ${SNAP_DISTANCE} mm)`
+                    : selModuleKey ? `Mover: arrastrá las flechas (imán a ${SNAP_DISTANCE} mm)` : 'Clic en un módulo para moverlo'}
                 </span>
               )}
               <div className="flex-1" />
@@ -401,7 +408,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   scene={viewScene} bbox={viewPlaced ? viewPlaced.localBox : assembly.bbox}
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
-                  moveEnabled={moveEnabled} onMoveModule={moveModule}
+                  moveEnabled={moveEnabled} frontView={frontView} onMoveModule={moveModule}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}
                 />
               ) : (
