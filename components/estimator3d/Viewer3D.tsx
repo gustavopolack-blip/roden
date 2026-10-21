@@ -1,12 +1,13 @@
 /**
  * Visor three.js del constructor 3D. Dibuja la escena que arma utils/furniture3d/geometry
- * (la misma que se exporta a FBX/OBJ), permite orbitar y seleccionar piezas o módulos.
- * Escena en milímetros.
+ * (la misma que se exporta a FBX/OBJ), permite orbitar, seleccionar piezas o módulos y mover el
+ * módulo seleccionado con las flechas (con imán a los vecinos y al piso). Escena en milímetros.
  */
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { FurnitureScene, Box, boxCenter, boxSize, fitCameraDistance } from '../../utils/furniture3d/geometry';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { FurnitureScene, Box, Vec3, boxCenter, boxSize, fitCameraDistance, snapModuleMove, unionBox } from '../../utils/furniture3d/geometry';
 import { materialColorFor } from '../../utils/furniture3d/exporters';
 
 interface Viewer3DProps {
@@ -17,6 +18,8 @@ interface Viewer3DProps {
   issueModuleKeys: Set<string>;
   onPick: (sel: { pieceKey: string | null; moduleKey: string | null }) => void;
   fitToken: number; // cambia para pedir "encuadrar"
+  moveEnabled?: boolean;   // mostrar las flechas de mover sobre el módulo seleccionado
+  onMoveModule?: (moduleIndex: number, delta: Vec3) => void;   // al soltar: desplazamiento (mm) ya con imán
 }
 
 const disposeTree = (obj: THREE.Object3D) => {
@@ -29,14 +32,18 @@ const disposeTree = (obj: THREE.Object3D) => {
   });
 };
 
-const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken }) => {
+const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, onMoveModule }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
     controls: OrbitControls; content: THREE.Group; raf: number; fitted: boolean;
+    transform: TransformControls;
+    drag: { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null;
   } | null>(null);
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
+  const onMoveRef = useRef(onMoveModule);
+  onMoveRef.current = onMoveModule;
 
   // Inicialización (una vez)
   useEffect(() => {
@@ -63,8 +70,26 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const content = new THREE.Group();
     s.add(content);
 
-    const state = { renderer, scene: s, camera, controls, content, raf: 0, fitted: false };
+    // Flechas de mover (como el gizmo de 3ds Max). Mientras se arrastra no se orbita.
+    const transform = new TransformControls(camera, renderer.domElement);
+    transform.setSize(0.9);
+    s.add(transform.getHelper());
+    const state = { renderer, scene: s, camera, controls, content, raf: 0, fitted: false, transform, drag: null as { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null };
     ctx.current = state;
+    transform.addEventListener('dragging-changed', (e: any) => { controls.enabled = !e.value; });
+    transform.addEventListener('objectChange', () => {
+      const obj = transform.object, d = state.drag;
+      if (!obj || !d) return;
+      const o = d.origin;
+      const snapped = snapModuleMove(d.moving, d.others, [obj.position.x - o[0], obj.position.y - o[1], obj.position.z - o[2]]);
+      obj.position.set(o[0] + snapped[0], o[1] + snapped[1], o[2] + snapped[2]);
+    });
+    transform.addEventListener('mouseUp', () => {
+      const obj = transform.object, d = state.drag;
+      if (!obj || !d) return;
+      const delta: Vec3 = [obj.position.x - d.origin[0], obj.position.y - d.origin[1], obj.position.z - d.origin[2]];
+      if (delta.some(v => Math.abs(v) > 0.01)) onMoveRef.current?.(d.moduleIndex, delta);
+    });
     const loop = () => { controls.update(); renderer.render(s, camera); state.raf = requestAnimationFrame(loop); };
     loop();
 
@@ -79,6 +104,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY }; };
     const onUp = (e: PointerEvent) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+      if (transform.axis) return;   // clic sobre las flechas: no cambia la selección
       const r = renderer.domElement.getBoundingClientRect();
       const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       const ray = new THREE.Raycaster();
@@ -94,6 +120,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       ro.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onDown);
       renderer.domElement.removeEventListener('pointerup', onUp);
+      transform.detach();
+      transform.dispose();
       disposeTree(s);
       controls.dispose();
       renderer.dispose();
@@ -106,12 +134,24 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
   useEffect(() => {
     const c = ctx.current;
     if (!c) return;
+    c.transform.detach();
+    c.drag = null;
     disposeTree(c.content);
     c.content.clear();
 
+    // Las copias (Cant.) de un módulo cuelgan de un mismo grupo, ubicado en la primera copia
+    // (ahí aparecen las flechas): se mueven juntas.
+    const parents = new Map<number, THREE.Group>();
+    const parentOf = (mi: number, at: { x: number; y: number; z: number }) => {
+      let p = parents.get(mi);
+      if (!p) { p = new THREE.Group(); p.position.set(at.x, at.y, at.z); parents.set(mi, p); c.content.add(p); }
+      return p;
+    };
+
     scene.modules.forEach(sm => {
       const g = new THREE.Group();
-      g.position.set(sm.layout.x, sm.layout.y, sm.layout.z);
+      const parent = parentOf(sm.module.moduleIndex, sm.layout);
+      g.position.set(sm.layout.x - parent.position.x, sm.layout.y - parent.position.y, sm.layout.z - parent.position.z);
       g.rotation.y = THREE.MathUtils.degToRad(sm.layout.rotY);
       const moduleSelected = sm.module.key === selectedModuleKey;
       const hasIssue = issueModuleKeys.has(sm.module.key);
@@ -161,11 +201,23 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
         const helper = new THREE.Box3Helper(new THREE.Box3(new THREE.Vector3(...b.min), new THREE.Vector3(...b.max)), hasIssue ? 0xdc2626 : 0x4f46e5);
         g.add(helper);
       }
-      c.content.add(g);
+      parent.add(g);
     });
 
+    const sel = scene.modules.find(sm => sm.module.key === selectedModuleKey);
+    if (moveEnabled && sel) {
+      const mi = sel.module.moduleIndex;
+      c.drag = {
+        moduleIndex: mi,
+        moving: unionBox(scene.modules.filter(sm => sm.module.moduleIndex === mi).map(sm => sm.module.worldBox)),
+        others: scene.modules.filter(sm => sm.module.moduleIndex !== mi).map(sm => sm.module.worldBox),
+        origin: parents.get(mi)!.position.toArray() as Vec3,
+      };
+      c.transform.attach(parents.get(mi)!);
+    }
+
     if (!c.fitted && scene.modules.length) { fit(); c.fitted = true; }
-  }, [scene, selectedPieceKey, selectedModuleKey, issueModuleKeys]);
+  }, [scene, selectedPieceKey, selectedModuleKey, issueModuleKeys, moveEnabled]);
 
   const fit = () => {
     const c = ctx.current;

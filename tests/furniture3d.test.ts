@@ -8,7 +8,7 @@ import { SPECIAL_MODULE_TEMPLATES } from '../utils/specialModules';
 import { calculateModuleParts, calculateItemQuantities } from '../utils/estimatorEngine';
 import {
   buildAssembly, buildScene, placeModule, findPieceOverlaps, boxSize, boxCenter, transformBox, overlapVolume, MODULE_PLACERS,
-  fitCameraDistance, pieceAABB,
+  fitCameraDistance, pieceAABB, snapModuleMove,
 } from '../utils/furniture3d/geometry';
 
 const BASE = {
@@ -468,5 +468,31 @@ describe('cajón interno', () => {
     expect(lat).toHaveLength(2);
     lat.forEach(p => { expect(p.box.max[1]).toBe(900 - 18 - 10); expect(boxSize(p.box)[1]).toBe(80); });
     expect(findPieceOverlaps(pl.pieces)).toEqual([]);
+  });
+});
+
+describe('imán al arrastrar módulos en el visor', () => {
+  const box = (x0: number, x1: number, y0: number, y1: number, z0 = 0, z1 = 580) => ({ min: [x0, y0, z0], max: [x1, y1, z1] } as any);
+  const bajo = box(0, 600, 0, 720);
+  it('se pega al costado del vecino si queda a 30 mm o menos', () => {
+    // módulo de 600 que arranca en 1000, arrastrado 380 a la izquierda: queda a 20 del vecino → pegado
+    expect(snapModuleMove(box(1000, 1600, 0, 720), [bajo], [-380, 0, 0])).toEqual([-400, 0, 0]);
+  });
+  it('lejos del vecino no se pega: se redondea al mm', () => {
+    expect(snapModuleMove(box(1000, 1600, 0, 720), [bajo], [-300.4, 0, 0])).toEqual([-300, 0, 0]);
+  });
+  it('se apoya arriba de otro módulo y alinea el frente', () => {
+    // alacena 600 × 700 × 350 arriba del bajo: soltada 15 mm por encima y 12 mm corrida hacia atrás del frente
+    const alacena = box(0, 600, 1000, 1700, 0, 350);
+    const d = snapModuleMove(alacena, [bajo], [0, -265, 218]);
+    expect(d).toEqual([0, -280, 230]);
+  });
+  it('se pega al piso y nunca baja de él', () => {
+    expect(snapModuleMove(box(2000, 2600, 100, 820), [], [0, -90, 0])).toEqual([0, -100, 0]);
+    expect(snapModuleMove(box(2000, 2600, 100, 820), [], [0, -500, 0])).toEqual([0, -100, 0]);
+  });
+  it('un módulo que no está al lado (otra altura) no atrae', () => {
+    const lejos = box(0, 600, 1500, 2200);
+    expect(snapModuleMove(box(1000, 1600, 0, 720), [lejos], [-380, 0, 0])).toEqual([-380, 0, 0]);
   });
 });
