@@ -1,5 +1,6 @@
 
 import { BusinessData } from '../types';
+import { supabase } from './supabaseClient';
 
 // All Gemini calls are proxied through the Vercel serverless function.
 // The API key is stored server-side in process.env.GEMINI_API_KEY and is
@@ -17,9 +18,14 @@ const callGemini = async (payload: {
   model?: string;
   responseMimeType?: string;
 }): Promise<string> => {
+  // api/gemini.ts rejects requests without a valid Supabase session (401).
+  const { data: { session } } = await supabase.auth.getSession();
   const response = await fetch(GEMINI_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify(payload),
   });
 
