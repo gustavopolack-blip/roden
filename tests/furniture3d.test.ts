@@ -496,3 +496,40 @@ describe('imán al arrastrar módulos en el visor', () => {
     expect(snapModuleMove(box(1000, 1600, 0, 720), [lejos], [-380, 0, 0])).toEqual([-380, 0, 0]);
   });
 });
+
+describe('giros en X/Z y copias ubicadas por separado', () => {
+  const ajuste = (over: any = {}) => {
+    const t = SPECIAL_MODULE_TEMPLATES.find(x => x.id === 'AJUSTE')!;
+    const d = { width: 720, ...t.fixedDims!({}) } as any;
+    const r = t.calculate(d, {});
+    return mod({ id: 'aj', name: 'Ajuste', ...d, quantity: 4, moduleType: 'SPECIAL', isSpecialModule: true, specialTemplateId: 'AJUSTE',
+      specialOptions: {}, specialParts: r.parts, specialHardware: r.hardware, ...over });
+  };
+  it('ajuste volcado de costado (Z 90°): queda parado, 18 de espesor y 720 de alto', () => {
+    const a = buildAssembly('x', [ajuste({ quantity: 1, layout3d: { x: 600, y: 0, z: 0, rotY: 0, rotZ: 90 } })]);
+    const b = a.modules[0].worldBox;
+    // gira sobre la esquina de origen: el largo (X) pasa a ser alto (Y) y el espesor queda hacia −X
+    expect(boxSize(b).map(v => Math.round(v))).toEqual([18, 720, 100]);
+    expect(b.min.map(v => Math.round(v))).toEqual([582, 0, 0]);
+  });
+  it('sin separar, las 4 copias van en fila; separadas, cada una usa su ubicación y giro', () => {
+    const fila = buildAssembly('x', [ajuste({ layout3d: { x: 0, y: 0, z: 0, rotY: 0 } })]);
+    expect(fila.modules.map(m => m.layout.x)).toEqual([0, 720, 1440, 2160]);
+    expect(fila.modules.every(m => !m.ownLayout)).toBe(true);
+    const sep = buildAssembly('x', [ajuste({
+      layout3d: { x: 0, y: 0, z: 0, rotY: 0, rotZ: 90 },
+      layout3dCopies: { 1: { x: 600, y: 0, z: 0, rotY: 0, rotZ: 90 }, 2: { x: 1200, y: 0, z: 0, rotY: 0, rotZ: 90 }, 3: { x: 1800, y: 0, z: 0, rotY: 0, rotZ: 90 } },
+    })]);
+    expect(sep.modules.map(m => [m.layout.x, m.layout.rotZ, m.ownLayout])).toEqual([[0, 90, false], [600, 90, true], [1200, 90, true], [1800, 90, true]]);
+    expect(issuesOf(sep, 'MODULE_OVERLAP')).toEqual([]);
+    // dos copias en el mismo lugar: la validación lo marca
+    const choque = buildAssembly('x', [ajuste({ quantity: 2, layout3dCopies: { 1: { x: 0, y: 0, z: 0, rotY: 0 } }, layout3d: { x: 0, y: 0, z: 0, rotY: 0 } })]);
+    expect(issuesOf(choque, 'MODULE_OVERLAP').length).toBeGreaterThan(0);
+  });
+  it('el despiece y las cantidades no cambian al girar o separar copias', () => {
+    const plano = ajuste();
+    const girado = ajuste({ layout3d: { x: 0, y: 0, z: 0, rotY: 90, rotX: 90, rotZ: 90 }, layout3dCopies: { 1: { x: 900, y: 0, z: 0, rotY: 0, rotZ: 90 } } });
+    expect(calculateModuleParts(girado)).toEqual(calculateModuleParts(plano));
+    expect(calculateItemQuantities([girado])).toEqual(calculateItemQuantities([plano]));
+  });
+});

@@ -31,7 +31,12 @@ export type Vec3 = [number, number, number];
 export interface Box { min: Vec3; max: Vec3 }
 export type RotY = 0 | 90 | 180 | 270;
 
-export interface ModuleLayout3D { x: number; y: number; z: number; rotY: RotY }
+/**
+ * Ubicación de un módulo (o de una copia) en el mueble. Giros en pasos de 90°: rotY = en planta;
+ * rotX = volcado hacia el frente; rotZ = volcado de costado (ej.: un ajuste parado). Se aplican
+ * primero Z, después X y al final Y (orden 'YXZ' de three.js), sobre la esquina de origen.
+ */
+export interface ModuleLayout3D { x: number; y: number; z: number; rotY: RotY; rotX?: RotY; rotZ?: RotY }
 
 export type PieceRole = 'carcass' | 'back' | 'shelf' | 'front' | 'drawer' | 'hardware' | 'obra' | 'other';
 
@@ -61,6 +66,7 @@ export interface PlacedModule {
   moduleId: string;
   moduleIndex: number;
   instance: number;
+  ownLayout: boolean;          // copia (Cant.) con ubicación propia: se mueve y gira sola
   name: string;
   templateId: string | null;   // null = módulo estándar
   dims: { w: number; h: number; d: number };
@@ -173,10 +179,39 @@ export const rotateY = (p: Vec3, deg: number): Vec3 => {
   const c = Math.round(Math.cos(r) * 1e9) / 1e9, s = Math.round(Math.sin(r) * 1e9) / 1e9;
   return [c * p[0] + s * p[2], p[1], -s * p[0] + c * p[2]];
 };
+const trig = (deg: number) => {
+  const r = (deg * Math.PI) / 180;
+  return [Math.round(Math.cos(r) * 1e9) / 1e9, Math.round(Math.sin(r) * 1e9) / 1e9];
+};
+/** Rotación sobre X (three.js: positivo lleva +y hacia +z). */
+export const rotateXAxis = (p: Vec3, deg: number): Vec3 => {
+  if (!deg) return p;
+  const [c, s] = trig(deg);
+  return [p[0], c * p[1] - s * p[2], s * p[1] + c * p[2]];
+};
+/** Rotación sobre Z (three.js: positivo lleva +x hacia +y). */
+export const rotateZAxis = (p: Vec3, deg: number): Vec3 => {
+  if (!deg) return p;
+  const [c, s] = trig(deg);
+  return [c * p[0] - s * p[1], s * p[0] + c * p[1], p[2]];
+};
+/** Gira un punto local con los tres giros de la ubicación (Z, después X, después Y). */
+export const rotateLayout = (p: Vec3, l: Pick<ModuleLayout3D, 'rotY' | 'rotX' | 'rotZ'>): Vec3 =>
+  rotateY(rotateXAxis(rotateZAxis(p, l.rotZ || 0), l.rotX || 0), l.rotY);
+const ROTS = [0, 90, 180, 270];
+const asRot = (v: any): RotY => (ROTS.includes(v) ? v : 0) as RotY;
+/** Ubicación guardada (layout3d o la de una copia) normalizada; null si falta o es inválida. */
+export const readLayout = (l: any): ModuleLayout3D | null => {
+  if (!l || ![l.x, l.y, l.z].every((v: any) => typeof v === 'number' && isFinite(v))) return null;
+  const out: ModuleLayout3D = { x: l.x, y: l.y, z: l.z, rotY: asRot(l.rotY) };
+  if (asRot(l.rotX)) out.rotX = asRot(l.rotX);
+  if (asRot(l.rotZ)) out.rotZ = asRot(l.rotZ);
+  return out;
+};
 export const transformBox = (b: Box, layout: ModuleLayout3D): Box => {
   const corners: Vec3[] = [];
   for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) corners.push([x, y, z]);
-  const pts = corners.map(c => { const r = rotateY(c, layout.rotY); return [r[0] + layout.x, r[1] + layout.y, r[2] + layout.z] as Vec3; });
+  const pts = corners.map(c => { const r = rotateLayout(c, layout); return [r[0] + layout.x, r[1] + layout.y, r[2] + layout.z] as Vec3; });
   const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
   pts.forEach(p => { for (let i = 0; i < 3; i++) { min[i] = Math.min(min[i], p[i]); max[i] = Math.max(max[i], p[i]); } });
   return { min, max };
@@ -1005,7 +1040,7 @@ export const resolveLayouts = (modules: any[]): ModuleLayout3D[] => {
     let c = cursor;
     let wallCursor = 0;   // alacenas sin posición: fila propia, colgadas a WALL_CABINET_Y, desde x = 0
     return modules.map(m => {
-      if (hasLayout(m)) return { x: m.layout3d.x, y: m.layout3d.y, z: m.layout3d.z, rotY: ([0, 90, 180, 270].includes(m.layout3d.rotY) ? m.layout3d.rotY : 0) as RotY };
+      if (hasLayout(m)) return readLayout(m.layout3d)!;
       if (m.cabinetType === 'ALACENA' && !m.isSpecialModule) {
         const l: ModuleLayout3D = { x: wallCursor, y: WALL_CABINET_Y, z: 0, rotY: 0 };
         wallCursor += (m.width || 0) * (m.quantity || 1);
@@ -1070,8 +1105,10 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
 
     for (let inst = 0; inst < qty; inst++) {
       const l = layouts[mi];
-      const off = rotateY([inst * W, 0, 0], l.rotY);
-      const layout: ModuleLayout3D = { x: l.x + off[0], y: l.y + off[1], z: l.z + off[2], rotY: l.rotY };
+      // Las copias van una al lado de la otra, salvo las que tienen ubicación propia.
+      const own = inst > 0 ? readLayout(mod.layout3dCopies?.[inst]) : null;
+      const off = rotateLayout([inst * W, 0, 0], l);
+      const layout: ModuleLayout3D = own || { ...l, x: l.x + off[0], y: l.y + off[1], z: l.z + off[2] };
       const key = `${mod.id || `m${mi}`}#${inst}`;
       const rekey = (p: Piece3D) => ({ ...p, key: `${key}/${p.key.split('/').pop()}` });
       const pieces = base.pieces.map(rekey);
@@ -1079,7 +1116,7 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
       const volume = mkBox(0, W, 0, H + legH, 0, D);
       const localBox = pieces.length ? unionBox([volume, ...pieces.map(p => p.box)]) : volume;
       placed.push({
-        key, moduleId: mod.id, moduleIndex: mi, instance: inst,
+        key, moduleId: mod.id, moduleIndex: mi, instance: inst, ownLayout: !!own,
         name: qty > 1 ? `${label} (${inst + 1}/${qty})` : label,
         templateId: templateIdOf(mod), dims: { w: W, h: H + legH, d: D }, layout,
         status: base.status, notes: base.notes, pieces, gridPieces, localBox,
@@ -1157,7 +1194,7 @@ export const buildAssembly = (name: string, modules: any[]): Assembly => {
   placed.forEach(pm => {
     const mod = modules[pm.moduleIndex];
     const hinged = pm.pieces.filter(pc => pc.hingeSide);
-    if (mod.doorHingeSide || mod.cabinetType === 'ESQUINERO' || hinged.length !== 1 || (pm.layout.rotY !== 0 && pm.layout.rotY !== 180)) return;
+    if (mod.doorHingeSide || mod.cabinetType === 'ESQUINERO' || hinged.length !== 1 || (pm.layout.rotY !== 0 && pm.layout.rotY !== 180) || pm.layout.rotX || pm.layout.rotZ) return;
     const worldLeft = boxCenter(pm.worldBox)[0] <= axisX;
     const localLeft = pm.layout.rotY === 180 ? !worldLeft : worldLeft;
     hinged[0].hingeSide = localLeft ? 'left' : 'right';

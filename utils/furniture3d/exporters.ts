@@ -11,7 +11,7 @@
  * Se escribe FBX ASCII propio porque three.js no trae exportador FBX y no hace falta una
  * dependencia extra para cajas con materiales.
  */
-import { FurnitureScene, Box, Vec3, boxCenter, boxSize, rotateY, Piece3D } from './geometry';
+import { FurnitureScene, Box, Vec3, boxCenter, boxSize, rotateLayout, Piece3D, ModuleLayout3D } from './geometry';
 
 // ─────────────────────────────────────────────────────────────
 // Materiales de presentación (colores de referencia para el render;
@@ -125,7 +125,22 @@ const meshFor = (m: { size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder' }): B
 // Nodos comunes de la escena (los usan FBX y OBJ)
 // ─────────────────────────────────────────────────────────────
 interface MeshNode { name: string; material: string; translation: Vec3; size: Vec3; grainAxis: 0 | 1 | 2; shape?: 'cylinder'; rotX?: number; props: Record<string, string> }
-interface ModuleNode { name: string; translation: Vec3; rotY: number; meshes: MeshNode[] }
+interface ModuleNode { name: string; translation: Vec3; rot: Pick<ModuleLayout3D, 'rotY' | 'rotX' | 'rotZ'>; meshes: MeshNode[] }
+
+/**
+ * Giro del módulo como "Lcl Rotation" de FBX (orden por defecto eEulerXYZ: primero X, después Y,
+ * después Z). El módulo gira primero Z, después X, después Y; como son pasos de 90°, se busca la
+ * terna XYZ que deja los ejes en el mismo lugar (prefiere la que solo gira en Y).
+ */
+const fbxEuler = (rot: ModuleNode['rot']): Vec3 => {
+  const target = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(e => rotateLayout(e as Vec3, rot));
+  const steps = [0, 90, 180, 270];
+  for (const a of steps) for (const c of steps) for (const b of steps) {
+    const xyz = (p: Vec3) => rotateLayout(rotateLayout(rotateLayout(p, { rotY: 0, rotX: a as any }), { rotY: b as any }), { rotY: 0, rotZ: c as any });
+    if ([[1, 0, 0], [0, 1, 0], [0, 0, 1]].every((e, i) => xyz(e as Vec3).every((v, k) => Math.abs(v - target[i][k]) < 1e-6))) return [a, b, c];
+  }
+  return [0, rot.rotY, 0];
+};
 
 const pieceProps = (p: Piece3D): Record<string, string> => ({
   rodenPieza: p.name,
@@ -151,7 +166,7 @@ const collectNodes = (scene: FurnitureScene): ModuleNode[] => {
         translation: boxCenter(sm.placeholder), size: boxSize(sm.placeholder), grainAxis: 0,
         props: { rodenNota: 'Ubicacion de piezas pendiente para esta plantilla' } });
     }
-    return { name: mName, translation: [sm.layout.x, sm.layout.y, sm.layout.z], rotY: sm.layout.rotY, meshes };
+    return { name: mName, translation: [sm.layout.x, sm.layout.y, sm.layout.z], rot: { rotY: sm.layout.rotY, rotX: sm.layout.rotX, rotZ: sm.layout.rotZ }, meshes };
   });
 };
 
@@ -174,13 +189,13 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
   const userProps = (p: Record<string, string>) =>
     Object.entries(p).map(([k, v]) => `P: "${k}", "KString", "", "U", "${safeName(v).replace(/_/g, ' ')}"`);
 
-  const nullModel = (mid: number, name: string, t: Vec3, rotY: number) => {
+  const nullModel = (mid: number, name: string, t: Vec3, rot: Vec3) => {
     const aid = id();
     counts.model++; counts.attr++;
     objects.push(`\tNodeAttribute: ${aid}, "NodeAttribute::", "Null" {\n\t\tTypeFlags: "Null"\n\t}`);
     objects.push(`\tModel: ${mid}, "Model::${name}", "Null" {\n\t\tVersion: 232\n${props70([
       `P: "Lcl Translation", "Lcl Translation", "", "A",${n(t[0])},${n(t[1])},${n(t[2])}`,
-      `P: "Lcl Rotation", "Lcl Rotation", "", "A",0,${n(rotY)},0`,
+      `P: "Lcl Rotation", "Lcl Rotation", "", "A",${n(rot[0])},${n(rot[1])},${n(rot[2])}`,
     ])}\n\t\tShading: Y\n\t\tCulling: "CullingOff"\n\t}`);
     connections.push(`\tC: "OO",${aid},${mid}`);
   };
@@ -204,12 +219,12 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date } = {}): st
 
   // Raíz → módulos → piezas
   const rootId = id();
-  nullModel(rootId, rootName, [0, 0, 0], 0);
+  nullModel(rootId, rootName, [0, 0, 0], [0, 0, 0]);
   connections.push(`\tC: "OO",${rootId},0`);
 
   modules.forEach(m => {
     const mid = id();
-    nullModel(mid, m.name, m.translation, m.rotY);
+    nullModel(mid, m.name, m.translation, fbxEuler(m.rot));
     connections.push(`\tC: "OO",${mid},${rootId}`);
     m.meshes.forEach(mesh => {
       const gid = id(), oid = id();
@@ -391,11 +406,11 @@ export const exportOBJ = (scene: FurnitureScene, mtlFileName = 'amoblamiento.mtl
       bm.positions.forEach(p0 => {
         const p = rotateX(p0, mesh.rotX || 0);
         const local: Vec3 = [p[0] + mesh.translation[0], p[1] + mesh.translation[1], p[2] + mesh.translation[2]];
-        const r = rotateY(local, m.rotY);
+        const r = rotateLayout(local, m.rot);
         lines.push(`v ${n(r[0] + m.translation[0])} ${n(r[1] + m.translation[1])} ${n(r[2] + m.translation[2])}`);
       });
       bm.uvs.forEach(uv => lines.push(`vt ${n(uv[0])} ${n(uv[1])}`));
-      bm.normals.forEach(nv => { const r = rotateY(rotateX(nv, mesh.rotX || 0), m.rotY); lines.push(`vn ${n(r[0])} ${n(r[1])} ${n(r[2])}`); });
+      bm.normals.forEach(nv => { const r = rotateLayout(rotateX(nv, mesh.rotX || 0), m.rot); lines.push(`vn ${n(r[0])} ${n(r[1])} ${n(r[2])}`); });
       bm.polys.forEach(q => lines.push('f ' + q.map(i => `${i + vBase}/${i + vBase}/${i + vBase}`).join(' ')));
       vBase += bm.positions.length;
     });

@@ -62,7 +62,8 @@ export interface ExtendedCabinetModule extends CabinetModule {
     structureHasGrain?: boolean;
     frontsHaveGrain?: boolean;
     // Constructor 3D (solo dibujo; no intervienen en despiece ni costos)
-    layout3d?: { x: number; y: number; z: number; rotY: 0 | 90 | 180 | 270 }; // posición en el mueble (mm)
+    layout3d?: { x: number; y: number; z: number; rotY: 0 | 90 | 180 | 270; rotX?: 0 | 90 | 180 | 270; rotZ?: 0 | 90 | 180 | 270 }; // posición en el mueble (mm) y giros
+    layout3dCopies?: Record<number, { x: number; y: number; z: number; rotY: 0 | 90 | 180 | 270; rotX?: 0 | 90 | 180 | 270; rotZ?: 0 | 90 | 180 | 270 }>; // copias (Cant.) ubicadas por separado
     doorHingeSide?: 'LEFT' | 'RIGHT';                                       // apertura de puerta única
 }
 
