@@ -1,7 +1,8 @@
 /**
  * Visor three.js del constructor 3D. Dibuja la escena que arma utils/furniture3d/geometry
- * (la misma que se exporta a FBX/OBJ), permite orbitar, seleccionar piezas o módulos y mover el
- * módulo seleccionado con las flechas (con imán a los vecinos y al piso). Escena en milímetros.
+ * (la misma que se exporta a FBX/OBJ), permite orbitar, seleccionar piezas o módulos y mover
+ * módulos con imán a los vecinos y al piso: en 3D con las flechas del seleccionado; en la vista
+ * de frente (pared) arrastrándolos directo, solo a los costados y arriba/abajo. Escena en mm.
  */
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
@@ -18,7 +19,8 @@ interface Viewer3DProps {
   issueModuleKeys: Set<string>;
   onPick: (sel: { pieceKey: string | null; moduleKey: string | null }) => void;
   fitToken: number; // cambia para pedir "encuadrar"
-  moveEnabled?: boolean;   // mostrar las flechas de mover sobre el módulo seleccionado
+  moveEnabled?: boolean;   // se pueden mover módulos (flechas en 3D, arrastre directo de frente)
+  frontView?: boolean;     // vista de frente sin perspectiva: la pared de apoyo es el plano de la pantalla
   onMoveModule?: (moduleIndex: number, delta: Vec3) => void;   // al soltar: desplazamiento (mm) ya con imán
 }
 
@@ -32,14 +34,26 @@ const disposeTree = (obj: THREE.Object3D) => {
   });
 };
 
-const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, onMoveModule }) => {
+const setOrthoFrustum = (c: { ortho: THREE.OrthographicCamera; camera: THREE.PerspectiveCamera; orthoHalfH: number }) => {
+  const h = c.orthoHalfH, w = h * c.camera.aspect;
+  c.ortho.left = -w; c.ortho.right = w; c.ortho.top = h; c.ortho.bottom = -h;
+  c.ortho.updateProjectionMatrix();
+};
+
+const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
+    ortho: THREE.OrthographicCamera; orthoHalfH: number; front: boolean;
     controls: OrbitControls; content: THREE.Group; raf: number; fitted: boolean;
     transform: TransformControls;
     drag: { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null;
+    parents: Map<number, THREE.Group>;
   } | null>(null);
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+  const moveRef = useRef(moveEnabled);
+  moveRef.current = moveEnabled;
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
   const onMoveRef = useRef(onMoveModule);
@@ -67,6 +81,9 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
+    // Vista de frente: cámara sin perspectiva mirando la pared (eje −Z), para alinear a ojo.
+    const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 1e6);
+
     const content = new THREE.Group();
     s.add(content);
 
@@ -74,7 +91,12 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const transform = new TransformControls(camera, renderer.domElement);
     transform.setSize(0.9);
     s.add(transform.getHelper());
-    const state = { renderer, scene: s, camera, controls, content, raf: 0, fitted: false, transform, drag: null as { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null };
+    const state = {
+      renderer, scene: s, camera, ortho, orthoHalfH: 1000, front: false, controls, content, raf: 0, fitted: false, transform,
+      drag: null as { moduleIndex: number; moving: Box; others: Box[]; origin: Vec3 } | null,
+      parents: new Map<number, THREE.Group>(),
+    };
+    const activeCam = () => (state.front ? ortho : camera);
     ctx.current = state;
     transform.addEventListener('dragging-changed', (e: any) => { controls.enabled = !e.value; });
     transform.addEventListener('objectChange', () => {
@@ -90,35 +112,90 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       const delta: Vec3 = [obj.position.x - d.origin[0], obj.position.y - d.origin[1], obj.position.z - d.origin[2]];
       if (delta.some(v => Math.abs(v) > 0.01)) onMoveRef.current?.(d.moduleIndex, delta);
     });
-    const loop = () => { controls.update(); renderer.render(s, camera); state.raf = requestAnimationFrame(loop); };
+    const loop = () => { controls.update(); renderer.render(s, activeCam()); state.raf = requestAnimationFrame(loop); };
     loop();
 
     const ro = new ResizeObserver(() => {
       const w = mount.clientWidth, h = Math.max(1, mount.clientHeight);
       renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+      setOrthoFrustum(state);
     });
     ro.observe(mount);
 
-    // Selección por clic (ignora arrastres de órbita)
-    let down: { x: number; y: number } | null = null;
-    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY }; };
-    const onUp = (e: PointerEvent) => {
-      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
-      if (transform.axis) return;   // clic sobre las flechas: no cambia la selección
+    const rayAt = (e: PointerEvent) => {
       const r = renderer.domElement.getBoundingClientRect();
       const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       const ray = new THREE.Raycaster();
-      ray.setFromCamera(ndc, camera);
-      const hit = ray.intersectObjects(content.children, true).find(h => h.object.userData.pickable);
+      ray.setFromCamera(ndc, activeCam());
+      return ray;
+    };
+    const pickAt = (e: PointerEvent) => rayAt(e).intersectObjects(content.children, true).find(h => h.object.userData.pickable);
+
+    // Vista de frente: arrastre directo de un módulo sobre el plano de la pared (solo X e Y).
+    let wall: { moduleIndex: number; moduleKey: string; plane: THREE.Plane; start: THREE.Vector3; origin: Vec3; moving: Box; others: Box[]; delta: Vec3 } | null = null;
+    const wallPoint = (e: PointerEvent, plane: THREE.Plane) => rayAt(e).ray.intersectPlane(plane, new THREE.Vector3());
+
+    // Selección por clic (ignora arrastres de órbita)
+    let down: { x: number; y: number } | null = null;
+    const onDown = (e: PointerEvent) => {
+      down = { x: e.clientX, y: e.clientY };
+      if (!state.front || !moveRef.current || e.button !== 0) return;
+      const hit = pickAt(e);
+      const mi = hit?.object.userData.moduleIndex;
+      const parent = typeof mi === 'number' ? state.parents.get(mi) : undefined;
+      if (!hit || !parent) return;
+      const mods = sceneRef.current.modules;
+      const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -hit.point.z);
+      wall = {
+        moduleIndex: mi, moduleKey: hit.object.userData.moduleKey, plane, start: hit.point.clone(),
+        origin: parent.position.toArray() as Vec3, delta: [0, 0, 0],
+        moving: unionBox(mods.filter(sm => sm.module.moduleIndex === mi).map(sm => sm.module.worldBox)),
+        others: mods.filter(sm => sm.module.moduleIndex !== mi).map(sm => sm.module.worldBox),
+      };
+      controls.enabled = false;
+      renderer.domElement.setPointerCapture(e.pointerId);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!wall) {
+        // En la vista de frente, la mano indica qué se puede arrastrar.
+        if (state.front && moveRef.current) renderer.domElement.style.cursor = pickAt(e) ? 'grab' : '';
+        return;
+      }
+      const p = wallPoint(e, wall.plane);
+      const parent = state.parents.get(wall.moduleIndex);
+      if (!p || !parent) return;
+      const d = snapModuleMove(wall.moving, wall.others, [p.x - wall.start.x, p.y - wall.start.y, 0]);
+      wall.delta = [d[0], d[1], 0];   // la profundidad no cambia: el módulo sigue contra la pared
+      parent.position.set(wall.origin[0] + d[0], wall.origin[1] + d[1], wall.origin[2]);
+      renderer.domElement.style.cursor = 'grabbing';
+    };
+    const onUp = (e: PointerEvent) => {
+      if (wall) {
+        const w = wall;
+        wall = null;
+        controls.enabled = true;
+        renderer.domElement.style.cursor = '';
+        if (renderer.domElement.hasPointerCapture(e.pointerId)) renderer.domElement.releasePointerCapture(e.pointerId);
+        if (w.delta.some(v => Math.abs(v) > 0.01)) {
+          onMoveRef.current?.(w.moduleIndex, w.delta);
+          onPickRef.current({ pieceKey: null, moduleKey: w.moduleKey });
+          return;
+        }
+      }
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
+      if (transform.axis) return;   // clic sobre las flechas: no cambia la selección
+      const hit = pickAt(e);
       onPickRef.current(hit ? { pieceKey: hit.object.userData.pieceKey || null, moduleKey: hit.object.userData.moduleKey || null } : { pieceKey: null, moduleKey: null });
     };
     renderer.domElement.addEventListener('pointerdown', onDown);
+    renderer.domElement.addEventListener('pointermove', onMove);
     renderer.domElement.addEventListener('pointerup', onUp);
 
     return () => {
       cancelAnimationFrame(state.raf);
       ro.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onDown);
+      renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('pointerup', onUp);
       transform.detach();
       transform.dispose();
@@ -142,6 +219,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     // Las copias (Cant.) de un módulo cuelgan de un mismo grupo, ubicado en la primera copia
     // (ahí aparecen las flechas): se mueven juntas.
     const parents = new Map<number, THREE.Group>();
+    c.parents = parents;
     const parentOf = (mi: number, at: { x: number; y: number; z: number }) => {
       let p = parents.get(mi);
       if (!p) { p = new THREE.Group(); p.position.set(at.x, at.y, at.z); parents.set(mi, p); c.content.add(p); }
@@ -171,7 +249,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
         const mesh = new THREE.Mesh(geom, mat);
         mesh.position.set(center[0], center[1], center[2]);
         if (sp.piece.rotX) mesh.rotation.x = THREE.MathUtils.degToRad(sp.piece.rotX);
-        mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key };
+        mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key, moduleIndex: sm.module.moduleIndex };
         // Cilindro: solo el contorno de las tapas (sin las aristas de cada segmento).
         const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, sp.piece.shape === 'cylinder' ? 30 : 1), new THREE.LineBasicMaterial({ color: isSel ? 0x4f46e5 : 0x6b7280 }));
         mesh.add(edges);
@@ -191,7 +269,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
           new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: moduleSelected ? 0.45 : 0.25 }),
         );
         mesh.position.set(center[0], center[1], center[2]);
-        mesh.userData = { pickable: true, pieceKey: null, moduleKey: sm.module.key };
+        mesh.userData = { pickable: true, pieceKey: null, moduleKey: sm.module.key, moduleIndex: sm.module.moduleIndex };
         mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x2563eb })));
         g.add(mesh);
       }
@@ -205,7 +283,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     });
 
     const sel = scene.modules.find(sm => sm.module.key === selectedModuleKey);
-    if (moveEnabled && sel) {
+    if (moveEnabled && !frontView && sel) {
       const mi = sel.module.moduleIndex;
       c.drag = {
         moduleIndex: mi,
@@ -217,7 +295,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     }
 
     if (!c.fitted && scene.modules.length) { fit(); c.fitted = true; }
-  }, [scene, selectedPieceKey, selectedModuleKey, issueModuleKeys, moveEnabled]);
+  }, [scene, selectedPieceKey, selectedModuleKey, issueModuleKeys, moveEnabled, frontView]);
 
   const fit = () => {
     const c = ctx.current;
@@ -225,6 +303,17 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const b = new THREE.Box3().setFromObject(c.content);
     if (b.isEmpty()) return;
     const center = b.getCenter(new THREE.Vector3());
+    if (c.front) {
+      // De frente: todo el ancho y el alto en pantalla, con margen.
+      const size = b.getSize(new THREE.Vector3());
+      c.orthoHalfH = Math.max(size.y / 2, size.x / 2 / Math.max(c.camera.aspect, 0.1), 300) * 1.15;
+      c.ortho.zoom = 1;
+      c.ortho.position.set(center.x, center.y, b.max.z + 50000);
+      c.ortho.lookAt(center.x, center.y, center.z);
+      c.controls.target.set(center.x, center.y, center.z);
+      setOrthoFrustum(c);
+      return;
+    }
     // Distancia según el tamaño real (incluido el despiece explotado) y la proporción del visor:
     // antes era un múltiplo fijo de la medida mayor y en visores angostos el mueble quedaba cortado.
     const dist = fitCameraDistance({ min: b.min.toArray(), max: b.max.toArray() }, c.camera.fov, c.camera.aspect);
@@ -235,6 +324,17 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     c.camera.updateProjectionMatrix();
   };
   useEffect(() => { fit(); }, [fitToken]);
+
+  // Cambio de vista: de frente no se orbita (solo desplazar y acercar).
+  useEffect(() => {
+    const c = ctx.current;
+    if (!c) return;
+    c.front = frontView;
+    c.controls.object = frontView ? c.ortho : c.camera;
+    c.controls.enableRotate = !frontView;
+    (c.transform as any).camera = frontView ? c.ortho : c.camera;
+    fit();
+  }, [frontView]);
 
   const s = boxSize(bbox);
   return (
