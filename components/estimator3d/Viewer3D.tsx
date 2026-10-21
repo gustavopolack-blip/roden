@@ -59,7 +59,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
     ortho: THREE.OrthographicCamera; orthoHalfH: number; front: boolean;
-    controls: OrbitControls; content: THREE.Group; raf: number; fitted: boolean; grid: THREE.GridHelper;
+    controls: OrbitControls; content: THREE.Group; raf: number; fitted: boolean;
     transform: TransformControls;
     drag: (DragTarget & { origin: Vec3 }) | null;
     parents: Map<string, THREE.Group>;
@@ -106,7 +106,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     transform.setSize(0.9);
     s.add(transform.getHelper());
     const state = {
-      renderer, scene: s, camera, ortho, orthoHalfH: 1000, front: false, controls, content, raf: 0, fitted: false, transform, grid,
+      renderer, scene: s, camera, ortho, orthoHalfH: 1000, front: false, controls, content, raf: 0, fitted: false, transform,
       drag: null as (DragTarget & { origin: Vec3 }) | null,
       parents: new Map<string, THREE.Group>(),
     };
@@ -340,11 +340,11 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
   useEffect(() => { fit(); }, [fitToken]);
 
   /**
-   * "Foto" JPG de lo que se ve: misma cámara (ángulo y zoom), fondo blanco, sin grilla del piso,
-   * sin flechas ni resaltado de selección, recortada al mueble (con margen) y con un rótulo abajo.
-   * Resolución: el doble de la pantalla, sin pasar el máximo que acepta la placa de video (si se
-   * pasa, el navegador achica la imagen sin avisar). Se dibuja y se copia en el mismo paso, así no
-   * hace falta conservar el buffer de WebGL.
+   * Captura JPG de lo que se ve en el visor, igual que en pantalla (misma cámara, encuadre, fondo
+   * y grilla), sin las flechas de mover ni el resaltado de selección, con un rótulo abajo. Se
+   * dibuja en el momento de la llamada (antes de abrir el cuadro de "Guardar como", que puede
+   * sacar al navegador de pantalla completa y cambiar el visor). Resolución: el doble de la
+   * pantalla, sin pasar el máximo de la placa de video.
    */
   const capture = (caption: string): Promise<Blob | null> => {
     const c = ctx.current;
@@ -353,15 +353,11 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const restore: (() => void)[] = [];
     const hide = (o: THREE.Object3D) => { if (o.visible) { o.visible = false; restore.push(() => { o.visible = true; }); } };
     hide(c.transform.getHelper());
-    hide(c.grid);
     c.content.traverse(o => {
       if (o.userData.overlay) hide(o);
       const m = (o as any).material;
       if (m && !Array.isArray(m) && m.emissiveIntensity) { const v = m.emissiveIntensity; m.emissiveIntensity = 0; restore.push(() => { m.emissiveIntensity = v; }); }
     });
-    const bg = c.scene.background;
-    c.scene.background = new THREE.Color('#ffffff');
-    restore.push(() => { c.scene.background = bg; });
     const ratio = renderer.getPixelRatio();
     const el = renderer.domElement;
     const gl = renderer.getContext();
@@ -370,41 +366,20 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     renderer.setPixelRatio(scale);
     renderer.render(c.scene, c.front ? c.ortho : c.camera);
 
-    // Copia de lo dibujado y recorte al mueble: todo lo que no es fondo blanco, más un margen.
     const W = el.width, H = el.height;
-    const shot = document.createElement('canvas');
-    shot.width = W; shot.height = H;
-    const sg = shot.getContext('2d')!;
-    sg.drawImage(el, 0, 0);
+    const band = Math.round(40 * scale);
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H + band;
+    const g = out.getContext('2d')!;
+    g.drawImage(el, 0, 0);
     restore.forEach(f => f());
     renderer.setPixelRatio(ratio);
     renderer.render(c.scene, c.front ? c.ortho : c.camera);
 
-    const px = sg.getImageData(0, 0, W, H).data;
-    let x0 = W, y0 = H, x1 = -1, y1 = -1;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4;
-      if (px[i] < 245 || px[i + 1] < 245 || px[i + 2] < 245) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    }
-    if (x1 < 0) { x0 = 0; y0 = 0; x1 = W - 1; y1 = H - 1; }   // nada a la vista: la vista entera
-    const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.05);
-    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
-    const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-
-    // El rótulo tiene que entrar aunque el recorte sea angosto.
-    const font = Math.round(15 * scale);
-    sg.font = `${font}px sans-serif`;
-    const textW = sg.measureText(caption).width + Math.round(32 * scale);
-    const outW = Math.max(cw, Math.ceil(textW));
-    const band = Math.round(44 * scale);
-    const out = document.createElement('canvas');
-    out.width = outW; out.height = ch + band;
-    const g = out.getContext('2d')!;
-    g.fillStyle = '#ffffff'; g.fillRect(0, 0, out.width, out.height);
-    g.drawImage(shot, x0, y0, cw, ch, Math.round((outW - cw) / 2), 0, cw, ch);
-    g.fillStyle = '#e5e7eb'; g.fillRect(0, ch, out.width, Math.max(1, Math.round(scale)));
-    g.fillStyle = '#111827'; g.font = `${font}px sans-serif`; g.textBaseline = 'middle';
-    g.fillText(caption, Math.round(16 * scale), ch + band / 2);
+    g.fillStyle = '#ffffff'; g.fillRect(0, H, W, band);
+    g.fillStyle = '#e5e7eb'; g.fillRect(0, H, W, Math.max(1, Math.round(scale)));
+    g.fillStyle = '#111827'; g.font = `${Math.round(15 * scale)}px sans-serif`; g.textBaseline = 'middle';
+    g.fillText(caption, Math.round(16 * scale), H + band / 2);
     return new Promise(res => out.toBlob(b => res(b), 'image/jpeg', 0.92));
   };
   if (captureRef) captureRef.current = capture;

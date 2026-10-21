@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Viewer3D from './Viewer3D';
 import {
-  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, boxSize, ModuleLayout3D, transformBox,
+  buildAssembly, buildScene, PENDING_RULES, isManualModule, PlacedModule, RotY, Vec3, SNAP_DISTANCE, ModuleLayout3D, transformBox,
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
@@ -28,6 +28,7 @@ interface Builder3DProps {
   onApply?: (furnitureId: string, modules: ExtendedCabinetModule[]) => void;
   onClose: () => void;
   priceLabel?: string | null;         // precio del ítem según el estimador (informativo)
+  projectName?: string;                // obra (para el rótulo de la imagen JPG)
 }
 
 /** Qué se ve (el ítem con todos sus módulos o un módulo solo) y cómo (armado o despiezado). */
@@ -71,7 +72,7 @@ const NumField: React.FC<{ label: string; value: number | undefined; onChange?: 
     </label>
   );
 
-const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onApply, onClose, priceLabel }) => {
+const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onApply, onClose, priceLabel, projectName }) => {
   const [activeId, setActiveId] = useState(furnitures[0]?.id);
   const [drafts, setDrafts] = useState<Record<string, ExtendedCabinetModule[]>>(
     () => Object.fromEntries(furnitures.map(f => [f.id, JSON.parse(JSON.stringify(f.modules || []))])),
@@ -102,8 +103,9 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     setTimeout(() => setFitToken(t => t + 1), 150);
   };
   useEffect(() => {
-    // Esc del navegador sale de pantalla completa: el visor vuelve a su lugar.
-    const onChange = () => { if (!document.fullscreenElement) { setMaximized(false); setTimeout(() => setFitToken(t => t + 1), 150); } };
+    // Esc del navegador (o el cuadro de "Guardar como") sale de pantalla completa: el visor vuelve
+    // a su lugar sin mover la cámara.
+    const onChange = () => { if (!document.fullscreenElement) setMaximized(false); };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
@@ -239,12 +241,16 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   };
 
   /**
-   * Imagen JPG de lo que se ve en el visor, para la documentación técnica. Donde el navegador lo
-   * permite (Chrome, Edge) abre el cuadro de "Guardar como" para elegir carpeta y nombre; si no
-   * (Firefox, Safari), la descarga con el nombre sugerido.
+   * Imagen JPG de lo que se ve en el visor, como una captura, para la documentación técnica. La
+   * imagen se toma en el clic, antes de abrir el cuadro de "Guardar como" (que puede sacar al
+   * navegador de pantalla completa). Chrome y Edge: cuadro para elegir carpeta y nombre; Firefox y
+   * Safari: se descarga con el nombre sugerido.
    */
   const saveImage = async () => {
     const fileName = `${exportFileBase(active.name, presentation === 'exploded')}.jpg`;
+    const caption = [projectName && `Obra: ${projectName}`, `Mueble: ${active.name}`].filter(Boolean).join('   ·   ');
+    const shot = captureRef.current?.(caption);
+    if (!shot) return;
     const picker = (window as any).showSaveFilePicker;
     let handle: any = null;
     if (picker) {
@@ -255,10 +261,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
         handle = null;
       }
     }
-    const s = boxSize(viewPlaced ? viewPlaced.localBox : assembly.bbox);
-    const what = viewPlaced ? (modules[viewPlaced.moduleIndex]?.name || viewPlaced.name) : active.name;
-    const caption = `rødën · ${what} · ${Math.round(s[0])} × ${Math.round(s[1])} × ${Math.round(s[2])} mm (ancho × alto × prof.) · ${new Date().toLocaleDateString('es-AR')}`;
-    const blob = await captureRef.current?.(caption);
+    const blob = await shot;
     if (!blob) return;
     if (handle) {
       const w = await handle.createWritable();

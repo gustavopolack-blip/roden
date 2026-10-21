@@ -167,6 +167,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
       target: 'PENDING' | 'ITEM' | 'READONLY';
       furnitures: { id: string; name: string; modules: ExtendedCabinetModule[] }[];
       priceLabel?: string | null;
+      projectName?: string;
   }>(null);
 
   // Pending Modules (Not yet grouped into an Item)
@@ -3913,7 +3914,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                 {pendingModules.length > 0 && (
                                     <div className="flex gap-2">
                                     <button
-                                        onClick={() => setBuilder3d({ target: 'PENDING', furnitures: [{ id: 'pending', name: 'Módulos pendientes', modules: pendingModules }] })}
+                                        onClick={() => setBuilder3d({ target: 'PENDING', furnitures: [{ id: 'pending', name: 'Módulos pendientes', modules: pendingModules }], projectName: getActiveProjectName() })}
                                         className="bg-white border border-indigo-300 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-50">
                                         <Box size={16}/> 3D
                                     </button>
@@ -3975,7 +3976,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                 </div>
                                                 <div className="flex justify-end gap-3 mt-2">
                                                     {!(item as any).isManualItem && (
-                                                        <button onClick={() => setBuilder3d({ target: 'ITEM', furnitures: [{ id: item.id, name: item.name, modules: item.modules }], priceLabel: `Precio: ${formatCurrency(getQuotedItemPrice(item, activeSettings))}` })} className="text-indigo-600 hover:text-indigo-800 text-xs underline flex items-center gap-1">
+                                                        <button onClick={() => setBuilder3d({ target: 'ITEM', furnitures: [{ id: item.id, name: item.name, modules: item.modules }], priceLabel: `Precio: ${formatCurrency(getQuotedItemPrice(item, activeSettings))}`, projectName: getActiveProjectName() })} className="text-indigo-600 hover:text-indigo-800 text-xs underline flex items-center gap-1">
                                                             <Box size={10}/> 3D
                                                         </button>
                                                     )}
@@ -4212,7 +4213,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                                                         </button>
                                                         {(latestDoc.items || []).some((it: any) => !it?.isManualItem && (it?.modules || []).length) && (
                                                             <button
-                                                                onClick={() => setBuilder3d({ target: 'READONLY', furnitures: (latestDoc.items || []).filter((it: any) => !it?.isManualItem && (it?.modules || []).length).map((it: any) => ({ id: it.id, name: it.name, modules: it.modules })) })}
+                                                                onClick={() => setBuilder3d({ target: 'READONLY', furnitures: (latestDoc.items || []).filter((it: any) => !it?.isManualItem && (it?.modules || []).length).map((it: any) => ({ id: it.id, name: it.name, modules: it.modules })), projectName: project.name })}
                                                                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 text-xs font-bold text-gray-700 transition-all"
                                                             >
                                                                 <Box size={14} className="text-indigo-500"/> Modelo 3D
@@ -4429,6 +4430,7 @@ const CostEstimator: React.FC<CostEstimatorProps> = ({
                         furnitures={builder3d.furnitures}
                         readOnly={builder3d.target === 'READONLY'}
                         priceLabel={builder3d.priceLabel}
+                        projectName={builder3d.projectName}
                         onClose={() => setBuilder3d(null)}
                         onApply={(furnitureId, modules) => {
                             if (builder3d.target === 'PENDING') {

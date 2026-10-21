@@ -45,14 +45,13 @@ En el constructor:
   pega al piso y nunca baja de él. Sin imán, se redondea al mm. Las copias (Cant.) se mueven
   juntas. La posición queda en X/Y/Z del panel, como si se cargara a mano. Si queda superpuesto,
   Validación lo marca y no deja aplicar.
-- **Imagen JPG** (barra del visor): una "foto" de lo que se ve, con la **misma cámara** (ángulo y
-  zoom; también la vista de frente), para la documentación técnica. Se pueden sacar varias desde
-  distintos ángulos. Fondo blanco, **sin la grilla del piso**, sin flechas ni resaltado de
-  selección, **recortada al mueble** con un margen del 5 %, y un rótulo abajo (nombre, medidas
-  totales y fecha). Resolución: el doble de la pantalla, sin pasar el máximo de la placa de video
-  (si se pasa, el navegador achica la imagen sin avisar). En Chrome y Edge abre el cuadro "Guardar
-  como" (carpeta y nombre); en Firefox y Safari el navegador no lo permite y se descarga con el
-  nombre sugerido.
+- **Imagen JPG** (barra del visor): una **captura de lo que se ve en el visor en ese momento**
+  (misma cámara, encuadre, fondo y grilla; sirve para sacar varias desde distintos ángulos), sin
+  las flechas de mover ni el resaltado de selección, con un rótulo abajo: **Obra** (proyecto del
+  presupuesto) y **Mueble** (ítem). La imagen se toma en el clic, antes de abrir el cuadro de
+  "Guardar como" (que saca al navegador de pantalla completa). Resolución: el doble de la pantalla,
+  sin pasar el máximo de la placa de video. En Chrome y Edge abre el cuadro "Guardar como" (carpeta
+  y nombre); en Firefox y Safari se descarga con el nombre sugerido.
 - **Pantalla completa**: el visor y su barra ocupan toda la pantalla (pantalla completa del
   navegador; Esc o "Salir de pantalla completa" vuelve). En iPhone, donde el navegador no lo
   permite, el visor igual tapa toda la ventana.
