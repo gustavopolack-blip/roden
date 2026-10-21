@@ -8,6 +8,8 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { LibraryMaterial, matchMaterial, roughnessFor, texturedBox } from '../../utils/furniture3d/materialLibrary';
 import { FurnitureScene, Box, Vec3, PlacedModule, boxCenter, boxSize, fitCameraDistance, snapModuleMove, unionBox } from '../../utils/furniture3d/geometry';
 
 /** Lo que se mueve junto: el módulo con sus copias en fila, o una copia ubicada por separado. */
@@ -38,6 +40,10 @@ interface Viewer3DProps {
   captureRef?: React.MutableRefObject<((caption: string) => Promise<Blob | null>) | null>;
   /** El visor deja acá la función que copia lo que se ve (en mm) para exportar la maqueta. */
   modelRef?: React.MutableRefObject<(() => THREE.Group | null) | null>;
+  /** Biblioteca de materiales: cada pieza toma la textura de su placa (por nombre). */
+  library?: LibraryMaterial[];
+  /** URL pública de la imagen de un material (bucket material-textures). */
+  textureUrl?: (path: string) => string;
 }
 
 const disposeTree = (obj: THREE.Object3D) => {
@@ -56,12 +62,43 @@ const setOrthoFrustum = (c: { ortho: THREE.OrthographicCamera; camera: THREE.Per
   c.ortho.updateProjectionMatrix();
 };
 
-const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule, captureRef, modelRef }) => {
+/** Textura de un material (una sola carga por imagen; se repite según las coordenadas de la pieza). */
+const textureFor = (c: { textures: Map<string, THREE.Texture>; renderer: THREE.WebGLRenderer }, url: string): THREE.Texture => {
+  let t = c.textures.get(url);
+  if (!t) {
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+    t = loader.load(url);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = c.renderer.capabilities.getMaxAnisotropy();
+    c.textures.set(url, t);
+  }
+  return t;
+};
+
+/** Sol y piso de sombras ajustados al mueble que se ve. */
+const fitShadow = (c: { content: THREE.Group; sun: THREE.DirectionalLight; scene: THREE.Scene }) => {
+  const b = new THREE.Box3().setFromObject(c.content);
+  if (b.isEmpty()) return;
+  const center = b.getCenter(new THREE.Vector3()), size = b.getSize(new THREE.Vector3());
+  const r = Math.max(size.length() / 2, 500);
+  c.sun.target.position.set(center.x, b.min.y, center.z);
+  c.sun.position.set(center.x + r * 0.6, b.min.y + r * 1.6, center.z + r * 1.0);
+  const sc = c.sun.shadow.camera;
+  sc.left = -r * 1.3; sc.right = r * 1.3; sc.top = r * 1.3; sc.bottom = -r * 1.3; sc.near = r * 0.1; sc.far = r * 5;
+  sc.updateProjectionMatrix();
+  const floor = c.scene.children.find(o => o.userData.floor);
+  if (floor) { floor.position.set(center.x, b.min.y - 0.5, center.z); floor.scale.set(r * 6, r * 6, 1); }
+};
+
+const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, selectedModuleKey, issueModuleKeys, onPick, fitToken, moveEnabled = false, frontView = false, onMoveModule, captureRef, modelRef, library = [], textureUrl }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera;
     ortho: THREE.OrthographicCamera; orthoHalfH: number; front: boolean;
     controls: OrbitControls; content: THREE.Group; raf: number; fitted: boolean;
+    sun: THREE.DirectionalLight; textures: Map<string, THREE.Texture>;
     transform: TransformControls;
     drag: (DragTarget & { origin: Vec3 }) | null;
     parents: Map<string, THREE.Group>;
@@ -81,14 +118,31 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
+    // Terminación de presentación: tono neutro, reflejos de un ambiente interior y sombras suaves.
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
 
     const s = new THREE.Scene();
     s.background = new THREE.Color('#f3f4f6');
-    s.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 1.6));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    s.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    s.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 0.9));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.6);
     dir.position.set(2000, 4000, 3000);
-    s.add(dir);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.bias = -0.0004;
+    dir.shadow.normalBias = 2;
+    s.add(dir, dir.target);
+    // Piso que solo recibe sombra (no se ve como superficie).
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.18 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    floor.userData.floor = true;
+    s.add(floor);
     const grid = new THREE.GridHelper(10000, 20, 0xd1d5db, 0xe5e7eb);
     s.add(grid);
 
@@ -109,6 +163,7 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     s.add(transform.getHelper());
     const state = {
       renderer, scene: s, camera, ortho, orthoHalfH: 1000, front: false, controls, content, raf: 0, fitted: false, transform,
+      sun: dir, textures: new Map<string, THREE.Texture>(),
       drag: null as (DragTarget & { origin: Vec3 }) | null,
       parents: new Map<string, THREE.Group>(),
     };
@@ -218,6 +273,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       // y las libera disposeTree.
       transform.disconnect();
       disposeTree(s);
+      state.textures.forEach(t => t.dispose());
+      (s.environment as THREE.Texture | null)?.dispose();
       controls.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
@@ -256,16 +313,32 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       sm.pieces.forEach(sp => {
         const size = boxSize(sp.box), center = boxCenter(sp.box);
         const isSel = sp.piece.key === selectedPieceKey;
+        // Material de la biblioteca (por el nombre de la placa); si no hay, el color de referencia.
+        const lib = sp.piece.shape === 'cylinder' ? null : matchMaterial(sp.piece.boardLabel, library);
+        const tex = lib?.texture_path && textureUrl ? textureFor(c, textureUrl(lib.texture_path)) : null;
         const mat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(...materialColorFor(sp.piece.boardLabel)),
-          roughness: 0.75, metalness: 0,
+          color: tex ? 0xffffff : lib ? new THREE.Color(lib.color) : new THREE.Color(...materialColorFor(sp.piece.boardLabel)),
+          map: tex, roughness: lib ? roughnessFor(lib) : 0.75, metalness: 0,
           emissive: new THREE.Color(isSel ? 0x4f46e5 : moduleSelected ? 0x1e1b4b : 0x000000),
           emissiveIntensity: isSel ? 0.55 : moduleSelected ? 0.12 : 0,
         });
-        const geom = sp.piece.shape === 'cylinder'
-          ? new THREE.CylinderGeometry(size[0] / 2, size[0] / 2, Math.max(size[1], 0.1), 24)
-          : new THREE.BoxGeometry(Math.max(size[0], 0.1), Math.max(size[1], 0.1), Math.max(size[2], 0.1));
+        let geom: THREE.BufferGeometry;
+        if (sp.piece.shape === 'cylinder') {
+          geom = new THREE.CylinderGeometry(size[0] / 2, size[0] / 2, Math.max(size[1], 0.1), 24);
+        } else if (tex && lib) {
+          // Coordenadas de textura a escala real, con la veta de la imagen siguiendo la de la pieza.
+          const tb = texturedBox([Math.max(size[0], 0.1), Math.max(size[1], 0.1), Math.max(size[2], 0.1)], sp.piece.grainAxis, lib);
+          geom = new THREE.BufferGeometry();
+          geom.setAttribute('position', new THREE.Float32BufferAttribute(tb.positions, 3));
+          geom.setAttribute('normal', new THREE.Float32BufferAttribute(tb.normals, 3));
+          geom.setAttribute('uv', new THREE.Float32BufferAttribute(tb.uvs, 2));
+          geom.setIndex(tb.index);
+        } else {
+          geom = new THREE.BoxGeometry(Math.max(size[0], 0.1), Math.max(size[1], 0.1), Math.max(size[2], 0.1));
+        }
         const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         mesh.position.set(center[0], center[1], center[2]);
         if (sp.piece.rotX) mesh.rotation.x = THREE.MathUtils.degToRad(sp.piece.rotX);
         mesh.userData = { pickable: true, pieceKey: sp.piece.key, moduleKey: sm.module.key };
@@ -311,7 +384,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     }
 
     if (!c.fitted && scene.modules.length) { fit(); c.fitted = true; }
-  }, [scene, selectedPieceKey, selectedModuleKey, issueModuleKeys, moveEnabled, frontView]);
+    fitShadow(c);
+  }, [scene, selectedPieceKey, selectedModuleKey, issueModuleKeys, moveEnabled, frontView, library]);
 
   const fit = () => {
     const c = ctx.current;

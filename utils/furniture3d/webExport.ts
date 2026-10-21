@@ -20,10 +20,12 @@ const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt
 
 export const exportViewerHtml = async (model: THREE.Object3D, info: WebModelInfo): Promise<string> => {
   // Se cargan solo al exportar (no pesan en la app).
-  const [{ default: threeSrc }, { default: orbitSrc }] = await Promise.all([
+  const [{ default: threeSrc }, { default: orbitSrc }, { default: roomSrc }] = await Promise.all([
     import('/node_modules/three/build/three.module.min.js?raw'),
     import('three/examples/jsm/controls/OrbitControls.js?raw'),
+    import('three/examples/jsm/environments/RoomEnvironment.js?raw'),
   ]);
+  embedTextures(model);
   // Las aristas usan EdgesGeometry, que ObjectLoader no sabe reconstruir: se pasan a una geometría
   // común (en la copia; el visor no cambia).
   model.traverse(o => {
@@ -34,6 +36,7 @@ export const exportViewerHtml = async (model: THREE.Object3D, info: WebModelInfo
   const importMap = JSON.stringify({ imports: {
     three: `data:text/javascript;base64,${b64(threeSrc)}`,
     'three-orbit': `data:text/javascript;base64,${b64(orbitSrc)}`,
+    'three-room': `data:text/javascript;base64,${b64(roomSrc)}`,
   } });
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
@@ -56,19 +59,34 @@ html,body{margin:0;height:100%;background:#f3f4f6;font-family:system-ui,-apple-s
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three-orbit';
+import { RoomEnvironment } from 'three-room';
 try {
   const mount = document.getElementById('v');
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   mount.appendChild(renderer.domElement);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#f3f4f6');
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 1.6));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.4); dir.position.set(2000, 4000, 3000); scene.add(dir);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b0b0, 0.9));
   const model = new THREE.ObjectLoader().parse(JSON.parse(document.getElementById('m').textContent));
+  model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(model);
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  const r = Math.max(size.length() / 2, 500);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+  dir.position.set(center.x + r * 0.6, box.min.y + r * 1.6, center.z + r);
+  dir.target.position.set(center.x, box.min.y, center.z);
+  dir.castShadow = true; dir.shadow.mapSize.set(2048, 2048); dir.shadow.bias = -0.0004; dir.shadow.normalBias = 2;
+  Object.assign(dir.shadow.camera, { left: -r * 1.3, right: r * 1.3, top: r * 1.3, bottom: -r * 1.3, near: r * 0.1, far: r * 5 });
+  dir.shadow.camera.updateProjectionMatrix();
+  scene.add(dir, dir.target);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(r * 6, r * 6), new THREE.ShadowMaterial({ opacity: 0.18 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(center.x, box.min.y - 0.5, center.z); floor.receiveShadow = true; scene.add(floor);
   const grid = new THREE.GridHelper(Math.max(size.x, size.z) * 3, 30, 0xd1d5db, 0xe5e7eb); grid.position.set(center.x, box.min.y, center.z); scene.add(grid);
   const camera = new THREE.PerspectiveCamera(40, 1, 1, 1e6);
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -88,6 +106,38 @@ try {
 } catch (err) { document.getElementById('e').style.display = 'block'; console.error(err); }
 </script>
 </body></html>`;
+};
+
+/**
+ * Las texturas del visor vienen de una URL (Supabase); para que el archivo funcione sin internet
+ * se meten adentro como JPG (en la copia; el visor no cambia). Una imagen todavía sin cargar se
+ * deja afuera: la pieza queda con su color base.
+ */
+const embedTextures = (model: THREE.Object3D) => {
+  const done = new Map<THREE.Texture, THREE.Texture | null>();
+  model.traverse(o => {
+    const mat = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+    if (!mat || Array.isArray(mat) || !mat.map) return;
+    if (!done.has(mat.map)) {
+      const img = mat.map.image as HTMLImageElement | undefined;
+      let copy: THREE.Texture | null = null;
+      if (img && img.complete && img.naturalWidth > 0) {
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        cv.getContext('2d')!.drawImage(img, 0, 0);
+        const jpg = new Image();
+        jpg.src = cv.toDataURL('image/jpeg', 0.85);   // toJSON guarda tal cual una imagen data:
+        copy = mat.map.clone();
+        copy.source = new THREE.Source(jpg);
+      }
+      done.set(mat.map, copy);
+    }
+    const copy = done.get(mat.map)!;
+    const m2 = mat.clone();
+    m2.map = copy;
+    if (!copy) m2.color.set(0xd8cfc0);   // sin imagen: tono neutro de madera
+    (o as THREE.Mesh).material = m2;
+  });
 };
 
 /** USDZ (Apple) en metros, a tamaño real. */

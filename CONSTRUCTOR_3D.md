@@ -45,6 +45,16 @@ En el constructor:
   pega al piso y nunca baja de él. Sin imán, se redondea al mm. Las copias (Cant.) se mueven
   juntas. La posición queda en X/Y/Z del panel, como si se cargara a mano. Si queda superpuesto,
   Validación lo marca y no deja aplicar.
+- **Materiales** (Configuración → **Materiales 3D**, solo administrador): biblioteca de texturas y
+  colores (tabla `material_library`, imágenes en el bucket público `material-textures`, SQL en
+  `supabase_material_library.sql`). Cada pieza toma el material cuyo **nombre aparece en su placa**
+  (el color cargado en el estimador: "Roble Kendal" → "Roble Kendal 18mm MDF"); si coinciden
+  varios, gana el más largo; sin coincidencia, el color de referencia de siempre. La textura se
+  apoya **a escala real** (la medida que cubre la imagen) y su veta sigue **la veta de la pieza en
+  el despiece**: en módulos sin la opción "con veta" las puertas tienen veta horizontal (regla
+  vieja), y así se ven. Laca: color liso con brillo. Se aplica en el visor, la imagen JPG, la
+  maqueta web (texturas adentro, en JPG) y el USDZ. Terminación de presentación: tono neutro,
+  reflejos de ambiente interior y sombras suaves. Pendiente: llevar las texturas al FBX para 3ds Max.
 - **Imagen JPG** (barra del visor): una **captura de lo que se ve en el visor en ese momento**
   (misma cámara, encuadre, fondo y grilla; sirve para sacar varias desde distintos ángulos), sin
   las flechas de mover ni el resaltado de selección, con un rótulo abajo: **Obra** (proyecto del
