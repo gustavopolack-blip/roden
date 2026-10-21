@@ -52,6 +52,15 @@ En el constructor:
   "Guardar como" (que saca al navegador de pantalla completa). Resolución: el doble de la pantalla,
   sin pasar el máximo de la placa de video. En Chrome y Edge abre el cuadro "Guardar como" (carpeta
   y nombre); en Firefox y Safari se descarga con el nombre sugerido.
+- **Maqueta para celular, tablet o PC** (barra del visor), copia de lo que se ve:
+  - **Maqueta web (.html)**: un solo archivo (~1 MB) que se abre en cualquier navegador y se gira
+    con el dedo o el mouse (pellizcar/rueda para acercar). Lleva adentro three.js y la maqueta:
+    **funciona sin internet**. Abajo, rótulo con obra, mueble y medidas. En Android y PC se abre
+    tocándolo (o "Abrir con Chrome"); **en iPhone el visor de Archivos puede no ejecutarlo**: para
+    iPhone/iPad usar el USDZ.
+  - **iPhone/iPad (.usdz)**: formato de Apple. Se abre solo desde Archivos, WhatsApp o Mail, se
+    gira y se puede ver **con realidad aumentada en el ambiente, a tamaño real** (se exporta en
+    metros). Las marcas de bisagra no salen (USDZ solo admite el material de las placas).
 - **Pantalla completa**: el visor y su barra ocupan toda la pantalla (pantalla completa del
   navegador; Esc o "Salir de pantalla completa" vuelve). En iPhone, donde el navegador no lo
   permite, el visor igual tapa toda la ventana.
