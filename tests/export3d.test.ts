@@ -199,3 +199,32 @@ describe('giros en X/Z y copias separadas en la exportación', () => {
     vs.forEach(v => v.forEach((c, k) => { expect(c).toBeGreaterThanOrEqual(b.min[k] - 1e-3); expect(c).toBeLessThanOrEqual(b.max[k] + 1e-3); }));
   });
 });
+
+describe('FBX con materiales de la biblioteca', () => {
+  const asm = buildAssembly('Placard', [mod({ id: 't', name: 'Bajo', cntDoors: 2, materialColorName: 'Roble Kendal' })]);
+  const scene = buildScene(asm, 0);
+  const materials = (label: string) => /roble kendal/i.test(label)
+    ? { color: [0.7, 0.5, 0.3] as [number, number, number], gloss: 0.1, texture: { fileName: 'Roble_Kendal.jpg', widthMm: 400, heightMm: 800, grainVertical: true } }
+    : null;
+  const text = exportFBX(scene, { materials });
+  it('referencia la imagen al lado del .fbx y la conecta al color difuso del material', () => {
+    expect(text).toMatch(/Video: \d+, "Video::Roble_Kendal_18mm_MDP", "Clip"/);
+    expect(text).toMatch(/RelativeFilename: "Roble_Kendal\.jpg"/);
+    const tex = text.match(/Texture: (\d+), "Texture::Roble_Kendal_18mm_MDP"/)!;
+    const mat = text.match(/Material: (\d+), "Material::Roble_Kendal_18mm_MDP"/)!;
+    expect(text).toContain(`C: "OP",${tex[1]},${mat[1]}, "DiffuseColor"`);
+    expect(text).toMatch(/ObjectType: "Texture" \{\n\t\tCount: 1/);
+  });
+  it('material con textura: difuso blanco; sin textura ni biblioteca: igual que antes', () => {
+    const block = text.slice(text.indexOf('"Material::Roble_Kendal_18mm_MDP"'));
+    expect(block.slice(0, 400)).toMatch(/"DiffuseColor", "Color", "", "A",1,1,1/);
+    expect(exportFBX(scene, { date: new Date(2026, 0, 1) })).toBe(exportFBX(scene, { date: new Date(2026, 0, 1), materials: () => null }));
+    expect(exportFBX(scene)).not.toMatch(/Texture::/);
+  });
+  it('UV a escala de la imagen: un lateral de 684 mm de alto (veta) recorre 684/800 de la imagen', () => {
+    const geo = text.slice(text.indexOf('Geometry::M01_Bajo_Lateral"'));
+    const uv = geo.slice(geo.indexOf('UV: *')).match(/a: ([^\n]+)/)![1].split(',').map(Number);
+    const vs = uv.filter((_, i) => i % 2 === 1);
+    expect(Math.max(...vs) - Math.min(...vs)).toBeCloseTo(684 / 800, 3);
+  });
+});

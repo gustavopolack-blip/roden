@@ -54,7 +54,13 @@ En el constructor:
   el despiece**: en módulos sin la opción "con veta" las puertas tienen veta horizontal (regla
   vieja), y así se ven. Laca: color liso con brillo. Se aplica en el visor, la imagen JPG, la
   maqueta web (texturas adentro, en JPG) y el USDZ. Terminación de presentación: tono neutro,
-  reflejos de ambiente interior y sombras suaves. Pendiente: llevar las texturas al FBX para 3ds Max.
+  reflejos de ambiente interior y sombras suaves.
+- **FBX con materiales**: los materiales de la biblioteca van al FBX (color, brillo y textura con
+  la misma escala y veta que el visor). Si alguno tiene imagen, se descarga un **ZIP con el .fbx y
+  las imágenes en la misma carpeta**: descomprimirlo e importar el .fbx desde ahí (3ds Max busca
+  las texturas al lado del archivo). Sin imágenes, se baja el .fbx solo, como antes. Verificado
+  releyendo el FBX con el FBXLoader de three.js (textura cargada, veta correcta); **no probado en
+  3ds Max**.
 - **Imagen JPG** (barra del visor): una **captura de lo que se ve en el visor en ese momento**
   (misma cámara, encuadre, fondo y grilla; sirve para sacar varias desde distintos ángulos), sin
   las flechas de mover ni el resaltado de selección, con un rótulo abajo: **Obra** (proyecto del
@@ -85,7 +91,9 @@ posición (todos los anteriores) se ubican automáticamente en fila sobre el pis
 ## Exportar e importar en 3ds Max
 
 1. En el constructor: **FBX ensamblado** (o **FBX despiece** para el explotado).
-2. En 3ds Max: *File → Import → Import…* → elegir el `.fbx`.
+2. Si bajó un **ZIP** (el mueble tiene materiales con imagen), descomprimirlo en una carpeta.
+   En 3ds Max: *File → Import → Import…* → elegir el `.fbx` (las texturas quedan al lado y se
+   cargan solas; si Max no las encuentra, *Asset Tracking* → apuntar a esa carpeta).
 3. En el diálogo del importador FBX, sección *Units*: dejar **Automatic** (el archivo declara
    milímetros) o fijar *File units = Millimeters*. Ejes: el archivo es Y-arriba; el importador
    lo convierte a Z-arriba (*Axis Conversion → Y-up*).
