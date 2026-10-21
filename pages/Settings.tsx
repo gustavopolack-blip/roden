@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { Save, Bell, Lock, Globe, Database, Building2, RefreshCw, Tag, Trash2, CheckCircle, Circle } from 'lucide-react';
+import { Save, Bell, Lock, Globe, Database, Building2, RefreshCw, Tag, Trash2, CheckCircle, Circle, Palette } from 'lucide-react';
+import MaterialLibrary from '../components/MaterialLibrary';
 
 interface SettingsProps {
     onLoadDemoData?: () => void;
@@ -50,6 +51,12 @@ const Settings: React.FC<SettingsProps> = ({ onLoadDemoData, priceLists = [], on
              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === 'pricelists' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
           >
             <Tag size={18} /> Listas de Precios
+          </button>
+          <button
+             onClick={() => setActiveTab('materials')}
+             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeTab === 'materials' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            <Palette size={18} /> Materiales 3D
           </button>
         </div>
 
@@ -193,6 +200,8 @@ const Settings: React.FC<SettingsProps> = ({ onLoadDemoData, priceLists = [], on
                     </div>
                 </div>
             )}
+
+             {activeTab === 'materials' && <MaterialLibrary />}
 
              {activeTab === 'security' && (
                 <div className="bg-white border border-gray-200 rounded-xl p-12 shadow-sm flex flex-col items-center justify-center text-center animate-fade-in h-64">

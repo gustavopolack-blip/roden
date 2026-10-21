@@ -18,6 +18,8 @@ import {
 } from '../../utils/furniture3d/geometry';
 import { exportFBX, exportOBJ, exportFileBase } from '../../utils/furniture3d/exporters';
 import { exportViewerHtml, exportUsdz } from '../../utils/furniture3d/webExport';
+import { LibraryMaterial, TEXTURE_BUCKET } from '../../utils/furniture3d/materialLibrary';
+import { supabase } from '../../services/supabaseClient';
 import { calculateModuleParts, calculateItemQuantities, getBoardLabel, getFrontLayout, ExtendedCabinetModule } from '../../utils/estimatorEngine';
 import { getTemplate, getFixedDims } from '../../utils/specialModules';
 
@@ -93,6 +95,17 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
   const [frontView, setFrontView] = useState(false);
   const captureRef = useRef<((caption: string) => Promise<Blob | null>) | null>(null);
   const modelRef = useRef<(() => any) | null>(null);
+  // Biblioteca de materiales (Configuración → Materiales 3D). Si no carga, se dibuja como antes.
+  const [library, setLibrary] = useState<LibraryMaterial[]>([]);
+  useEffect(() => {
+    let alive = true;
+    supabase.from('material_library').select('*').then(({ data, error }) => {
+      if (error) { console.warn('[Builder3D] Biblioteca de materiales:', error.message); return; }
+      if (alive && data) setLibrary(data as LibraryMaterial[]);
+    });
+    return () => { alive = false; };
+  }, []);
+  const textureUrl = (path: string) => supabase.storage.from(TEXTURE_BUCKET).getPublicUrl(path).data.publicUrl;
   const viewerRef = useRef<HTMLElement>(null);
   const toggleMaximized = () => {
     if (maximized) {
@@ -527,6 +540,7 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                   selectedPieceKey={selPieceKey} selectedModuleKey={selModuleKey}
                   issueModuleKeys={issueModuleKeys} fitToken={fitToken}
                   moveEnabled={moveEnabled} frontView={frontView} onMoveModule={moveModule} captureRef={captureRef} modelRef={modelRef}
+                  library={library} textureUrl={textureUrl}
                   onPick={({ pieceKey, moduleKey }) => { setSelPieceKey(pieceKey); if (moduleKey) setSelModuleKey(moduleKey); }}
                 />
               ) : (
