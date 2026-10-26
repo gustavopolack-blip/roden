@@ -66,3 +66,25 @@ export const texturedBox = (size: Vec3, grainAxis: 0 | 1 | 2, m: Pick<LibraryMat
   bm.polys.forEach(q => index.push(q[0], q[1], q[2], q[0], q[2], q[3]));
   return { positions, normals, uvs, index };
 };
+
+const BRANDS = ['Egger', 'Faplac'];
+/**
+ * Importación de varias imágenes: nombre y marca a partir del nombre del archivo.
+ * "faplac_roble-kendal.jpg" → { name: "Roble Kendal", brand: "Faplac" }. Se revisa antes de guardar.
+ */
+export const parseTextureFileName = (fileName: string): { name: string; brand: string | null } => {
+  let words = fileName.replace(/\.[a-z0-9]+$/i, '').split(/[\s_\-.]+/).filter(Boolean);
+  let brand: string | null = null;
+  words = words.filter(w => {
+    const b = BRANDS.find(x => x.toLowerCase() === w.toLowerCase());
+    if (b && !brand) { brand = b; return false; }
+    return true;
+  });
+  // Todo en minúsculas o todo en mayúsculas → Tipo Título; si ya viene con mayúsculas propias, se respeta.
+  const raw = words.join(' ');
+  const uniformCase = raw === raw.toLowerCase() || raw === raw.toUpperCase();
+  const name = uniformCase
+    ? words.map(w => (/\d/.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())).join(' ')
+    : raw;
+  return { name, brand };
+};
