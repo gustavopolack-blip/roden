@@ -57,3 +57,13 @@ describe('textura a escala real con la veta de la pieza', () => {
     expect(tb.positions.length / 3).toBe(24);
   });
 });
+
+describe('importar varias: nombre y marca desde el archivo', () => {
+  it('saca la marca y arma el nombre', async () => {
+    const { parseTextureFileName } = await import('../utils/furniture3d/materialLibrary');
+    expect(parseTextureFileName('faplac_roble-kendal.jpg')).toEqual({ name: 'Roble Kendal', brand: 'Faplac' });
+    expect(parseTextureFileName('EGGER H1145 ST10 ROBLE BARDOLINO.png')).toEqual({ name: 'H1145 ST10 Roble Bardolino', brand: 'Egger' });
+    expect(parseTextureFileName('Nogal Lincoln.jpeg')).toEqual({ name: 'Nogal Lincoln', brand: null });
+    expect(parseTextureFileName('Gris Grafito_Faplac.webp')).toEqual({ name: 'Gris Grafito', brand: 'Faplac' });
+  });
+});

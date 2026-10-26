@@ -47,7 +47,10 @@ En el constructor:
   Validación lo marca y no deja aplicar.
 - **Materiales** (Configuración → **Materiales 3D**, solo administrador): biblioteca de texturas y
   colores (tabla `material_library`, imágenes en el bucket público `material-textures`, SQL en
-  `supabase_material_library.sql`). Cada pieza toma el material cuyo **nombre aparece en su placa**
+  `supabase_material_library.sql`). **Importar varias**: se eligen todas las imágenes de una carpeta
+  a la vez; el nombre y la marca (Egger/Faplac) salen del nombre del archivo y el color base del
+  promedio de la imagen; se revisan en una tabla y se guardan juntas (si el nombre ya existe, se le
+  reemplaza la imagen). Cada pieza toma el material cuyo **nombre aparece en su placa**
   (el color cargado en el estimador: "Roble Kendal" → "Roble Kendal 18mm MDF"); si coinciden
   varios, gana el más largo; sin coincidencia, el color de referencia de siempre. La textura se
   apoya **a escala real** (la medida que cubre la imagen) y su veta sigue **la veta de la pieza en
