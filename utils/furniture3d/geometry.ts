@@ -57,6 +57,7 @@ export interface Piece3D {
   hingeSide?: 'left' | 'right';
   shape?: 'cylinder';         // herrajes redondos (patas); por defecto, caja
   rotX?: number;              // giro sobre el eje x (grados) alrededor del centro de `box`; + = el frente baja
+  finish?: string;            // material de la biblioteca elegido en el constructor (nombre); solo dibujo
 }
 
 export type PlacementStatus = 'placed' | 'approximate' | 'unplaced';
@@ -232,6 +233,19 @@ export const materialThickness = (material: string): number => {
 interface PlaceResult { pieces: Piece3D[]; status: PlacementStatus; notes: string[] }
 type Placer = (mod: any, parts: CalculatedPart[]) => PlaceResult | null;
 
+/**
+ * Material de la biblioteca elegido para el módulo (solo dibujo). Los frentes visibles de 18 mm
+ * toman el de frentes (sin elegir: el de estructura); el resto de las placas de 18 mm y el fondo
+ * color de 5,5 mm, el de estructura. Cajones de 15 mm y fondo blanco de 3 mm quedan como están.
+ */
+const finishFor = (mod: any, part: CalculatedPart): string | undefined => {
+  const m3 = mod.material3d, m = part.material || '';
+  if (!m3) return undefined;
+  if (m.startsWith('18mm') && isVisibleFrontPiece(part.name)) return m3.fronts || m3.structure || undefined;
+  if (m.startsWith('18mm') || m.includes('5.5mm') || m.includes('55mm')) return m3.structure || undefined;
+  return undefined;
+};
+
 /** Crea la pieza 3D a partir de la pieza del despiece y su caja; calcula el eje de veta. */
 const makePiece = (
   mod: any, parts: CalculatedPart[], partIndex: number, copy: number, box: Box, role: PieceRole,
@@ -250,7 +264,7 @@ const makePiece = (
     boardLabel: getBoardLabel(mod, part), grain: part.grain || 'free',
     thickness: materialThickness(part.material),
     partSize: { width: part.width, height: part.height },
-    box, grainAxis, role, ...extra,
+    box, grainAxis, role, finish: finishFor(mod, part), ...extra,
   };
 };
 

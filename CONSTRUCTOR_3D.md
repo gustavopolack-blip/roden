@@ -50,9 +50,17 @@ En el constructor:
   `supabase_material_library.sql`). **Importar varias**: se eligen todas las imágenes de una carpeta
   a la vez; el nombre y la marca (Egger/Faplac) salen del nombre del archivo y el color base del
   promedio de la imagen; se revisan en una tabla y se guardan juntas (si el nombre ya existe, se le
-  reemplaza la imagen). Cada pieza toma el material cuyo **nombre aparece en su placa**
-  (el color cargado en el estimador: "Roble Kendal" → "Roble Kendal 18mm MDF"); si coinciden
-  varios, gana el más largo; sin coincidencia, el color de referencia de siempre. La textura se
+  reemplaza la imagen). **Asignar**: en el constructor, con el módulo seleccionado, *Material 3D*
+  → **Estructura** y **Frentes** (frentes sin elegir = estructura; "Aplicar estos materiales a todo
+  el mueble" los copia al resto). Se guarda en el módulo (`material3d`, nombre del material) al
+  aplicar al estimador; solo dibujo. Toman el de frentes los frentes visibles de 18 mm; el de
+  estructura, el resto de 18 mm y el fondo color de 5,5 mm; cajones de 15 mm y fondo blanco de 3 mm
+  no cambian. En presupuestos de solo lectura no se puede elegir. Sin material elegido (o si se
+  borró de la biblioteca), la pieza toma el material cuyo **nombre aparece en su placa**; hoy el
+  estimador no guarda el nombre del color, así que las placas son genéricas ("Melamina Color 18mm
+  MDP") y solo coincide un material llamado así. Si coinciden varios, gana el más largo; sin
+  coincidencia, el color de referencia de siempre. En el FBX hay un material por material elegido
+  (la placa queda en las propiedades: `rodenMaterial`, y el elegido en `rodenTerminacion`). La textura se
   apoya **a escala real** (la medida que cubre la imagen) y su veta sigue **la veta de la pieza en
   el despiece**: en módulos sin la opción "con veta" las puertas tienen veta horizontal (regla
   vieja), y así se ven. Laca: color liso con brillo. Se aplica en el visor, la imagen JPG, la

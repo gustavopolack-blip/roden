@@ -65,6 +65,7 @@ export interface ExtendedCabinetModule extends CabinetModule {
     layout3d?: { x: number; y: number; z: number; rotY: 0 | 90 | 180 | 270; rotX?: 0 | 90 | 180 | 270; rotZ?: 0 | 90 | 180 | 270 }; // posición en el mueble (mm) y giros
     layout3dCopies?: Record<number, { x: number; y: number; z: number; rotY: 0 | 90 | 180 | 270; rotX?: 0 | 90 | 180 | 270; rotZ?: 0 | 90 | 180 | 270 }>; // copias (Cant.) ubicadas por separado
     doorHingeSide?: 'LEFT' | 'RIGHT';                                       // apertura de puerta única
+    material3d?: { structure?: string; fronts?: string };                   // material de la biblioteca (nombre); frentes sin elegir = estructura
 }
 
 // NEW: Item definition (Grouping of Modules)

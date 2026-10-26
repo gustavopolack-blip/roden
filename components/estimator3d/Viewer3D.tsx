@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { LibraryMaterial, matchMaterial, roughnessFor, texturedBox } from '../../utils/furniture3d/materialLibrary';
+import { LibraryMaterial, pieceMaterial, roughnessFor, texturedBox } from '../../utils/furniture3d/materialLibrary';
 import { FurnitureScene, Box, Vec3, PlacedModule, boxCenter, boxSize, fitCameraDistance, snapModuleMove, unionBox } from '../../utils/furniture3d/geometry';
 
 /** Lo que se mueve junto: el módulo con sus copias en fila, o una copia ubicada por separado. */
@@ -313,8 +313,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
       sm.pieces.forEach(sp => {
         const size = boxSize(sp.box), center = boxCenter(sp.box);
         const isSel = sp.piece.key === selectedPieceKey;
-        // Material de la biblioteca (por el nombre de la placa); si no hay, el color de referencia.
-        const lib = sp.piece.shape === 'cylinder' ? null : matchMaterial(sp.piece.boardLabel, library);
+        // Material de la biblioteca (el elegido o el de la placa); si no hay, el color de referencia.
+        const lib = sp.piece.shape === 'cylinder' ? null : pieceMaterial(sp.piece, library);
         const tex = lib?.texture_path && textureUrl ? textureFor(c, textureUrl(lib.texture_path)) : null;
         const mat = new THREE.MeshStandardMaterial({
           color: tex ? 0xffffff : lib ? new THREE.Color(lib.color) : new THREE.Color(...materialColorFor(sp.piece.boardLabel)),
