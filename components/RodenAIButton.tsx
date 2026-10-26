@@ -15,7 +15,7 @@ const RodenAIButton: React.FC<RodenAIButtonProps> = ({ mode, data, userRole, lab
   const [analysis, setAnalysis] = useState<string | null>(null);
 
   // REGLA DE SEGURIDAD INVIOLABLE
-  // if (userRole !== 'administrador') return null;
+  if (userRole !== 'administrador') return null;
   
   const handleAnalyze = async () => {
     setIsOpen(true);
