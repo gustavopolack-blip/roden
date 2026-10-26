@@ -76,6 +76,63 @@ const NumField: React.FC<{ label: string; value: number | undefined; onChange?: 
     </label>
   );
 
+/**
+ * Elegir un material de la biblioteca viendo su textura (o su color): botón con la muestra y, al
+ * abrirlo, grilla de muestras con búsqueda.
+ */
+const MaterialPicker: React.FC<{
+  value: string; noneLabel: string; options: LibraryMaterial[]; textureUrl: (path: string) => string;
+  disabled?: boolean; onChange: (name: string) => void;
+}> = ({ value, noneLabel, options, textureUrl, disabled, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const current = options.find(m => m.name === value);
+  const q = query.trim().toLowerCase();
+  const shown = q ? options.filter(m => `${m.name} ${m.brand || ''}`.toLowerCase().includes(q)) : options;
+  const swatch = (m: LibraryMaterial | undefined, cls: string) => (
+    <span className={`${cls} rounded border border-gray-200 bg-cover bg-center shrink-0 block`}
+      style={m ? { backgroundColor: m.color, backgroundImage: m.texture_path ? `url(${textureUrl(m.texture_path)})` : undefined }
+        : { backgroundImage: 'repeating-linear-gradient(45deg,#f3f4f6 0 4px,#fff 4px 8px)' }} />
+  );
+  const pick = (name: string) => { onChange(name); setOpen(false); setQuery(''); };
+  return (
+    <div className="flex-1 min-w-0">
+      <button type="button" disabled={disabled} onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 border border-gray-200 p-1 rounded text-xs text-left bg-white hover:border-gray-400 disabled:opacity-50">
+        {swatch(current, 'w-7 h-7')}
+        <span className="flex-1 min-w-0 truncate">{current ? current.name : noneLabel}</span>
+        {open ? <ChevronUp size={12} className="shrink-0" /> : <ChevronDown size={12} className="shrink-0" />}
+      </button>
+      {open && (
+        <div className="mt-1 border border-gray-200 rounded-lg p-2 bg-gray-50">
+          {options.length > 8 && (
+            <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar material…"
+              className="w-full border border-gray-200 p-1.5 rounded text-xs mb-2" />
+          )}
+          <div className="grid grid-cols-3 gap-1.5 max-h-72 overflow-y-auto">
+            {!q && (
+              <button type="button" onClick={() => pick('')} title={noneLabel}
+                className={`p-1 rounded border text-left ${!current ? 'border-black bg-white' : 'border-transparent hover:border-gray-300'}`}>
+                {swatch(undefined, 'w-full aspect-square')}
+                <span className="block text-[10px] leading-tight mt-0.5 line-clamp-2">{noneLabel}</span>
+              </button>
+            )}
+            {shown.map(m => (
+              <button type="button" key={m.id} onClick={() => pick(m.name)} title={`${m.name}${m.brand ? ` (${m.brand})` : ''}`}
+                className={`p-1 rounded border text-left ${current?.id === m.id ? 'border-black bg-white' : 'border-transparent hover:border-gray-300'}`}>
+                {swatch(m, 'w-full aspect-square')}
+                <span className="block text-[10px] leading-tight mt-0.5 line-clamp-2">{m.name}</span>
+                {m.brand && <span className="block text-[9px] text-gray-400">{m.brand}</span>}
+              </button>
+            ))}
+          </div>
+          {shown.length === 0 && <p className="text-[10px] text-gray-400">Ningún material coincide.</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onApply, onClose, priceLabel, projectName }) => {
   const [activeId, setActiveId] = useState(furnitures[0]?.id);
   const [drafts, setDrafts] = useState<Record<string, ExtendedCabinetModule[]>>(
@@ -478,15 +535,12 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                       <p className="text-[10px] text-gray-400 mt-1">La biblioteca está vacía: cargá materiales en Configuración → Materiales 3D.</p>
                     ) : (<>
                       {([['structure', 'Estructura', 'Según la placa'], ['fronts', 'Frentes', 'Igual a estructura']] as const).map(([k, label, none]) => (
-                        <label key={k} className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-gray-500 w-16 shrink-0">{label}</span>
-                          <select disabled={!editable} className="flex-1 min-w-0 border border-gray-200 p-1.5 rounded text-xs"
-                            value={selMod.material3d?.[k] || ''}
-                            onChange={e => setMaterial3d(selModIndex, { ...selMod.material3d, [k]: e.target.value || undefined })}>
-                            <option value="">{none}</option>
-                            {libraryOptions.map(m => <option key={m.id} value={m.name}>{m.name}{m.brand ? ` (${m.brand})` : ''}</option>)}
-                          </select>
-                        </label>
+                        <div key={k} className="flex items-start gap-2 mt-1">
+                          <span className="text-[10px] text-gray-500 w-16 shrink-0 pt-2.5">{label}</span>
+                          <MaterialPicker key={`${selModuleKey}-${k}`} disabled={!editable} value={selMod.material3d?.[k] || ''} noneLabel={none}
+                            options={libraryOptions} textureUrl={textureUrl}
+                            onChange={name => setMaterial3d(selModIndex, { ...selMod.material3d, [k]: name || undefined })} />
+                        </div>
                       ))}
                       {editable && modules.length > 1 && (
                         <button onClick={() => setMaterial3d(null, { ...selMod.material3d })} className="mt-2 text-[11px] text-indigo-600 hover:underline block">Aplicar estos materiales a todo el mueble</button>

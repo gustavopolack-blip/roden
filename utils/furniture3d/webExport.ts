@@ -90,7 +90,7 @@ try {
   const grid = new THREE.GridHelper(Math.max(size.x, size.z) * 3, 30, 0xd1d5db, 0xe5e7eb); grid.position.set(center.x, box.min.y, center.z); scene.add(grid);
   const camera = new THREE.PerspectiveCamera(40, 1, 1, 1e6);
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true; controls.target.copy(center);
+  controls.target.copy(center);   // sin inercia: al soltar, se frena (como el visor)
   const fit = () => {
     const w = mount.clientWidth, h = Math.max(1, mount.clientHeight);
     renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();

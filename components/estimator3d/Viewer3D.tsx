@@ -149,7 +149,8 @@ const Viewer3D: React.FC<Viewer3DProps> = ({ scene, bbox, selectedPieceKey, sele
     const camera = new THREE.PerspectiveCamera(40, mount.clientWidth / Math.max(1, mount.clientHeight), 10, 200000);
     camera.position.set(2500, 2000, 4000);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
+    // Sin inercia: al soltar, la vista se frena (la inercia de three.js se frena por cuadro dibujado
+    // y, con pocos cuadros por segundo, seguía girando varios segundos).
 
     // Vista de frente: cámara sin perspectiva mirando la pared (eje −Z), para alinear a ojo.
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 1e6);
