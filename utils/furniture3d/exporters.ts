@@ -142,9 +142,13 @@ const fbxEuler = (rot: ModuleNode['rot']): Vec3 => {
   return [0, rot.rotY, 0];
 };
 
+/** Material de la pieza en el archivo: el elegido en el constructor o, si no, su placa. */
+const materialLabelOf = (p: Piece3D) => p.finish || p.boardLabel;
+
 const pieceProps = (p: Piece3D): Record<string, string> => ({
   rodenPieza: p.name,
   rodenMaterial: p.boardLabel,
+  ...(p.finish ? { rodenTerminacion: p.finish } : {}),
   rodenMedidas: `${Math.round(p.partSize.width)} x ${Math.round(p.partSize.height)} x ${p.thickness} mm`,
   rodenVeta: p.grain,
   ...(p.hingeSide ? { rodenBisagra: p.hingeSide === 'left' ? 'izquierda' : 'derecha' } : {}),
@@ -157,7 +161,7 @@ const collectNodes = (scene: FurnitureScene): ModuleNode[] => {
     const mName = unique(safeName(`M${String(mi + 1).padStart(2, '0')}_${sm.module.name}`));
     const meshes: MeshNode[] = sm.pieces.map(sp => ({
       name: unique(safeName(`${mName}_${sp.piece.name}${sp.piece.hingeSide ? `_bisagra_${sp.piece.hingeSide === 'left' ? 'izq' : 'der'}` : ''}`)),
-      material: safeName(sp.piece.boardLabel),
+      material: safeName(materialLabelOf(sp.piece)),
       translation: boxCenter(sp.box), size: boxSize(sp.box), grainAxis: sp.piece.grainAxis, shape: sp.piece.shape, rotX: sp.piece.rotX,
       props: pieceProps(sp.piece),
     }));
@@ -176,8 +180,8 @@ const collectNodes = (scene: FurnitureScene): ModuleNode[] => {
 export const FBX_UNIT_SCALE_FACTOR = 0.1; // cm por unidad → la unidad es el milímetro
 
 /**
- * Material de la biblioteca para el FBX, por etiqueta de placa: color (0..1), brillo y, si hay,
- * la imagen de textura que va al lado del .fbx (3ds Max la busca en la carpeta del archivo).
+ * Material de la biblioteca para el FBX, por etiqueta de placa o material elegido: color (0..1),
+ * brillo y, si hay, la imagen de textura que va al lado del .fbx (3ds Max la busca en la carpeta).
  */
 export interface FbxMaterialInfo {
   color?: [number, number, number];
@@ -191,7 +195,7 @@ const textureUvs = (uvs: [number, number][], t: NonNullable<FbxMaterialInfo['tex
   return uvs.map(([along, across]) => (t.grainVertical ? [across / w, along / h] : [along / w, across / h]));
 };
 
-export const exportFBX = (scene: FurnitureScene, opts: { date?: Date; materials?: (boardLabel: string) => FbxMaterialInfo | null } = {}): string => {
+export const exportFBX = (scene: FurnitureScene, opts: { date?: Date; materials?: (label: string) => FbxMaterialInfo | null } = {}): string => {
   const date = opts.date || new Date();
   const modules = collectNodes(scene);
   let nextId = 100000;
@@ -216,10 +220,10 @@ export const exportFBX = (scene: FurnitureScene, opts: { date?: Date; materials?
     connections.push(`\tC: "OO",${aid},${mid}`);
   };
 
-  // Materiales (uno por etiqueta de placa)
+  // Materiales (uno por etiqueta de placa o material elegido)
   const materialIds = new Map<string, number>();
   const materialLabel = new Map<string, string>();
-  scene.modules.forEach(sm => sm.pieces.forEach(sp => materialLabel.set(safeName(sp.piece.boardLabel), sp.piece.boardLabel)));
+  scene.modules.forEach(sm => sm.pieces.forEach(sp => materialLabel.set(safeName(materialLabelOf(sp.piece)), materialLabelOf(sp.piece))));
   if (scene.modules.some(sm => sm.placeholder)) materialLabel.set('Volumen_pendiente', 'Volumen pendiente');
   const materialInfo = new Map<string, FbxMaterialInfo | null>();
   materialLabel.forEach((label, name) => {
@@ -434,7 +438,7 @@ export const exportOBJ = (scene: FurnitureScene, mtlFileName = 'amoblamiento.mtl
   ];
   let vBase = 1;
   const usedMats = new Map<string, [number, number, number]>();
-  scene.modules.forEach(sm => sm.pieces.forEach(sp => usedMats.set(safeName(sp.piece.boardLabel), materialColorFor(sp.piece.boardLabel))));
+  scene.modules.forEach(sm => sm.pieces.forEach(sp => usedMats.set(safeName(materialLabelOf(sp.piece)), materialColorFor(materialLabelOf(sp.piece)))));
   if (scene.modules.some(sm => sm.placeholder)) usedMats.set('Volumen_pendiente', materialColorFor('volumen'));
 
   modules.forEach(m => {

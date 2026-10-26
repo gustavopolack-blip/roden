@@ -228,3 +228,28 @@ describe('FBX con materiales de la biblioteca', () => {
     expect(Math.max(...vs) - Math.min(...vs)).toBeCloseTo(684 / 800, 3);
   });
 });
+
+describe('material elegido en el constructor (material3d, solo dibujo)', () => {
+  const base = { id: 'e', name: 'Bajo', cntDoors: 2, materialColorName: 'Roble Kendal' };
+  const piecesOf = (m: any) => buildScene(buildAssembly('x', [mod(m)]), 0).modules.flatMap(sm => sm.pieces.map(sp => sp.piece));
+  it('frentes toman el de frentes; el resto de 18 mm, el de estructura; 15 y 3 mm no cambian', () => {
+    const ps = piecesOf({ ...base, cntDrawers: 1, cntDoors: 1, material3d: { structure: 'Blanco Nieve', fronts: 'Nogal Terracota' } });
+    ps.filter(p => /^(Puerta|Frente)/.test(p.name)).forEach(p => expect(p.finish).toBe('Nogal Terracota'));
+    ps.filter(p => p.name.startsWith('Lateral') && p.material.startsWith('18mm')).forEach(p => expect(p.finish).toBe('Blanco Nieve'));
+    expect(ps.filter(p => p.finish === 'Blanco Nieve').length).toBeGreaterThan(2);
+    ps.filter(p => /^(15mm|3mm)/.test(p.material)).forEach(p => expect(p.finish).toBeUndefined());
+    expect(ps.some(p => p.material.startsWith('15mm'))).toBe(true);
+  });
+  it('frentes sin elegir = estructura; sin material3d, nada cambia', () => {
+    piecesOf({ ...base, material3d: { structure: 'Blanco Nieve' } }).filter(p => p.material.startsWith('18mm')).forEach(p => expect(p.finish).toBe('Blanco Nieve'));
+    piecesOf(base).forEach(p => expect(p.finish).toBeUndefined());
+  });
+  it('FBX: un material por el elegido (no por la placa), y la placa queda en las propiedades', () => {
+    const scene = buildScene(buildAssembly('x', [mod({ ...base, material3d: { structure: 'Nogal Terracota' } })]), 0);
+    const text = exportFBX(scene, { materials: l => (l === 'Nogal Terracota' ? { color: [0.4, 0.3, 0.2] } : null) });
+    expect(text).toMatch(/"Material::Nogal_Terracota"/);
+    expect(text).not.toMatch(/"Material::Roble_Kendal_18mm_MDP"/);
+    expect(text).toMatch(/"rodenTerminacion", "KString", "", "U", "Nogal Terracota"/);
+    expect(text).toMatch(/"rodenMaterial", "KString", "", "U", "Roble Kendal 18mm MDP"/);
+  });
+});

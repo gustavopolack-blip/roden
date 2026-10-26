@@ -2,7 +2,7 @@
  * Biblioteca de materiales del 3D: qué material toma cada placa y cómo se apoya la textura.
  */
 import { describe, it, expect } from 'vitest';
-import { matchMaterial, texturedBox, roughnessFor, LibraryMaterial } from '../utils/furniture3d/materialLibrary';
+import { matchMaterial, pieceMaterial, texturedBox, roughnessFor, LibraryMaterial } from '../utils/furniture3d/materialLibrary';
 
 const mat = (name: string, over: Partial<LibraryMaterial> = {}): LibraryMaterial => ({
   id: name, name, kind: 'MELAMINA', color: '#cccccc', texture_path: 'x.jpg', texture_width_mm: 1000, texture_height_mm: 500,
@@ -65,5 +65,14 @@ describe('importar varias: nombre y marca desde el archivo', () => {
     expect(parseTextureFileName('EGGER H1145 ST10 ROBLE BARDOLINO.png')).toEqual({ name: 'H1145 ST10 Roble Bardolino', brand: 'Egger' });
     expect(parseTextureFileName('Nogal Lincoln.jpeg')).toEqual({ name: 'Nogal Lincoln', brand: null });
     expect(parseTextureFileName('Gris Grafito_Faplac.webp')).toEqual({ name: 'Gris Grafito', brand: 'Faplac' });
+  });
+});
+
+describe('material de una pieza (pieceMaterial)', () => {
+  const lib = [mat('Roble Kendal'), mat('Nogal Terracota')];
+  it('el elegido en el constructor manda sobre la placa; si ya no está en la biblioteca, vuelve a la placa', () => {
+    expect(pieceMaterial({ finish: 'Nogal Terracota', boardLabel: 'Roble Kendal 18mm MDF' }, lib)?.name).toBe('Nogal Terracota');
+    expect(pieceMaterial({ finish: 'Borrado', boardLabel: 'Roble Kendal 18mm MDF' }, lib)?.name).toBe('Roble Kendal');
+    expect(pieceMaterial({ boardLabel: 'Melamina Color 18mm MDP' }, lib)).toBeNull();
   });
 });

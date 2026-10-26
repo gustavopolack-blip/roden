@@ -5,9 +5,10 @@
  * Cada pieza toma el material cuyo nombre aparece en su placa (la etiqueta del despiece, ej.
  * "Roble Kendal 18mm MDF" → "Roble Kendal"). Si varios coinciden, gana el nombre más largo
  * ("Roble Kendal Natural" antes que "Roble Kendal"). Sin coincidencia, la pieza conserva el color
- * de referencia de siempre.
+ * de referencia de siempre. En el constructor se puede elegir el material de estructura y frentes de
+ * cada módulo (`material3d`): ese manda sobre el de la placa.
  */
-import { Vec3 } from './geometry';
+import { Piece3D, Vec3 } from './geometry';
 import { boxMesh } from './exporters';
 
 export type MaterialKind = 'MELAMINA' | 'LACA' | 'ENCHAPADO';
@@ -43,6 +44,10 @@ export const matchMaterial = (boardLabel: string, library: LibraryMaterial[]): L
   });
   return best;
 };
+
+/** Material de una pieza: el elegido en el constructor (si sigue en la biblioteca) o el de su placa. */
+export const pieceMaterial = (p: Pick<Piece3D, 'finish' | 'boardLabel'>, library: LibraryMaterial[]): LibraryMaterial | null =>
+  (p.finish ? matchMaterial(p.finish, library) : null) || matchMaterial(p.boardLabel, library);
 
 /** Rugosidad del material (three.js) según el brillo cargado: mate 0,9 … brillante 0,15. */
 export const roughnessFor = (m: Pick<LibraryMaterial, 'gloss'>): number => 0.9 - 0.75 * Math.min(1, Math.max(0, m.gloss));

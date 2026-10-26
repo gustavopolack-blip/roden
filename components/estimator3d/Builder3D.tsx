@@ -211,6 +211,13 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
     setDrafts(prev => ({ ...prev, [active.id]: prev[active.id].map((m: any, i) => { if (i !== idx) return m; const { layout3dCopies, ...rest } = m; return rest; }) }));
     setDirty(true);
   };
+  /** Material de la biblioteca para estructura / frentes (solo dibujo). idx null = todos los módulos. */
+  const setMaterial3d = (idx: number | null, material3d: { structure?: string; fronts?: string }) => {
+    const value = material3d.structure || material3d.fronts ? material3d : undefined;
+    setDrafts(prev => ({ ...prev, [active.id]: prev[active.id].map((m: any, i) => (idx === null || i === idx) ? { ...m, material3d: value } : m) }));
+    setDirty(true);
+  };
+  const libraryOptions = useMemo(() => [...library].sort((a, b) => a.name.localeCompare(b.name, 'es')), [library]);
   /**
    * Giro en su lugar: la caja girada arranca en la misma esquina (mínimo X/Y/Z) que antes, así no
    * se mete en el vecino ni baja del piso.
@@ -462,6 +469,31 @@ const Builder3D: React.FC<Builder3DProps> = ({ furnitures, readOnly = false, onA
                       <option value="RIGHT">Derecha</option>
                     </select>
                   </label>
+                )}
+
+                {!isManualModule(selMod) && (
+                  <div>
+                    <span className="text-[10px] text-gray-500 uppercase font-bold">Material 3D (solo dibujo)</span>
+                    {libraryOptions.length === 0 ? (
+                      <p className="text-[10px] text-gray-400 mt-1">La biblioteca está vacía: cargá materiales en Configuración → Materiales 3D.</p>
+                    ) : (<>
+                      {([['structure', 'Estructura', 'Según la placa'], ['fronts', 'Frentes', 'Igual a estructura']] as const).map(([k, label, none]) => (
+                        <label key={k} className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-gray-500 w-16 shrink-0">{label}</span>
+                          <select disabled={!editable} className="flex-1 min-w-0 border border-gray-200 p-1.5 rounded text-xs"
+                            value={selMod.material3d?.[k] || ''}
+                            onChange={e => setMaterial3d(selModIndex, { ...selMod.material3d, [k]: e.target.value || undefined })}>
+                            <option value="">{none}</option>
+                            {libraryOptions.map(m => <option key={m.id} value={m.name}>{m.name}{m.brand ? ` (${m.brand})` : ''}</option>)}
+                          </select>
+                        </label>
+                      ))}
+                      {editable && modules.length > 1 && (
+                        <button onClick={() => setMaterial3d(null, { ...selMod.material3d })} className="mt-2 text-[11px] text-indigo-600 hover:underline block">Aplicar estos materiales a todo el mueble</button>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-1">No cambia el despiece ni el costo. Cajones de 15 mm y fondos blancos quedan como están.</p>
+                    </>)}
+                  </div>
                 )}
 
                 <div>
