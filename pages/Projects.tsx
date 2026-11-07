@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Project, ProjectStatus, QuotingColor, Client, User, ProductionStep, ProductionOrder } from '../types';
-import { generateChecklist } from '../services/geminiService';
+import { generateChecklist } from '../services/aiService';
 import { Plus, MoreHorizontal, Calendar, CheckSquare, Loader2, Filter, HardDrive, X, Pencil, Search, Hammer, Check, Archive, Clock, AlertCircle, Calculator, Zap, FileText, Link2, Bell } from 'lucide-react';
 import RodenAIButton from '../components/RodenAIButton';
 import { translateProductionStep } from '../translations';

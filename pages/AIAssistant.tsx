@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BusinessData, User } from '../types';
-import { askRodenAI } from '../services/geminiService';
+import { askRodenAI } from '../services/aiService';
 import { Sparkles, Send, Bot, User as UserIcon, ArrowUp, Trash2, Zap } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import RodenAIButton from '../components/RodenAIButton';

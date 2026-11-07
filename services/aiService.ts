@@ -2,24 +2,22 @@
 import { BusinessData } from '../types';
 import { supabase } from './supabaseClient';
 
-// All Gemini calls are proxied through the Vercel serverless function.
-// The API key is stored server-side in process.env.GEMINI_API_KEY and is
-// never exposed in the frontend bundle.
+// All AI calls (OpenAI / ChatGPT models) are proxied through the Vercel serverless
+// function api/ai. The API key is stored server-side in process.env.OPENAI_API_KEY
+// and is never exposed in the frontend bundle.
 // IMPORTANT: the app is served under /os/ (rodenmobel.com/os). Calling
-// '/api/gemini' from there hits the PUBLIC WEBSITE project, not this one.
+// '/api/ai' from there hits the PUBLIC WEBSITE project, not this one.
 // BASE_URL ('/os/') + the vercel.json rewrite (/os/* -> /*) routes it here.
 
-const GEMINI_ENDPOINT = `${import.meta.env.BASE_URL}api/gemini`;
+const AI_ENDPOINT = `${import.meta.env.BASE_URL}api/ai`;
 
-const callGemini = async (payload: {
+const callAI = async (payload: {
   systemInstruction: string;
   userMessage: string;
-  temperature?: number;
-  responseMimeType?: string;
 }): Promise<string> => {
-  // api/gemini solo atiende a usuarios con sesión: se manda el token de Supabase.
+  // api/ai solo atiende a usuarios con sesión: se manda el token de Supabase.
   const { data: { session } } = await supabase.auth.getSession();
-  const response = await fetch(GEMINI_ENDPOINT, {
+  const response = await fetch(AI_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -195,10 +193,9 @@ export const runContextualAnalysis = async (
       ${dataString}
     `;
 
-    return await callGemini({
+    return await callAI({
       systemInstruction,
       userMessage: `Ejecutá el análisis para el modo: ${mode}`,
-      temperature: 0.1,
     });
   } catch (error) {
     console.error('Contextual Analysis Error:', error);
@@ -231,10 +228,9 @@ export const askRodenAI = async (query: string, data: BusinessData): Promise<str
       Responde a la consulta del usuario basándote en estos datos.
     `;
 
-    return await callGemini({
+    return await callAI({
       systemInstruction,
       userMessage: query,
-      temperature: 0.2,
     });
   } catch (error) {
     console.error('Roden AI Error:', error);
@@ -244,12 +240,12 @@ export const askRodenAI = async (query: string, data: BusinessData): Promise<str
 
 export const generateChecklist = async (projectType: string): Promise<string[]> => {
   try {
-    const text = await callGemini({
+    const text = await callAI({
       systemInstruction: '',
       userMessage: `Genera una lista de control de producción de alto nivel de 5 ítems para un proyecto de "${projectType}" en una carpintería de alta gama. Devuelve SOLO un array JSON de strings en Español.`,
-      responseMimeType: 'application/json',
     });
-    return JSON.parse(text);
+    // El modelo a veces envuelve el JSON en texto o en ```json: se toma el primer array.
+    return JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] ?? text);
   } catch (error) {
     console.error('Checklist Gen Error:', error);
     return ['Medición en obra', 'Pedido de materiales', 'Corte de placas', 'Ensamblaje', 'Control de Calidad'];

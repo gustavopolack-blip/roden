@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Zap, X, Loader2, CheckSquare, Square } from 'lucide-react';
-import { runContextualAnalysis } from '../services/geminiService';
+import { runContextualAnalysis } from '../services/aiService';
 
 interface RodenAIButtonProps {
   mode: 'clientes_cartera' | 'proyectos_atencion' | 'estimador_revision' | 'historial_diagnostico' | 'taller_checklist' | 'proveedores_costos' | 'finanzas_lectura' | 'dashboard_briefing';

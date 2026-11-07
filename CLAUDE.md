@@ -54,13 +54,13 @@ AIAssistant, Settings, Login.
 ## Stack
 
 React 19 + TypeScript (~5.8) + Vite 6 + Supabase (PostgreSQL + Auth + Realtime) +
-Google Gemini AI. Deploy en Vercel. **Sin backend propio**: el cliente habla directo con
-Supabase. Hay funciones serverless en `api/` (gemini.ts) y un `server.ts` experimental.
+OpenAI (modelos de ChatGPT) para la IA. Deploy en Vercel. **Sin backend propio**: el cliente habla
+directo con Supabase. Hay funciones serverless en `api/` (ai.ts, health.ts) y un `server.ts` experimental.
 
 Variables de entorno (prefijo `VITE_` obligatorio, acceder con `import.meta.env.VITE_*`,
 NUNCA `process.env.*` en código de cliente):
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. La key de Gemini es `GEMINI_API_KEY` **sin**
-`VITE_` (solo la lee `api/gemini.ts` en Vercel); con `VITE_` quedaría pública en el bundle.
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. La IA usa `OPENAI_API_KEY` y `OPENAI_MODEL` **sin**
+`VITE_` (solo las lee `api/ai.ts` en Vercel); con `VITE_` la clave quedaría pública en el bundle.
 Nunca poner un secreto detrás de `VITE_`.
 
 ## Flujo de trabajo entre computadoras (LEER SIEMPRE)
@@ -90,7 +90,7 @@ Después de mergear un PR: `git checkout main && git pull` en cada máquina. No 
 trabajando sobre una rama ya mergeada: para el próximo cambio, rama nueva desde `main`.
 
 `.env` NO está en el repo (está en `.gitignore`, correcto). Para correr local:
-`cp .env.example .env` (ya trae URL + anon key de Supabase). La key de Gemini vive del
+`cp .env.example .env` (ya trae URL + anon key de Supabase). La clave de OpenAI vive del
 lado servidor en Vercel.
 
 ## Contratos irrompibles (romperlos = regresiones serias)
