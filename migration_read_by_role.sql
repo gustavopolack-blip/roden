@@ -1,4 +1,4 @@
--- Lecturas por rol en la base — 7/11/2026 (PENDIENTE: todavía no aplicado en producción).
+-- Lecturas por rol en la base — 7/11/2026 (aplicado en producción).
 --
 -- Antes: cualquier usuario con sesión leía todas las tablas (políticas *_read_auth con true). La
 -- pantalla ocultaba datos, pero un operario podía leer clientes, precios, presupuestos y pagos
