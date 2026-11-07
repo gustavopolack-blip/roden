@@ -61,6 +61,7 @@ import {
 } from './utils/dataMapper';
 import { Loader2, Menu, ShieldAlert, RefreshCw, X, ShieldCheck, Fingerprint } from 'lucide-react';
 import NotificationBell from './components/NotificationBell';
+import MfaScreen from './components/MfaScreen';
 import { emitNotification } from './utils/notificationHelpers';
 import { Session } from '@supabase/supabase-js';
 import {
@@ -243,6 +244,18 @@ const App: React.FC = () => {
     if (hasBiometricCredential() && !sessionStorage.getItem('roden_biometric_unlocked')) {
       setBiometricLocked(true);
     }
+  }, [session]);
+
+  // ── Verificación en dos pasos (MFA) ─────────────────────────────────────────
+  // Si el usuario activó el código (Configuración → Seguridad) y la sesión solo pasó la contraseña,
+  // se pide el código antes de mostrar la app. La base no entrega datos hasta entonces
+  // (migration_mfa_enforcement.sql), así que al verificar se recargan.
+  const [mfaRequired, setMfaRequired] = useState(false);
+  useEffect(() => {
+    if (!session) { setMfaRequired(false); return; }
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
+      setMfaRequired(data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2');
+    });
   }, [session]);
 
   const handleBiometricUnlock = async () => {
@@ -1478,6 +1491,8 @@ const App: React.FC = () => {
         />
       ) : !session ? (
         <Login />
+      ) : mfaRequired ? (
+        <MfaScreen onVerified={() => { setMfaRequired(false); fetchData(); }} onLogout={handleForceReset} />
       ) : !currentUser ? (
         /* Sesión activa pero perfil cargando */
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white">

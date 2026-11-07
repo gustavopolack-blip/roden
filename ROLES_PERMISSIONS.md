@@ -43,3 +43,18 @@ Rol enfocado estrictamente en la ejecución y visualización de trabajo activo.
 - **Informes:** Acceso total a métricas de rendimiento, excepto eliminar.
 
 - **Restricción Global:** NO tiene acceso a otros módulos (Proveedores, Finanzas, Presupuestos, etc.). generar un archivo roles_permissions.md
+## Control en la base (Supabase)
+
+Desde el 7/11/2026 la base aplica estos permisos también a las lecturas, no solo la pantalla
+(`migration_read_by_role.sql`):
+
+| Tabla | Administrador | Gerente | Operario |
+|---|---|---|---|
+| Obras (projects) | todas | todas menos canceladas | en producción, listas y terminadas |
+| Clientes | todos | los de sus obras visibles | los de sus obras visibles |
+| Pagos a proveedores | todos | solo proveedor "Taller" | ninguno |
+| Proveedores | todos | todos | ninguno |
+| Presupuestos, listas de precios, plantillas, finanzas | todo | nada | nada |
+
+Verificación en dos pasos (`migration_mfa_enforcement.sql`): quien la activa en Configuración →
+Seguridad no recibe datos hasta ingresar el código de 6 dígitos.
