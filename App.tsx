@@ -50,7 +50,7 @@ import {
 import { supabase } from './services/supabaseClient';
 import {
   projectFromDB, projectToDB,
-  userFromDB, userToDB,
+  userFromDB,
   taskFromDB, taskToDB,
   clientFromDB, clientToDB,
   supplierPaymentFromDB, supplierPaymentToDB,
@@ -1213,17 +1213,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddUser = async (newUser: User) => {
-    try {
-      const { error } = await supabase.from('users').insert(userToDB(newUser));
-      if (error) throw error;
-      fetchData();
-    } catch (err: any) {
-      console.error('Error creando usuario:', err);
-      alert(`Error: ${err.message}`);
-    }
-  };
-
   // ────────────────────────────────────────────────
   // Renderizado de páginas
   // ────────────────────────────────────────────────
@@ -1408,7 +1397,7 @@ const App: React.FC = () => {
             />
           } />
 
-          <Route path="/staff" element={<Staff users={users} onAddUser={handleAddUser} />} />
+          <Route path="/staff" element={<Staff users={users} />} />
 
           <Route path="/marketing" element={<Marketing />} />
 

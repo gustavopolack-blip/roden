@@ -29,6 +29,7 @@
   },
   "exclude": [
     "node_modules",
-    "edge-function-crear-evento-calendario.ts"
+    "edge-function-crear-evento-calendario.ts",
+    "edge-function-crear-usuario.ts"
   ]
 }

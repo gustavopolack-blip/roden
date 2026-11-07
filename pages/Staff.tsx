@@ -8,10 +8,9 @@ import { createClient } from '@supabase/supabase-js';
 
 interface StaffProps {
   users: User[];
-  onAddUser: (user: User) => void;
 }
 
-const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
+const Staff: React.FC<StaffProps> = ({ users }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -128,64 +127,28 @@ const Staff: React.FC<StaffProps> = ({ users, onAddUser }) => {
               if (error) throw error;
               window.location.reload();
           } else {
-              // CREATE MODE - ADMIN CREA USUARIO CON PASSWORD
-              
-              // 2. Crear usuario en Auth (Auth.users)
-              // NOTA: En un entorno cliente real, no podemos crear usuarios con contraseña directamente sin ser admin (service_role).
-              // La única forma segura desde el cliente es invitar al usuario o usar una Edge Function.
-              // Sin embargo, para este prototipo, intentaremos usar signUp. Si hay sesión activa, esto podría fallar o cambiar la sesión actual.
-              // La solución correcta es usar una segunda instancia de cliente PERO eso requiere anon key y no tiene permisos de admin.
-              // Por lo tanto, la creación de usuarios debe hacerse desde el panel de Supabase o mediante una función backend.
-              
-              // INTENTO DE SOLUCIÓN HÍBRIDA:
-              // Usamos signUp. Si funciona, genial. Si no, avisamos.
-              // ADVERTENCIA: signUp iniciará sesión automáticamente con el nuevo usuario, cerrando la del admin.
-              // Para evitar esto, deberíamos usar una Edge Function. Como no tenemos, avisaremos al usuario.
-
-              alert("AVISO: Al crear un usuario desde aquí, se cerrará tu sesión actual y quedarás logueado como el nuevo usuario. Esto es una limitación de seguridad de Supabase en el lado del cliente. Deberás volver a iniciar sesión como administrador.");
-
-              const { data: authData, error: authError } = await supabase.auth.signUp({
-                  email: formData.email,
-                  password: formData.password,
-                  options: {
-                      data: {
-                          name: formData.name,
-                          role: formData.role
-                      }
-                  }
+              // CREATE MODE - el administrador crea el usuario con contraseña.
+              // Edge Function "crear-usuario" (edge-function-crear-usuario.ts): verifica que quien
+              // llama sea administrador, crea el usuario con la clave de servicio (no cierra esta
+              // sesión) y fija el rol del lado servidor. El trigger on_auth_user_created crea el
+              // perfil en public.users con ese rol.
+              const { data: created, error: fnError } = await supabase.functions.invoke('crear-usuario', {
+                  body: {
+                      email: formData.email,
+                      password: formData.password,
+                      name: formData.name,
+                      phone: formData.phone,
+                      role: formData.role,
+                  },
               });
-
-              if (authError) {
-                  if (authError.message.includes("already registered")) {
-                       // Si ya existe en Auth, intentamos crear solo el perfil en public.users
-                       // Pero necesitamos el ID. No podemos obtenerlo sin loguearnos.
-                       // Asumimos que el usuario debe contactar soporte o el admin debe borrarlo.
-                       throw new Error("El usuario ya existe en Auth. Por favor, bórralo desde el panel de Supabase o usa otro email.");
-                  }
-                  throw authError;
+              if (fnError) {
+                  // El mensaje útil viene en el cuerpo de la respuesta (ej.: "User already registered").
+                  const detail = await (fnError as any).context?.json?.().catch(() => null);
+                  throw new Error(detail?.error || fnError.message);
               }
-              
-              if (!authData.user) throw new Error("No se pudo crear el usuario en Auth.");
-              
-              // 3. Crear perfil en Public (Public.users) - ELIMINADO
-              // Ahora confiamos en el trigger on_auth_user_created definido en migration_auth_trigger.sql
-              // para insertar automáticamente en public.users al crear el usuario en Auth.
-              
-              // Simulamos el objeto User para actualizar la UI inmediatamente (optimistic update)
-              const newUserProfile: User = {
-                  id: authData.user.id,
-                  name: formData.name,
-                  email: formData.email || '',
-                  phone: formData.phone,
-                  role: formData.role,
-                  status: formData.status,
-                  joinedDate: formData.joinedDate,
-                  avatarInitials: formData.name.substring(0, 2).toUpperCase()
-              };
-              
-              onAddUser(newUserProfile);
-              alert(`Usuario creado exitosamente.\n\nEmail: ${formData.email}\n\nTu sesión se ha cerrado automáticamente por seguridad. Por favor, vuelve a ingresar con tu cuenta de administrador.`);
-              window.location.reload(); // Recargar para forzar login de nuevo o manejar el estado
+              if (!created?.id) throw new Error("No se pudo crear el usuario.");
+
+              window.location.reload();
               setIsModalOpen(false);
           }
       } catch (error: any) {
