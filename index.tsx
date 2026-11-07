@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
+import { initMonitoring } from './services/monitoring';
+
+initMonitoring();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
