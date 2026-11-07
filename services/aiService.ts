@@ -199,7 +199,7 @@ export const runContextualAnalysis = async (
     });
   } catch (error) {
     console.error('Contextual Analysis Error:', error);
-    return 'Error en la conexión con rødën AI. Reintentá en unos momentos.';
+    return `Error en la conexión con rødën AI: ${(error as Error)?.message || 'sin detalle'}`;
   }
 };
 
@@ -234,7 +234,7 @@ export const askRodenAI = async (query: string, data: BusinessData): Promise<str
     });
   } catch (error) {
     console.error('Roden AI Error:', error);
-    return 'Error en la conexión con rødën AI. Reintentá en unos momentos.';
+    return `Error en la conexión con rødën AI: ${(error as Error)?.message || 'sin detalle'}`;
   }
 };
 
