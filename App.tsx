@@ -48,6 +48,7 @@ import {
 } from './types';
 
 import { supabase } from './services/supabaseClient';
+import { reportError } from './services/monitoring';
 import {
   projectFromDB, projectToDB,
   userFromDB,
@@ -372,8 +373,10 @@ const App: React.FC = () => {
       results.forEach((res, index) => {
         if (res.status === 'rejected') {
           console.error(`[fetchData] Table fetch ${index} failed:`, res.reason);
+          reportError(res.reason, { where: 'fetchData', table: index });
         } else if (res.status === 'fulfilled' && res.value.error) {
           console.error(`[fetchData] Table fetch ${index} returned Supabase error:`, res.value.error);
+          reportError(new Error(res.value.error.message), { where: 'fetchData', table: index, code: res.value.error.code });
           if (res.value.error.message?.includes('permission denied')) {
             hasPermissionError = true;
           }
@@ -475,6 +478,7 @@ const App: React.FC = () => {
       if (plRes.status === 'fulfilled' && plRes.value.data) setPriceLists(plRes.value.data);
     } catch (err: any) {
       console.error('[fetchData] Error cargando datos:', err);
+      reportError(err, { where: 'fetchData' });
       if (err.message?.includes('Timeout') || err.message?.includes('timeout')) {
         setDbError('La base de datos está pausada o no responde. Por favor, reintenta en un momento.');
       } else if (err.code === '42501' || (err.message && err.message.includes('permission denied'))) {
