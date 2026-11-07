@@ -1,7 +1,9 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
-const GCAL_MCP_URL = 'https://gcal.mcp.claude.com/mcp';
+// Edge Function de Supabase "crear-evento-calendario" (proyecto rødën Sistema Operativo).
+// Crea un evento en el Google Calendar de quien llama, con el token de Google que manda.
+// Hoy la app no la usa (Notas abre Google Calendar con un enlace); se conserva por si se retoma.
+// Solo atiende a usuarios con sesión de rødën OS (7/11/2026): antes estaba abierta a cualquiera.
+// Este archivo es la versión desplegada; el anterior del repo (vía Anthropic) estaba desactualizado.
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -9,92 +11,88 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
+  // Sesión de un usuario (no alcanza con la clave publicable, que va en la app).
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!);
+  const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  const { data: auth } = await supabase.auth.getUser(token);
+  if (!auth?.user) {
+    return new Response(JSON.stringify({ ok: false, error: 'Sesión inválida' }), {
+      status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    const { titulo, fechaInicio, fechaFin, descripcion } = await req.json();
+    const { titulo, fechaInicio, fechaFin, descripcion, googleToken } = await req.json();
+
     if (!titulo || !fechaInicio || !fechaFin) {
       return new Response(JSON.stringify({ ok: false, error: 'Faltan campos requeridos' }), {
-        headers: { ...cors, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
 
-    const prompt = `Creá un evento en Google Calendar con estos datos exactos:
-- Título: "${titulo}"
-- Inicio: ${fechaInicio} (zona horaria America/Argentina/Buenos_Aires)
-- Fin: ${fechaFin} (zona horaria America/Argentina/Buenos_Aires)
-- Descripción: "${descripcion || 'Creado desde rødën OS'}"
+    if (!googleToken) {
+      return new Response(JSON.stringify({ ok: false, error: 'Token de Google no disponible. Cerrá sesión y volvé a entrar con Google.' }), {
+        status: 400, headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
 
-Usá gcal_create_event con calendarId "primary" y sendUpdates "none".
-Respondé SOLO con JSON válido, sin texto extra: {"ok": true, "link": "<htmlLink>"} o {"ok": false, "error": "<mensaje>"}.`;
-
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'mcp-client-2025-04-04',
+    // Construir evento para Google Calendar API
+    const event = {
+      summary: titulo,
+      description: descripcion || 'Creado desde rødën OS',
+      start: {
+        dateTime: `${fechaInicio}-03:00`,
+        timeZone: 'America/Argentina/Buenos_Aires',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        mcp_servers: [{ type: 'url', url: GCAL_MCP_URL, name: 'gcal' }],
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+      end: {
+        dateTime: `${fechaFin}-03:00`,
+        timeZone: 'America/Argentina/Buenos_Aires',
+      },
+    };
 
-    const data = await res.json();
+    // Llamar a Google Calendar API directamente con el token del usuario
+    const calRes = await fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      }
+    );
 
-    if (!res.ok) {
-      const errMsg = data?.error?.message || res.statusText;
-      return new Response(JSON.stringify({ ok: false, error: `Error API: ${errMsg}` }), {
+    const calData = await calRes.json();
+
+    if (!calRes.ok) {
+      const errMsg = calData?.error?.message || calRes.statusText;
+      // Token expirado
+      if (calRes.status === 401) {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: 'Sesión de Google expirada. Cerrá sesión y volvé a entrar con Google.'
+        }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ ok: false, error: errMsg }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
 
-    const text = (data.content || [])
-      .filter((b: any) => b.type === 'text')
-      .map((b: any) => b.text)
-      .join('');
-
-    // Intentar extraer JSON de la respuesta
-    const jsonMatch = text.match(/\{[\s\S]*?\}/);
-    if (jsonMatch) {
-      try {
-        const result = JSON.parse(jsonMatch[0]);
-        return new Response(JSON.stringify(result), {
-          headers: { ...cors, 'Content-Type': 'application/json' },
-        });
-      } catch (_) {}
-    }
-
-    // Fallback: buscar htmlLink en tool results
-    const toolResults = (data.content || []).filter((b: any) => b.type === 'mcp_tool_result');
-    for (const tr of toolResults) {
-      const resultText = tr?.content?.[0]?.text || '';
-      if (resultText.includes('htmlLink')) {
-        const linkMatch = resultText.match(/https:\/\/www\.google\.com\/calendar\/event[^\s"]+/);
-        return new Response(JSON.stringify({ ok: true, link: linkMatch?.[0] || '' }), {
-          headers: { ...cors, 'Content-Type': 'application/json' },
-        });
-      }
-      if (resultText.includes('"id"') && resultText.includes('"summary"')) {
-        return new Response(JSON.stringify({ ok: true, link: '' }), {
-          headers: { ...cors, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    return new Response(JSON.stringify({ ok: false, error: 'No se pudo crear el evento' }), {
+    return new Response(JSON.stringify({
+      ok: true,
+      link: calData.htmlLink || '',
+      eventId: calData.id,
+    }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
 
   } catch (e: any) {
     return new Response(JSON.stringify({ ok: false, error: e.message }), {
-      status: 500,
-      headers: { ...cors, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 });
