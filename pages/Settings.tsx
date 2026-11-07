@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Save, Bell, Lock, Globe, Database, Building2, RefreshCw, Tag, Trash2, CheckCircle, Circle, Palette } from 'lucide-react';
 import MaterialLibrary from '../components/MaterialLibrary';
+import TwoFactorSettings from '../components/TwoFactorSettings';
 
 interface SettingsProps {
     onLoadDemoData?: () => void;
@@ -203,13 +204,7 @@ const Settings: React.FC<SettingsProps> = ({ onLoadDemoData, priceLists = [], on
 
              {activeTab === 'materials' && <MaterialLibrary />}
 
-             {activeTab === 'security' && (
-                <div className="bg-white border border-gray-200 rounded-xl p-12 shadow-sm flex flex-col items-center justify-center text-center animate-fade-in h-64">
-                    <Lock size={48} className="text-gray-300 mb-4" />
-                    <h3 className="text-lg font-bold text-gray-400">Configuración Avanzada</h3>
-                    <p className="text-sm text-gray-400 mt-2">Esta sección está restringida en la versión demo.</p>
-                </div>
-            )}
+             {activeTab === 'security' && <TwoFactorSettings />}
 
         </div>
       </div>
